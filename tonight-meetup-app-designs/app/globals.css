@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 235 22% 24%;
+    --foreground: 220 20% 94%;
+    --card: 235 18% 30%;
+    --card-foreground: 220 20% 94%;
+    --popover: 235 18% 30%;
+    --popover-foreground: 220 20% 94%;
+    --primary: 168 65% 52%;
+    --primary-foreground: 235 25% 12%;
+    --secondary: 235 15% 34%;
+    --secondary-foreground: 220 20% 94%;
+    --muted: 235 15% 34%;
+    --muted-foreground: 230 12% 60%;
+    --accent: 168 65% 52%;
+    --accent-foreground: 235 25% 12%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 220 20% 94%;
+    --border: 235 12% 36%;
+    --input: 235 12% 36%;
+    --ring: 168 65% 52%;
+    --chart-1: 168 65% 52%;
+    --chart-2: 200 65% 55%;
+    --chart-3: 340 65% 58%;
+    --chart-4: 43 74% 60%;
+    --chart-5: 262 52% 60%;
+    --radius: 1rem;
+    --sidebar-background: 235 18% 30%;
+    --sidebar-foreground: 220 20% 94%;
+    --sidebar-primary: 168 65% 52%;
+    --sidebar-primary-foreground: 235 25% 12%;
+    --sidebar-accent: 235 15% 34%;
+    --sidebar-accent-foreground: 220 20% 94%;
+    --sidebar-border: 235 12% 36%;
+    --sidebar-ring: 168 65% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  background: linear-gradient(155deg, hsl(250 26% 26%) 0%, hsl(235 22% 23%) 50%, hsl(220 24% 22%) 100%);
+  min-height: 100dvh;
+}
