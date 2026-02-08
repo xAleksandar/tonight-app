@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Flag, Info, Send, ShieldAlert } from 'lucide-react';
 
+import MessageList, { type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
@@ -27,8 +28,6 @@ export type ChatConversationContext = {
   };
 };
 
-const classNames = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
-
 const STATUS_LABELS: Record<string, string> = {
   connected: 'Live updates active',
   connecting: 'Connecting…',
@@ -36,7 +35,7 @@ const STATUS_LABELS: Record<string, string> = {
   error: 'Realtime unavailable',
 };
 
-type MessagesStatus = 'loading' | 'ready' | 'error';
+type MessagesStatus = MessageListStatus;
 
 type ChatConversationProps = {
   joinRequestId: string;
@@ -80,21 +79,6 @@ const formatDateTime = (value: string) => {
   }
 };
 
-const formatMessageTimestamp = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
-  } catch {
-    return date.toLocaleTimeString();
-  }
-};
-
 export default function ChatConversation({
   joinRequestId,
   currentUserId,
@@ -109,7 +93,6 @@ export default function ChatConversation({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending'>('idle');
   const [socketNotice, setSocketNotice] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   const counterpart = useMemo(() => {
@@ -189,13 +172,6 @@ export default function ChatConversation({
     joinRoom(joinRequestId);
   }, [isConnected, joinRequestId, joinRoom]);
 
-  useEffect(() => {
-    if (!scrollRef.current) {
-      return;
-    }
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
-
   const handleSend = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -242,69 +218,6 @@ export default function ChatConversation({
   const connectionLabel = STATUS_LABELS[connectionState] ?? 'Connecting…';
   const connectionAccent = connectionState === 'connected' ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : connectionState === 'error' ? 'text-rose-600 border-rose-100 bg-rose-50' : 'text-amber-600 border-amber-100 bg-amber-50';
   const connectionDot = connectionState === 'connected' ? 'bg-emerald-500' : connectionState === 'error' ? 'bg-rose-500' : 'bg-amber-500 animate-pulse';
-
-  const renderMessages = () => {
-    if (messagesStatus === 'loading') {
-      return (
-        <div className="space-y-3" role="status" aria-live="polite">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-16 w-full animate-pulse rounded-2xl bg-zinc-100" />
-          ))}
-        </div>
-      );
-    }
-
-    if (messagesStatus === 'error') {
-      return (
-        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
-          <p>{messagesError ?? 'We could not load this conversation.'}</p>
-          <button
-            type="button"
-            onClick={() => fetchMessages().catch(() => {})}
-            className="mt-3 rounded-full border border-current px-4 py-2 text-xs font-semibold uppercase tracking-wide"
-          >
-            Try again
-          </button>
-        </div>
-      );
-    }
-
-    if (!messages.length) {
-      return (
-        <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-4 py-6 text-center text-sm text-zinc-500">
-          No messages yet. Break the ice with a quick hello.
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col gap-3" aria-live="polite">
-        {messages.map((message) => {
-          const isSelf = message.senderId === currentUserId;
-          return (
-            <div
-              key={message.id}
-              className={classNames('flex flex-col gap-1', isSelf ? 'items-end' : 'items-start')}
-            >
-              <div
-                className={classNames(
-                  'max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
-                  isSelf
-                    ? 'rounded-br-md bg-pink-600 text-white'
-                    : 'rounded-bl-md border border-zinc-100 bg-white text-zinc-900'
-                )}
-              >
-                {message.content}
-              </div>
-              <span className="px-2 text-[10px] uppercase tracking-wide text-zinc-400">
-                {formatMessageTimestamp(message.createdAt)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-zinc-50 via-white to-zinc-100 text-zinc-900">
@@ -360,9 +273,13 @@ export default function ChatConversation({
           </div>
 
           <div className="flex flex-1 flex-col">
-            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-6 py-6" aria-live="polite">
-              {renderMessages()}
-            </div>
+            <MessageList
+              status={messagesStatus}
+              error={messagesError}
+              messages={messages}
+              currentUserId={currentUserId}
+              onRetry={() => fetchMessages().catch(() => {})}
+            />
 
             <div className="flex items-center justify-center gap-4 border-t border-zinc-100 bg-zinc-50/80 px-6 py-3 text-[11px] text-zinc-500">
               <button

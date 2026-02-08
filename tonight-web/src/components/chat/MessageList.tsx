@@ -1,0 +1,125 @@
+"use client";
+
+import { useEffect, useMemo, useRef } from 'react';
+
+import type { SerializedMessage } from '@/lib/chat';
+
+export type MessageListStatus = 'loading' | 'ready' | 'error';
+
+const classNames = (...classes: Array<string | boolean | null | undefined>) =>
+  classes.filter(Boolean).join(' ');
+
+type MessageListProps = {
+  status: MessageListStatus;
+  error?: string | null;
+  messages: SerializedMessage[];
+  currentUserId: string;
+  onRetry?: () => void;
+  className?: string;
+};
+
+export default function MessageList({
+  status,
+  error,
+  messages,
+  currentUserId,
+  onRetry,
+  className,
+}: MessageListProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const isLoading = status === 'loading';
+  const isError = status === 'error';
+  const isReady = status === 'ready';
+
+  useEffect(() => {
+    if (!scrollRef.current || !isReady) {
+      return;
+    }
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [isReady, messages]);
+
+  const content = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className="space-y-3" role="status" aria-live="polite">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-16 w-full animate-pulse rounded-2xl bg-zinc-100" />
+          ))}
+        </div>
+      );
+    }
+
+    if (isError) {
+      return (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
+          <p>{error ?? 'We could not load this conversation.'}</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-3 rounded-full border border-current px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+
+    if (!messages.length) {
+      return (
+        <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-4 py-6 text-center text-sm text-zinc-500">
+          No messages yet. Break the ice with a quick hello.
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-3" aria-live="polite">
+        {messages.map((message) => {
+          const isSelf = message.senderId === currentUserId;
+          return (
+            <div key={message.id} className={classNames('flex flex-col gap-1', isSelf ? 'items-end' : 'items-start')}>
+              <div
+                className={classNames(
+                  'max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
+                  isSelf
+                    ? 'rounded-br-md bg-pink-600 text-white'
+                    : 'rounded-bl-md border border-zinc-100 bg-white text-zinc-900'
+                )}
+              >
+                {message.content}
+              </div>
+              <span className="px-2 text-[10px] uppercase tracking-wide text-zinc-400">
+                {formatMessageTimestamp(message.createdAt)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }, [error, isError, isLoading, isReady, messages, currentUserId, onRetry]);
+
+  return (
+    <div
+      ref={scrollRef}
+      className={classNames('flex-1 space-y-4 overflow-y-auto px-6 py-6', className)}
+      aria-live={isLoading ? 'polite' : undefined}
+    >
+      {content}
+    </div>
+  );
+}
+
+const formatMessageTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toLocaleTimeString();
+  }
+};
