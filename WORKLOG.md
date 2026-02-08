@@ -43,13 +43,15 @@
 - Task 16.3: Harden geospatial block filtering (added bidirectional block parameter assertions in property suite) — Commit `c2aa6a6`.
 - Task 16.4: Update chat endpoints to check blocking. — Commit `dbc0bfc`.
 - Task 16.5: Create BlockUserButton component (confirmation popover, API orchestration, RTL coverage) — Commit `31c2443`.
+- Task 16.6: Add BlockUserButton to user profile and chat pages (profile safety card, chat action rail, composer blocking state) — Commit `8b7c9e0`.
+- Task 17.1: Create POST /api/reports (validation + service layer + authenticated route, npm test) — Commit `3d92986`.
 
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 16.6 — Add BlockUserButton to user profile and chat pages.
+- **Next priority:** Task 17.2 — Write property test for report creation.
 
 ## Next Up
-1. Task 16.6: Add BlockUserButton to user profile and chat pages.
-2. Task 17.1: Create POST /api/reports.
-3. Task 17.2: Write property test for report creation.
+1. Task 17.2: Write property test for report creation.
+2. Task 17.3: Create ReportModal component (user-facing report flow for events and profiles).
+3. Task 17.4: Add report functionality to event and user pages (surfaced buttons, modal wiring).
