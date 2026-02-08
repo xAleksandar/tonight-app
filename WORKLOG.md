@@ -31,8 +31,14 @@
 - Task 14.2: Set up Socket.IO server in Next.js (Node runtime API route that boots socketService and exposes readiness endpoint) — Commit `2c9ffc0`.
 - Task 14.3: Create Socket.IO client hook (hooks/useSocket.ts with authenticated connect/join/send helpers plus unit tests) — Commit `317f4f1`.
 - Task 15.1: Create GET /api/chat/[joinRequestId]/messages (chat service with access control + message serialization, authenticated API route) — Commit `b8e692a`.
+- Task 15.2: Write property tests for chat access control (Property 27 + 28 to ensure accepted hosts/participants pass and other statuses fail) — Commit `190e7fd`.
+
+## In Progress / Priority Notes
+- **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
+- **New priority:** Implement the welcome/login flow from the design package so the app boots into that screen before discovery.
 
 ## Next Up
-1. Task 15.2: Write property tests for chat access control.
-2. Task 15.3: Create POST /api/chat/[joinRequestId]/messages.
-3. Task 15.4: Write property tests for message storage and delivery.
+1. Task 15.3: Create POST /api/chat/[joinRequestId]/messages.
+2. Task 15.4: Write property tests for message storage and delivery.
+3. Task 15.5: Create chat page (app/chat/[joinRequestId]/page.tsx) powered by the new Socket.IO hook and POST/GET APIs.
+4. Task 15.6: Create MessageList component with scrollable bubbles + timestamps.
