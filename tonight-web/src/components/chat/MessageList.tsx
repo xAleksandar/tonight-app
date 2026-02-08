@@ -6,13 +6,23 @@ import type { SerializedMessage } from '@/lib/chat';
 
 export type MessageListStatus = 'loading' | 'ready' | 'error';
 
+export type ChatMessage = SerializedMessage & {
+  deliveryStatus?: 'queued' | 'sending' | 'failed';
+};
+
 const classNames = (...classes: Array<string | boolean | null | undefined>) =>
   classes.filter(Boolean).join(' ');
+
+const DELIVERY_STATUS_LABELS: Record<NonNullable<ChatMessage['deliveryStatus']>, string> = {
+  queued: 'Queued',
+  sending: 'Sending…',
+  failed: 'Failed to send',
+};
 
 type MessageListProps = {
   status: MessageListStatus;
   error?: string | null;
-  messages: SerializedMessage[];
+  messages: ChatMessage[];
   currentUserId: string;
   onRetry?: () => void;
   className?: string;
@@ -76,20 +86,26 @@ export default function MessageList({
       <div className="flex flex-col gap-3" aria-live="polite">
         {messages.map((message) => {
           const isSelf = message.senderId === currentUserId;
+          const bubbleClass = classNames(
+            'max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
+            message.deliveryStatus === 'failed'
+              ? 'border border-rose-200 bg-rose-50 text-rose-700'
+              : isSelf
+                ? 'rounded-br-md bg-pink-600 text-white'
+                : 'rounded-bl-md border border-zinc-100 bg-white text-zinc-900'
+          );
+          const statusLabel = message.deliveryStatus ? DELIVERY_STATUS_LABELS[message.deliveryStatus] : null;
+          const timestampLabel = formatMessageTimestamp(message.createdAt);
+          const metaLabel = statusLabel
+            ? [statusLabel, timestampLabel].filter(Boolean).join(' • ')
+            : timestampLabel;
+          const metaTone = message.deliveryStatus === 'failed' ? 'text-rose-500' : 'text-zinc-400';
+
           return (
             <div key={message.id} className={classNames('flex flex-col gap-1', isSelf ? 'items-end' : 'items-start')}>
-              <div
-                className={classNames(
-                  'max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
-                  isSelf
-                    ? 'rounded-br-md bg-pink-600 text-white'
-                    : 'rounded-bl-md border border-zinc-100 bg-white text-zinc-900'
-                )}
-              >
-                {message.content}
-              </div>
-              <span className="px-2 text-[10px] uppercase tracking-wide text-zinc-400">
-                {formatMessageTimestamp(message.createdAt)}
+              <div className={bubbleClass}>{message.content}</div>
+              <span className={classNames('px-2 text-[10px] uppercase tracking-wide', metaTone)}>
+                {metaLabel}
               </span>
             </div>
           );

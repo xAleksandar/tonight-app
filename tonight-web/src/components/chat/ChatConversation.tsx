@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Flag, Info, Send } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
-import MessageList, { type MessageListStatus } from '@/components/chat/MessageList';
+import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
@@ -35,6 +35,13 @@ const STATUS_LABELS: Record<string, string> = {
   connecting: 'Connecting…',
   idle: 'Offline',
   error: 'Realtime unavailable',
+  reconnecting: 'Reconnecting…',
+};
+
+type ConversationMessage = ChatMessage;
+type QueuedMessageRecord = {
+  clientReferenceId: string;
+  content: string;
 };
 
 type MessagesStatus = MessageListStatus;
@@ -58,10 +65,8 @@ const readErrorPayload = async (response: Response, fallback: string) => {
   return fallback;
 };
 
-const sortMessages = (items: SerializedMessage[]) =>
-  [...items].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
+const sortMessages = (items: ConversationMessage[]) =>
+  [...items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);
@@ -81,6 +86,24 @@ const formatDateTime = (value: string) => {
   }
 };
 
+const formatRetryCountdown = (value: number | null) => {
+  if (value == null) {
+    return null;
+  }
+  const seconds = Math.ceil(value / 1000);
+  if (seconds <= 0) {
+    return 'soon';
+  }
+  return `${seconds}s`;
+};
+
+const createClientMessageId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
 export default function ChatConversation({
   joinRequestId,
   currentUserId,
@@ -88,7 +111,7 @@ export default function ChatConversation({
   context,
 }: ChatConversationProps) {
   const router = useRouter();
-  const [messages, setMessages] = useState<SerializedMessage[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [messagesStatus, setMessagesStatus] = useState<MessagesStatus>('loading');
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState('');
@@ -96,7 +119,10 @@ export default function ChatConversation({
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending'>('idle');
   const [socketNotice, setSocketNotice] = useState<string | null>(null);
   const [hasBlockedCounterpart, setHasBlockedCounterpart] = useState(false);
+  const [queuedMessageCount, setQueuedMessageCount] = useState(0);
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
+  const queuedFlushInFlightRef = useRef(false);
 
   const counterpart = useMemo(() => {
     return context.requesterRole === 'host' ? context.participant : context.host;
@@ -133,7 +159,11 @@ export default function ChatConversation({
       }
 
       const payload = (await response.json()) as { messages?: SerializedMessage[] };
-      setMessages(sortMessages(payload.messages ?? []));
+      setMessages((previous) => {
+        const optimistic = previous.filter((message) => message.deliveryStatus);
+        const next = sortMessages([...(payload.messages ?? []), ...optimistic]);
+        return next;
+      });
       setMessagesStatus('ready');
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
@@ -154,7 +184,13 @@ export default function ChatConversation({
     };
   }, [fetchMessages]);
 
-  const { connectionState, isConnected, joinRoom } = useSocket({
+  const {
+    connectionState,
+    isConnected,
+    joinRoom,
+    nextRetryInMs,
+    reconnectAttempt,
+  } = useSocket({
     token: socketToken,
     readinessEndpoint: '/api/socket/io',
     onMessage: (payload) => {
@@ -166,6 +202,11 @@ export default function ChatConversation({
       console.error('Socket connection error', error);
       setSocketNotice('Real-time updates are unavailable. Sending messages will still work.');
     },
+    onDisconnect: (reason) => {
+      if (reason !== 'io client disconnect') {
+        setSocketNotice((previous) => previous ?? 'We lost the live connection. Messages will auto-resume soon.');
+      }
+    },
   });
 
   useEffect(() => {
@@ -174,6 +215,106 @@ export default function ChatConversation({
     }
     joinRoom(joinRequestId);
   }, [isConnected, joinRequestId, joinRoom]);
+
+  const queueMessageForSend = useCallback(
+    (content: string) => {
+      const clientReferenceId = `queued-${createClientMessageId()}`;
+      const optimisticMessage: ConversationMessage = {
+        id: clientReferenceId,
+        clientReferenceId,
+        joinRequestId,
+        senderId: currentUserId,
+        content,
+        createdAt: new Date().toISOString(),
+        deliveryStatus: 'queued',
+      };
+
+      queuedMessagesRef.current.push({ clientReferenceId, content });
+      setQueuedMessageCount(queuedMessagesRef.current.length);
+      setMessages((previous) => sortMessages([...previous, optimisticMessage]));
+    },
+    [currentUserId, joinRequestId]
+  );
+
+  const flushQueuedMessages = useCallback(async () => {
+    if (queuedFlushInFlightRef.current || hasBlockedCounterpart) {
+      return;
+    }
+
+    queuedFlushInFlightRef.current = true;
+    try {
+      while (queuedMessagesRef.current.length) {
+        const next = queuedMessagesRef.current[0];
+        setMessages((previous) =>
+          previous.map((message) =>
+            message.id === next.clientReferenceId
+              ? { ...message, deliveryStatus: 'sending' as const }
+              : message
+          )
+        );
+
+        try {
+          const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: next.content }),
+          });
+
+          if (!response.ok) {
+            const message = await readErrorPayload(response, 'Unable to send this message.');
+            throw new Error(message);
+          }
+
+          const payload = (await response.json()) as { message: SerializedMessage };
+          setMessages((previous) => {
+            const remaining = previous.filter((message) => message.id !== next.clientReferenceId);
+            return sortMessages([...remaining, payload.message]);
+          });
+          setSendError(null);
+        } catch (error) {
+          console.error('Failed to flush queued chat message', error);
+          const failureMessage = (error as Error).message ?? 'Unable to send this message.';
+          setMessages((previous) =>
+            previous.map((message) =>
+              message.id === next.clientReferenceId
+                ? { ...message, deliveryStatus: 'failed' as const }
+                : message
+            )
+          );
+          showErrorToast('Message not sent', failureMessage);
+          setSendError(failureMessage);
+          queuedMessagesRef.current.shift();
+          setQueuedMessageCount(queuedMessagesRef.current.length);
+          break;
+        }
+
+        queuedMessagesRef.current.shift();
+        setQueuedMessageCount(queuedMessagesRef.current.length);
+      }
+    } finally {
+      queuedFlushInFlightRef.current = false;
+    }
+  }, [hasBlockedCounterpart, joinRequestId]);
+
+  useEffect(() => {
+    if (!isConnected || !queuedMessagesRef.current.length) {
+      return;
+    }
+    flushQueuedMessages().catch((error) => {
+      console.error('Unexpected queued flush failure', error);
+    });
+  }, [flushQueuedMessages, isConnected]);
+
+  useEffect(() => {
+    if (!hasBlockedCounterpart || !queuedMessagesRef.current.length) {
+      return;
+    }
+    queuedMessagesRef.current = [];
+    setQueuedMessageCount(0);
+    setMessages((previous) => previous.filter((message) => !message.deliveryStatus));
+  }, [hasBlockedCounterpart]);
 
   const handleSend = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -191,8 +332,15 @@ export default function ChatConversation({
         return;
       }
 
-      setSendStatus('sending');
       setSendError(null);
+
+      if (!isConnected && connectionState !== 'error') {
+        queueMessageForSend(trimmed);
+        setComposerValue('');
+        return;
+      }
+
+      setSendStatus('sending');
 
       try {
         const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
@@ -220,12 +368,64 @@ export default function ChatConversation({
         setSendStatus('idle');
       }
     },
-    [appendMessage, composerValue, hasBlockedCounterpart, joinRequestId, sendStatus]
+    [appendMessage, composerValue, connectionState, hasBlockedCounterpart, isConnected, joinRequestId, queueMessageForSend, sendStatus]
   );
 
-  const connectionLabel = STATUS_LABELS[connectionState] ?? 'Connecting…';
-  const connectionAccent = connectionState === 'connected' ? 'text-emerald-600 border-emerald-100 bg-emerald-50' : connectionState === 'error' ? 'text-rose-600 border-rose-100 bg-rose-50' : 'text-amber-600 border-amber-100 bg-amber-50';
-  const connectionDot = connectionState === 'connected' ? 'bg-emerald-500' : connectionState === 'error' ? 'bg-rose-500' : 'bg-amber-500 animate-pulse';
+  const connectionLabel = (() => {
+    if (connectionState === 'reconnecting') {
+      const countdown = formatRetryCountdown(nextRetryInMs);
+      if (countdown) {
+        return `Reconnecting in ${countdown}`;
+      }
+    }
+    return STATUS_LABELS[connectionState] ?? 'Connecting…';
+  })();
+
+  const connectionHelperText = (() => {
+    switch (connectionState) {
+      case 'connected':
+        return 'Live updates are active.';
+      case 'connecting':
+        return 'Establishing secure real-time updates…';
+      case 'reconnecting': {
+        const countdown = formatRetryCountdown(nextRetryInMs);
+        if (countdown) {
+          return `Retry ${Math.max(reconnectAttempt, 1)} in ${countdown}.`;
+        }
+        return 'Attempting to reconnect…';
+      }
+      case 'idle':
+        return 'Offline. Messages will queue until we reconnect.';
+      case 'error':
+        return 'Realtime is unavailable. Sending still works over the API.';
+      default:
+        return '';
+    }
+  })();
+
+  const connectionAccent = connectionState === 'connected'
+    ? 'text-emerald-600 border-emerald-100 bg-emerald-50'
+    : connectionState === 'error'
+      ? 'text-rose-600 border-rose-100 bg-rose-50'
+      : 'text-amber-600 border-amber-100 bg-amber-50';
+  const connectionDot = connectionState === 'connected'
+    ? 'bg-emerald-500'
+    : connectionState === 'error'
+      ? 'bg-rose-500'
+      : 'bg-amber-500 animate-pulse';
+
+  const queuedHelperText = queuedMessageCount > 0
+    ? `${queuedMessageCount === 1 ? '1 message' : `${queuedMessageCount} messages`} will send automatically once the connection returns.`
+    : null;
+
+  const derivedNotice = socketNotice
+    ?? (connectionState === 'reconnecting'
+      ? 'We lost the live connection. Messages will send once we reconnect.'
+      : connectionState === 'idle'
+        ? 'You are offline. We will keep retrying in the background.'
+        : connectionState === 'error'
+          ? 'Realtime is unavailable, but you can keep chatting.'
+          : null);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-zinc-50 via-white to-zinc-100 text-zinc-900">
@@ -271,12 +471,13 @@ export default function ChatConversation({
                 {connectionLabel}
               </span>
             </div>
+            <p className="mt-2 text-xs text-zinc-500">{connectionHelperText}</p>
             <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-700">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Join request accepted
             </p>
-            {socketNotice ? (
-              <p className="mt-2 text-sm text-amber-600">{socketNotice}</p>
+            {derivedNotice ? (
+              <p className="mt-2 text-sm text-amber-600">{derivedNotice}</p>
             ) : null}
           </div>
 
@@ -302,7 +503,6 @@ export default function ChatConversation({
                   setHasBlockedCounterpart(true);
                   setComposerValue('');
                   setSendError('You blocked this user. Messages are now disabled.');
-                  setSocketNotice('You blocked this user. Messages are disabled going forward.');
                 }}
               />
               <span className="h-3 w-px bg-zinc-200" />
@@ -344,6 +544,9 @@ export default function ChatConversation({
                 <p className="mt-2 text-sm text-zinc-500">
                   You blocked this user. Manage safety settings from your profile if you change your mind.
                 </p>
+              ) : null}
+              {queuedHelperText ? (
+                <p className="mt-2 text-sm text-amber-600">{queuedHelperText}</p>
               ) : null}
               {sendError ? <p className="mt-2 text-sm text-rose-600">{sendError}</p> : null}
             </div>

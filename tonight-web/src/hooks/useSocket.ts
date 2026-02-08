@@ -10,7 +10,7 @@ import {
   type SocketMessagePayload,
 } from '@/lib/socket';
 
-export type SocketConnectionState = 'idle' | 'connecting' | 'connected' | 'error';
+export type SocketConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 type ClientSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
@@ -43,9 +43,15 @@ export type UseSocketResult = {
   disconnect: () => void;
   joinRoom: (joinRequestId: string) => void;
   sendMessage: (joinRequestId: string, payload: Omit<SocketMessagePayload, 'joinRequestId'>) => void;
+  /** Current retry attempt counter (0 when connected or idle) */
+  reconnectAttempt: number;
+  /** Milliseconds remaining before the next automatic reconnect attempt. Null when not scheduled. */
+  nextRetryInMs: number | null;
 };
 
 const DEFAULT_SOCKET_READINESS_ENDPOINT = '/api/socket/io';
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 15000;
 
 const isBrowserEnvironment = () => typeof window !== 'undefined';
 
@@ -58,6 +64,14 @@ const ensureServerReady = async (endpoint: string) => {
 };
 
 const normalizeJoinRequestId = (value: string) => value?.trim();
+
+const getReconnectDelay = (attempt: number) => {
+  if (attempt <= 0) {
+    return RECONNECT_BASE_DELAY_MS;
+  }
+  const raw = RECONNECT_BASE_DELAY_MS * 2 ** (attempt - 1);
+  return Math.min(raw, RECONNECT_MAX_DELAY_MS);
+};
 
 export const useSocket = (options: UseSocketOptions): UseSocketResult => {
   const {
@@ -87,9 +101,16 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
   const joinedRoomsRef = useRef<Set<string>>(new Set());
   const tokenRef = useRef<string | null>(token ?? null);
   const isMountedRef = useRef(true);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectCountdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const manualDisconnectRef = useRef(false);
+  const startConnectionRef = useRef<({ isRetry }?: { isRetry?: boolean }) => Promise<void>>();
 
   const [connectionState, setConnectionState] = useState<SocketConnectionState>('idle');
   const [error, setError] = useState<Error | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [nextRetryInMs, setNextRetryInMs] = useState<number | null>(null);
 
   useEffect(() => {
     tokenRef.current = token ?? null;
@@ -104,6 +125,14 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       socketRef.current?.removeAllListeners();
       socketRef.current?.disconnect();
       socketRef.current = null;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (reconnectCountdownIntervalRef.current) {
+        clearInterval(reconnectCountdownIntervalRef.current);
+        reconnectCountdownIntervalRef.current = null;
+      }
     };
   }, []);
 
@@ -122,30 +151,118 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       }
       setConnectionState(nextState);
       setError(nextError);
+      if (nextState === 'connected' || nextState === 'idle') {
+        setNextRetryInMs(null);
+        setReconnectAttempt(0);
+      }
     },
     []
   );
 
-  const attachSocketListeners = useCallback((socket: ClientSocket) => {
-    socket.on('connect', () => {
-      updateState('connected');
-      handlersRef.current.onConnect?.();
-    });
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
 
-    socket.on('disconnect', (reason) => {
+  const clearReconnectCountdown = useCallback(() => {
+    if (reconnectCountdownIntervalRef.current) {
+      clearInterval(reconnectCountdownIntervalRef.current);
+      reconnectCountdownIntervalRef.current = null;
+    }
+  }, []);
+
+  const resetReconnectTracking = useCallback(() => {
+    reconnectAttemptsRef.current = 0;
+    setReconnectAttempt(0);
+    setNextRetryInMs(null);
+    clearReconnectTimer();
+    clearReconnectCountdown();
+  }, [clearReconnectCountdown, clearReconnectTimer]);
+
+  const flushQueuedRoomJoins = useCallback((socket: ClientSocket) => {
+    joinedRoomsRef.current.forEach((roomId) => {
+      socket.emit(JOIN_REQUEST_JOIN_EVENT, roomId);
+    });
+  }, []);
+
+  const scheduleReconnect = useCallback(() => {
+    if (!isBrowserEnvironment()) {
+      return;
+    }
+
+    if (!tokenRef.current) {
       updateState('idle');
-      handlersRef.current.onDisconnect?.(typeof reason === 'string' ? reason : 'disconnect');
-    });
+      return;
+    }
 
-    socket.on('connect_error', (err: Error) => {
-      updateState('error', err);
-      handlersRef.current.onError?.(err);
-    });
+    const nextAttempt = reconnectAttemptsRef.current + 1;
+    reconnectAttemptsRef.current = nextAttempt;
+    setReconnectAttempt(nextAttempt);
 
-    socket.on(JOIN_REQUEST_MESSAGE_EVENT, (payload: SocketMessagePayload) => {
-      handlersRef.current.onMessage?.(payload);
-    });
-  }, [updateState]);
+    const delay = getReconnectDelay(nextAttempt);
+    updateState('reconnecting');
+    setNextRetryInMs(delay);
+
+    clearReconnectTimer();
+    clearReconnectCountdown();
+
+    const targetTimestamp = Date.now() + delay;
+    reconnectCountdownIntervalRef.current = window.setInterval(() => {
+      const remaining = Math.max(targetTimestamp - Date.now(), 0);
+      setNextRetryInMs(remaining);
+      if (remaining <= 0) {
+        clearReconnectCountdown();
+      }
+    }, 200);
+
+    reconnectTimerRef.current = window.setTimeout(() => {
+      clearReconnectTimer();
+      clearReconnectCountdown();
+      setNextRetryInMs(null);
+      const attemptConnection = startConnectionRef.current;
+      if (attemptConnection) {
+        void attemptConnection({ isRetry: true });
+      }
+    }, delay);
+  }, [clearReconnectCountdown, clearReconnectTimer, updateState]);
+
+  const attachSocketListeners = useCallback(
+    (socket: ClientSocket) => {
+      socket.on('connect', () => {
+        manualDisconnectRef.current = false;
+        resetReconnectTracking();
+        updateState('connected');
+        flushQueuedRoomJoins(socket);
+        handlersRef.current.onConnect?.();
+      });
+
+      socket.on('disconnect', (reason) => {
+        const normalizedReason = typeof reason === 'string' ? reason : 'disconnect';
+        handlersRef.current.onDisconnect?.(normalizedReason);
+
+        if (manualDisconnectRef.current) {
+          manualDisconnectRef.current = false;
+          updateState('idle');
+          return;
+        }
+
+        scheduleReconnect();
+      });
+
+      socket.on('connect_error', (err: Error) => {
+        updateState('error', err);
+        handlersRef.current.onError?.(err);
+        scheduleReconnect();
+      });
+
+      socket.on(JOIN_REQUEST_MESSAGE_EVENT, (payload: SocketMessagePayload) => {
+        handlersRef.current.onMessage?.(payload);
+      });
+    },
+    [flushQueuedRoomJoins, resetReconnectTracking, scheduleReconnect, updateState]
+  );
 
   const getOrCreateSocket = useCallback(() => {
     let socket = socketRef.current;
@@ -170,59 +287,77 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     return socket;
   }, [attachSocketListeners, resolvedPath, socketUrl]);
 
-  const connect = useCallback(async () => {
-    if (!isBrowserEnvironment()) {
-      return;
-    }
+  const startConnection = useCallback(
+    async ({ isRetry = false }: { isRetry?: boolean } = {}) => {
+      if (!isBrowserEnvironment()) {
+        return;
+      }
 
-    if (!tokenRef.current) {
-      const missingTokenError = new Error('Missing authentication token for socket connection');
-      updateState('error', missingTokenError);
-      handlersRef.current.onError?.(missingTokenError);
-      return;
-    }
+      if (!tokenRef.current) {
+        const missingTokenError = new Error('Missing authentication token for socket connection');
+        updateState('error', missingTokenError);
+        handlersRef.current.onError?.(missingTokenError);
+        return;
+      }
 
-    const socket = getOrCreateSocket();
-    socket.auth = { ...(socket.auth ?? {}), token: tokenRef.current };
+      if (!isRetry) {
+        resetReconnectTracking();
+      }
 
-    if (socket.connected || connectionState === 'connecting') {
-      return;
-    }
+      const socket = getOrCreateSocket();
+      socket.auth = { ...(socket.auth ?? {}), token: tokenRef.current };
 
-    updateState('connecting');
+      if (socket.connected || connectionState === 'connecting') {
+        return;
+      }
 
-    await ensureServerReady(readinessEndpoint);
+      manualDisconnectRef.current = false;
+      updateState('connecting');
 
-    socket.connect();
-  }, [connectionState, getOrCreateSocket, readinessEndpoint, updateState]);
+      await ensureServerReady(readinessEndpoint);
+
+      socket.connect();
+    },
+    [connectionState, getOrCreateSocket, readinessEndpoint, resetReconnectTracking, updateState]
+  );
+
+  startConnectionRef.current = startConnection;
+  useEffect(() => {
+    startConnectionRef.current = startConnection;
+  }, [startConnection]);
+
+  const publicConnect = useCallback(async () => {
+    await startConnection({ isRetry: false });
+  }, [startConnection]);
 
   const disconnect = useCallback(() => {
+    manualDisconnectRef.current = true;
     joinedRoomsRef.current.clear();
+    clearReconnectTimer();
+    clearReconnectCountdown();
+    resetReconnectTracking();
+    socketRef.current?.removeAllListeners();
     socketRef.current?.disconnect();
+    socketRef.current = null;
     updateState('idle');
-  }, [updateState]);
+  }, [clearReconnectCountdown, clearReconnectTimer, resetReconnectTracking, updateState]);
 
-  const joinRoom = useCallback(
-    (joinRequestId: string) => {
-      const normalized = normalizeJoinRequestId(joinRequestId);
-      if (!normalized) {
-        return;
-      }
+  const joinRoom = useCallback((joinRequestId: string) => {
+    const normalized = normalizeJoinRequestId(joinRequestId);
+    if (!normalized) {
+      return;
+    }
 
-      if (joinedRoomsRef.current.has(normalized)) {
-        return;
-      }
+    if (joinedRoomsRef.current.has(normalized) && socketRef.current?.connected) {
+      return;
+    }
 
-      const socket = socketRef.current;
-      if (!socket) {
-        return;
-      }
-
+    joinedRoomsRef.current.add(normalized);
+    const socket = socketRef.current;
+    if (socket && socket.connected) {
       socket.emit(JOIN_REQUEST_JOIN_EVENT, normalized);
-      joinedRoomsRef.current.add(normalized);
-    },
-    []
-  );
+    }
+  }, []);
 
   const sendMessage = useCallback((joinRequestId: string, payload: Omit<SocketMessagePayload, 'joinRequestId'>) => {
     const normalized = normalizeJoinRequestId(joinRequestId);
@@ -238,18 +373,20 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
 
   useEffect(() => {
     if (autoConnect && token) {
-      void connect();
+      void publicConnect();
     }
-  }, [autoConnect, connect, token]);
+  }, [autoConnect, publicConnect, token]);
 
   return {
     socket: socketRef.current,
     connectionState,
     error,
     isConnected: connectionState === 'connected',
-    connect,
+    connect: publicConnect,
     disconnect,
     joinRoom,
     sendMessage,
+    reconnectAttempt,
+    nextRetryInMs,
   };
 };
