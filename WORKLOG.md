@@ -45,13 +45,14 @@
 - Task 16.5: Create BlockUserButton component (confirmation popover, API orchestration, RTL coverage) — Commit `31c2443`.
 - Task 16.6: Add BlockUserButton to user profile and chat pages (profile safety card, chat action rail, composer blocking state) — Commit `8b7c9e0`.
 - Task 17.1: Create POST /api/reports (validation + service layer + authenticated route, npm test) — Commit `b34a35d`.
+- Task 17.2: Write property test for report creation (Property 35 for report round trip coverage, enforced status/normalization) — Commit `a15aa7e`.
+- Task 17.3: Create ReportModal component (design-aligned modal, optimistic submission UX, RTL coverage) — Commit `06c0dd5`.
 
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 17.2 — Write property test for report creation.
+- **Next priority:** Task 17.4 — Add report functionality to event and user pages.
 
 ## Next Up
-1. Task 17.2: Write property test for report creation.
-2. Task 17.3: Create ReportModal component (user-facing report flow for events and profiles).
-3. Task 17.4: Add report functionality to event and user pages (surfaced buttons, modal wiring).
+1. Task 17.4: Add report functionality to event and user pages (surfaced buttons, modal wiring).
+2. Task 19: Final checkpoint — ensure all property and integration suites stay green after report feature work.
