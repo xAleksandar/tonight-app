@@ -14,7 +14,8 @@
 - Task 10.2: Create MapboxLocationPicker component (client-side map setup, marker interactions, disabled/error states) — Commit `0c649cf`.
 - Task 10.3: Write Property 38 (map click coordinate capture) tests (jsdom-friendly harness, mock Mapbox loader, property assertions) — Commit `f4eebaf`.
 - Task 10.4: Create EventMapView component (map initialization, event/user markers, popups, selection syncing) — Commit `0389003`.
+- Task 10.5: Create EventListView component (summary header, clickable cards, distance/time formatting) — Commit `0db17ba`.
 
 ## Next Up
-1. Task 10.5: Create EventListView component.
-2. Task 10.6: Write Property 22 (list view required fields) tests.
+1. Task 10.6: Write Property 22 (list view required fields) tests.
+2. Task 11.1: Create event creation page (app/events/create/page.tsx).
