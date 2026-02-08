@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Clock,
@@ -13,14 +12,16 @@ import {
   MapPin,
   Music,
   Plus,
-  RefreshCcw,
   SlidersHorizontal,
   Sparkles,
   UtensilsCrossed,
   Waves,
   Clapperboard,
   Users,
+  ChevronDown,
   ChevronRight,
+  MessageCircle,
+  User,
 } from "lucide-react";
 
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
@@ -417,12 +418,11 @@ function AuthenticatedHomePage() {
   }, [visibleEvents]);
 
   const locationReady = locationStatus === "ready" && !!userLocation;
-  const eventsReady = eventsStatus === "success" && visibleEvents.length > 0;
   const isLoading =
     locationStatus === "locating" || (eventsStatus === "loading" && visibleEvents.length === 0);
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] px-4 pb-24 pt-4 text-white sm:px-6 md:pb-12 md:pt-6">
+    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] px-4 pb-24 pt-4 text-foreground sm:px-6 md:pb-12 md:pt-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 md:flex-row md:gap-10">
         <DesktopSidebar
           selectedCategory={selectedCategory}
@@ -432,17 +432,7 @@ function AuthenticatedHomePage() {
 
         <div className="flex flex-1 flex-col">
           <DesktopHeader
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            radiusKm={radiusKm}
-            pendingRadiusKm={pendingRadiusKm}
-            onPendingRadiusChange={setPendingRadiusKm}
-            onApplyRadius={applyRadiusChange}
-            onOpenMobileRange={() => setRangeSheetOpen(true)}
-            onRefresh={handleRefresh}
-            lastUpdatedLabel={lastUpdatedLabel}
-            describeLocation={describeLocation}
-            rangeSummary={buildRadiusSummary(radiusKm)}
+            onNavigateProfile={() => router.push("/profile")}
           />
 
           <main className="flex-1 px-4 pb-6 pt-4 md:px-8 md:pb-10">
@@ -452,9 +442,6 @@ function AuthenticatedHomePage() {
               describeLocation={describeLocation}
               rangeSummary={buildRadiusSummary(radiusKm)}
               radiusKm={radiusKm}
-              pendingRadiusKm={pendingRadiusKm}
-              onPendingRadiusChange={setPendingRadiusKm}
-              onApplyRadius={applyRadiusChange}
               onOpenRange={() => {
                 setPendingRadiusKm(radiusKm);
                 setRangeSheetOpen(true);
@@ -466,7 +453,7 @@ function AuthenticatedHomePage() {
             />
 
             <section className="mt-4 flex flex-col gap-4">
-              <StatusCards
+              <DiscoverySummary
                 describeLocation={describeLocation}
                 lastUpdatedLabel={lastUpdatedLabel}
                 rangeSummary={buildRadiusSummary(radiusKm)}
@@ -474,11 +461,6 @@ function AuthenticatedHomePage() {
                 onRefresh={handleRefresh}
                 locationStatus={locationStatus}
                 eventsStatus={eventsStatus}
-              />
-
-              <CategoryRow
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
               />
 
               {locationStatus === "denied" || locationStatus === "unsupported" ? (
@@ -507,29 +489,31 @@ function AuthenticatedHomePage() {
                 />
               ) : null}
 
-              <div className="rounded-3xl border border-white/5 bg-white/5 p-5 shadow-xl shadow-black/20 backdrop-blur">
+              <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-xl shadow-black/20">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-white/80">Live tonight</p>
-                    <p className="text-xs text-white/60">
-                      Toggle between map and list to explore intimate meetups near you.
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+                    <p className="text-lg font-semibold text-foreground">Live nearby meetups</p>
+                    <p className="text-xs text-muted-foreground">
+                      Toggle between list and map to explore plans within your radius.
                     </p>
                   </div>
                   <ViewToggle current={viewMode} onChange={setViewMode} />
                 </div>
 
-                <div className="mt-6">
+                <div className="mt-5">
                   {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
 
                   {!isLoading && viewMode === "map" && (
-                    <EventMapView
-                      events={mapItems}
-                      userLocation={userLocation || undefined}
-                      selectedEventId={selectedEventId}
-                      onEventSelect={setSelectedEventId}
-                      height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
-                      className="text-white"
-                    />
+                    <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
+                      <EventMapView
+                        events={mapItems}
+                        userLocation={userLocation || undefined}
+                        selectedEventId={selectedEventId}
+                        onEventSelect={setSelectedEventId}
+                        height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
+                      />
+                    </div>
                   )}
 
                   {!isLoading && viewMode === "list" && (
@@ -549,10 +533,8 @@ function AuthenticatedHomePage() {
       </div>
 
       <MobileActionBar
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onRefresh={handleRefresh}
         onCreate={handleCreate}
+        onOpenProfile={() => router.push("/profile")}
       />
 
       {rangeSheetOpen && (
@@ -574,176 +556,164 @@ type DesktopSidebarProps = {
 };
 
 function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: DesktopSidebarProps) {
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const activeCategory = selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory] : null;
+  const ActiveIcon = activeCategory?.icon ?? Sparkles;
+
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-white/5 bg-white/5 px-5 py-8 shadow-xl shadow-black/30 backdrop-blur md:flex md:flex-col">
-      <div className="flex items-center gap-3 text-white">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-400 text-slate-900 shadow-lg shadow-emerald-500/40">
+    <aside className="hidden w-64 shrink-0 border-r border-border/60 bg-card/40 px-4 py-6 text-foreground backdrop-blur-xl md:flex md:flex-col">
+      <div className="flex items-center gap-3 px-1">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
           <Sparkles className="h-5 w-5" />
         </div>
         <div>
           <p className="text-lg font-semibold leading-tight">Tonight</p>
-          <p className="text-xs text-white/70">Discover real-life meetups</p>
+          <p className="text-xs text-muted-foreground">Discover real-life meetups</p>
         </div>
       </div>
 
-      <div className="mt-8 space-y-2">
-        <p className="text-xs uppercase tracking-wide text-white/50">Navigation</p>
-        <div className="rounded-2xl bg-white/5 p-2">
-          <SidebarButton icon={Compass} label="Discover" active />
-          <SidebarButton icon={Users} label="People nearby" disabled />
-        </div>
-      </div>
+      <nav className="mt-8 space-y-1 text-sm">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-primary bg-primary/10"
+        >
+          <Compass className="h-4.5 w-4.5" />
+          Discover
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground/70"
+          disabled
+        >
+          <Users className="h-4.5 w-4.5" />
+          People nearby
+        </button>
+      </nav>
 
-      <div className="mt-8 space-y-3">
-        <div className="flex items-center justify-between text-xs text-white/60">
-          <span>Categories</span>
-          {selectedCategory && (
-            <button
-              type="button"
-              onClick={() => onCategoryChange(null)}
-              className="text-[11px] font-medium text-emerald-300 hover:text-emerald-200"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className="space-y-1">
-          {CATEGORY_ORDER.map((entry) => {
-            if (entry === "all") {
+      <div className="mt-8">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categories</p>
+        <button
+          type="button"
+          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-border/80 bg-background/40 px-3 py-2 text-left text-sm font-medium text-foreground"
+          onClick={() => setCategoriesOpen((value) => !value)}
+        >
+          <span className="rounded-lg bg-card/70 p-1.5 text-muted-foreground">
+            <ActiveIcon className="h-4 w-4" />
+          </span>
+          <span className="flex-1">
+            {selectedCategory ? activeCategory?.label : "All"}
+          </span>
+          <ChevronDown
+            className={classNames(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              categoriesOpen && "rotate-180"
+            )}
+          />
+        </button>
+        {categoriesOpen && (
+          <div className="mt-3 space-y-1 rounded-xl border border-border/60 bg-background/40 p-2">
+            {CATEGORY_ORDER.map((entry) => {
+              if (entry === "all") {
+                return (
+                  <button
+                    key="all"
+                    type="button"
+                    onClick={() => {
+                      onCategoryChange(null);
+                      setCategoriesOpen(false);
+                    }}
+                    className={classNames(
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                      selectedCategory === null
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                    )}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    All
+                  </button>
+                );
+              }
+              const definition = CATEGORY_DEFINITIONS[entry];
+              const Icon = definition.icon;
               return (
-                <SidebarCategoryButton
-                  key="all"
-                  label="All"
-                  active={!selectedCategory}
-                  onClick={() => onCategoryChange(null)}
-                />
+                <button
+                  key={definition.id}
+                  type="button"
+                  onClick={() => {
+                    onCategoryChange(definition.id);
+                    setCategoriesOpen(false);
+                  }}
+                  className={classNames(
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                    selectedCategory === definition.id
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {definition.label}
+                </button>
               );
-            }
-            const definition = CATEGORY_DEFINITIONS[entry];
-            return (
-              <SidebarCategoryButton
-                key={definition.id}
-                label={definition.label}
-                icon={definition.icon}
-                active={selectedCategory === definition.id}
-                onClick={() => onCategoryChange(definition.id)}
-              />
-            );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       <button
         type="button"
         onClick={onCreate}
-        className="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-900 shadow-xl shadow-emerald-500/40 transition hover:opacity-90"
+        className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90"
       >
         <Plus className="h-4 w-4" />
-        Host an event
+        Post event
       </button>
     </aside>
   );
 }
 
 type DesktopHeaderProps = {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  radiusKm: number;
-  pendingRadiusKm: number;
-  onPendingRadiusChange: (value: number) => void;
-  onApplyRadius: () => void;
-  onOpenMobileRange: () => void;
-  onRefresh: () => void;
-  lastUpdatedLabel: string;
-  describeLocation: string;
-  rangeSummary: string;
+  onNavigateProfile: () => void;
+  onNavigateMessages?: () => void;
 };
 
-function DesktopHeader({
-  viewMode,
-  onViewModeChange,
-  radiusKm,
-  pendingRadiusKm,
-  onPendingRadiusChange,
-  onApplyRadius,
-  onOpenMobileRange,
-  onRefresh,
-  lastUpdatedLabel,
-  describeLocation,
-  rangeSummary,
-}: DesktopHeaderProps) {
+function DesktopHeader({ onNavigateProfile, onNavigateMessages }: DesktopHeaderProps) {
+  const messagesDisabled = typeof onNavigateMessages !== "function";
+
   return (
-    <header className="hidden border-b border-white/5 bg-white/5 px-8 py-6 text-white shadow-lg shadow-black/30 backdrop-blur md:block">
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-emerald-300">Tonight</p>
+    <header className="hidden border-b border-border/60 bg-background/60 px-8 py-6 text-foreground shadow-lg shadow-black/20 backdrop-blur-xl md:block">
+      <div className="flex items-center justify-between gap-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
           <h1 className="text-3xl font-semibold leading-tight">Discover what's happening near you</h1>
-          <p className="text-sm text-white/70">
-            We hand-curate intimate plans hosted by locals. Share your vibe or request to join a meetup.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Browse intimate plans hosted by locals and request to join before spots fill up.
           </p>
         </div>
-        <div className="flex flex-col gap-3 text-sm text-white/70">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-white/50">Current location</p>
-            <p className="text-sm font-semibold text-white">{describeLocation}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-white/50">Radius</p>
-            <p className="text-sm font-semibold text-white">{rangeSummary}</p>
-          </div>
-          <p className="text-xs text-white/60">Last updated {lastUpdatedLabel}</p>
-        </div>
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center gap-4">
-        <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 lg:flex">
-          <div className="space-y-1">
-            <p className="text-xs uppercase tracking-wide text-white/50">Radius</p>
-            <p className="text-sm font-semibold">{Math.round(pendingRadiusKm)} km</p>
-          </div>
-          <input
-            type="range"
-            min={MIN_RADIUS_KM}
-            max={MAX_RADIUS_KM}
-            value={pendingRadiusKm}
-            onChange={(event) => onPendingRadiusChange(Number(event.target.value))}
-            className="h-1 w-40 accent-emerald-400"
-          />
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onApplyRadius}
-            className="rounded-full bg-emerald-400/90 px-4 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-emerald-300"
+            onClick={messagesDisabled ? undefined : onNavigateMessages}
+            className={classNames(
+              "relative flex h-11 w-11 items-center justify-center rounded-full border",
+              messagesDisabled
+                ? "border-border/70 text-muted-foreground"
+                : "border-border/80 bg-card/60 text-muted-foreground hover:text-primary"
+            )}
+            aria-label="Messages"
+            aria-disabled={messagesDisabled}
+            disabled={messagesDisabled}
           >
-            Apply
+            <MessageCircle className="h-4.5 w-4.5" />
           </button>
-        </div>
-
-        <div className="flex items-center gap-2 lg:hidden">
           <button
             type="button"
-            onClick={onOpenMobileRange}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80"
+            onClick={onNavigateProfile}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/60 text-sm font-semibold text-foreground"
+            aria-label="Profile"
           >
-            <SlidersHorizontal className="h-4 w-4" />
-            {Math.round(radiusKm)} km
+            <span>YN</span>
           </button>
-        </div>
-
-        <div className="ml-auto flex flex-wrap items-center gap-3">
-          <ViewToggle current={viewMode} onChange={onViewModeChange} />
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-white transition hover:border-emerald-300 hover:text-emerald-200"
-          >
-            Refresh feed
-          </button>
-          <Link
-            href="/events/create"
-            className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-300"
-          >
-            Host an event
-          </Link>
         </div>
       </div>
     </header>
@@ -756,21 +726,11 @@ type MobileHeroProps = {
   describeLocation: string;
   rangeSummary: string;
   radiusKm: number;
-  pendingRadiusKm: number;
-  onPendingRadiusChange: (value: number) => void;
-  onApplyRadius: () => void;
   onOpenRange: () => void;
   onRefresh: () => void;
   lastUpdatedLabel: string;
   selectedCategory: CategoryId | null;
   onCategoryChange: (category: CategoryId | null) => void;
-};
-
-type MobileActionBarProps = {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  onRefresh: () => void;
-  onCreate: () => void;
 };
 
 function MobileHero({
@@ -779,9 +739,6 @@ function MobileHero({
   describeLocation,
   rangeSummary,
   radiusKm,
-  pendingRadiusKm,
-  onPendingRadiusChange,
-  onApplyRadius,
   onOpenRange,
   onRefresh,
   lastUpdatedLabel,
@@ -789,130 +746,138 @@ function MobileHero({
   onCategoryChange,
 }: MobileHeroProps) {
   return (
-    <section className="sticky top-0 z-30 rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-4 py-5 text-white shadow-xl shadow-black/40 backdrop-blur md:hidden">
-      <div className="flex items-center justify-between">
+    <section className="sticky top-0 z-30 border-b border-border/80 bg-background/85 px-1 pb-4 pt-5 text-foreground backdrop-blur-md md:hidden">
+      <div className="flex items-center justify-between gap-3 px-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-emerald-300">Tonight</p>
-          <h1 className="mt-1 text-2xl font-semibold leading-tight">Discover nearby meetups</h1>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+          <h1 className="text-2xl font-semibold leading-tight">Discover</h1>
+          <p className="text-xs text-muted-foreground">Events near you</p>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-xl border border-border/70 bg-card/60 p-0.5">
+            <button
+              type="button"
+              onClick={() => onViewModeChange('list')}
+              className={classNames(
+                'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold',
+                viewMode === 'list'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground'
+              )}
+            >
+              <ListIcon className="h-4 w-4" />
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange('map')}
+              className={classNames(
+                'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold',
+                viewMode === 'map'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground'
+              )}
+            >
+              <MapIcon className="h-4 w-4" />
+              Map
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenRange}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            {Math.round(radiusKm)} km
+          </button>
+        </div>
       </div>
 
-      <div className="mt-4 space-y-2 text-sm text-white/80">
+      <div className="mt-3 space-y-1 px-3 text-xs text-muted-foreground">
         <p>
-          <span className="text-white/60">Current location:</span> {describeLocation}
+          <span className="text-foreground/70">Current location:</span> {describeLocation}
         </p>
         <p>
-          <span className="text-white/60">Range:</span> {rangeSummary}
+          <span className="text-foreground/70">Range:</span> {rangeSummary}
         </p>
-        <p className="text-xs text-white/60">Last updated {lastUpdatedLabel}</p>
+        <div className="flex items-center justify-between">
+          <span>Last updated {lastUpdatedLabel}</span>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="text-[11px] font-semibold text-primary"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onViewModeChange("list")}
-          className={classNames(
-            "flex flex-1 items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm",
-            viewMode === "list" ? "bg-white text-slate-900" : "bg-white/10 text-white"
-          )}
-        >
-          <ListIcon className="h-4 w-4" />
-          List
-        </button>
-        <button
-          type="button"
-          onClick={() => onViewModeChange("map")}
-          className={classNames(
-            "flex flex-1 items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm",
-            viewMode === "map" ? "bg-white text-slate-900" : "bg-white/10 text-white"
-          )}
-        >
-          <MapIcon className="h-4 w-4" />
-          Map
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onPendingRadiusChange(radiusKm);
-            onOpenRange();
-          }}
-          className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-sm"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {Math.round(radiusKm)} km
-        </button>
-      </div>
-
-      <div className="mt-4">
-        <CategoryRow selectedCategory={selectedCategory} onCategoryChange={onCategoryChange} compact />
+      <div className="mt-3 px-1">
+        <CategoryRow
+          selectedCategory={selectedCategory}
+          onCategoryChange={onCategoryChange}
+          compact
+        />
       </div>
     </section>
   );
 }
 
+type MobileActionBarProps = {
+  onCreate: () => void;
+  onOpenProfile: () => void;
+};
 
-function MobileActionBar({ viewMode, onViewModeChange, onRefresh, onCreate }: MobileActionBarProps) {
-  const options: { value: ViewMode; label: string; icon: typeof ListIcon }[] = [
-    { value: 'list', label: 'List', icon: ListIcon },
-    { value: 'map', label: 'Map', icon: MapIcon },
-  ];
-
+function MobileActionBar({ onCreate, onOpenProfile }: MobileActionBarProps) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 px-4 md:hidden">
-      <div className="pointer-events-auto space-y-3 rounded-3xl border border-white/10 bg-[#111428]/90 p-4 text-white shadow-2xl shadow-black/40 backdrop-blur">
-        <div className="flex items-center gap-2">
-          {options.map((option) => {
-            const Icon = option.icon;
-            const isActive = viewMode === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onViewModeChange(option.value)}
-                className={classNames(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-2xl px-3 py-2 text-sm',
-                  isActive ? 'bg-white text-slate-900 shadow' : 'border border-white/10 bg-white/5 text-white/80'
-                )}
-                aria-pressed={isActive}
-              >
-                <Icon className="h-4 w-4" />
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white/90"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/40"
-          >
-            <Plus className="h-4 w-4" />
-            Host
-          </button>
-        </div>
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/80 backdrop-blur-md md:hidden">
+      <div className="flex items-center justify-around px-2 py-2 text-xs font-semibold text-muted-foreground">
+        <button
+          type="button"
+          className="flex flex-col items-center gap-0.5 text-primary"
+        >
+          <Compass className="h-5 w-5" />
+          Discover
+        </button>
+        <button
+          type="button"
+          className="flex flex-col items-center gap-0.5 opacity-60"
+          disabled
+        >
+          <Users className="h-5 w-5" />
+          People
+        </button>
+        <button
+          type="button"
+          onClick={onCreate}
+          className="-mt-6 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+          aria-label="Post event"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          className="flex flex-col items-center gap-0.5 opacity-60"
+          disabled
+        >
+          <MessageCircle className="h-5 w-5" />
+          Messages
+        </button>
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex flex-col items-center gap-0.5"
+        >
+          <User className="h-5 w-5" />
+          Profile
+        </button>
       </div>
-    </div>
+      <div className="h-[env(safe-area-inset-bottom)]" />
+    </nav>
   );
 }
 
-
-type StatusCardsProps = {
+type DiscoverySummaryProps = {
   describeLocation: string;
   lastUpdatedLabel: string;
   rangeSummary: string;
@@ -922,7 +887,7 @@ type StatusCardsProps = {
   eventsStatus: EventsStatus;
 };
 
-function StatusCards({
+function DiscoverySummary({
   describeLocation,
   lastUpdatedLabel,
   rangeSummary,
@@ -930,41 +895,49 @@ function StatusCards({
   onRefresh,
   locationStatus,
   eventsStatus,
-}: StatusCardsProps) {
+}: DiscoverySummaryProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/20">
+    <div className="grid gap-3 lg:grid-cols-3">
+      <div className="rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm shadow-black/20">
         <div className="flex items-center justify-between text-sm">
           <div>
-            <p className="text-xs uppercase tracking-wide text-white/60">Location</p>
-            <p className="text-sm font-semibold text-white">{describeLocation}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
+            <p className="text-sm font-semibold text-foreground">{describeLocation}</p>
           </div>
           <button
             type="button"
             onClick={onUpdateLocation}
-            className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white"
+            className="rounded-full border border-border/80 px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
           >
             {locationStatus === "locating" ? "Locating…" : "Update"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-white/60">Last updated {lastUpdatedLabel}</p>
+        <p className="mt-2 text-xs text-muted-foreground">We use this to surface hosts near you.</p>
       </div>
 
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-black/20">
+      <div className="rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm shadow-black/20">
         <div className="flex items-center justify-between text-sm">
           <div>
-            <p className="text-xs uppercase tracking-wide text-white/60">Search scope</p>
-            <p className="text-sm font-semibold text-white">{rangeSummary}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Range</p>
+            <p className="text-sm font-semibold text-foreground">{rangeSummary}</p>
           </div>
           <button
             type="button"
             onClick={onRefresh}
-            className="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white"
+            className="rounded-full border border-border/80 px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
           >
             {eventsStatus === "loading" ? "Refreshing…" : "Refresh"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-white/60">Adjust your radius anytime from the controls above.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Adjust the radius from the list/map controls.</p>
+      </div>
+
+      <div className="rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm shadow-black/20">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Last updated</p>
+        <p className="mt-1 text-sm font-semibold text-foreground">{lastUpdatedLabel}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Tap refresh anytime to pull the latest nearby plans.
+        </p>
       </div>
     </div>
   );
@@ -978,14 +951,14 @@ type CategoryRowProps = {
 
 function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: CategoryRowProps) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs text-white/60">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>Categories</span>
         {selectedCategory && (
           <button
             type="button"
             onClick={() => onCategoryChange(null)}
-            className="text-[11px] font-semibold text-emerald-300 hover:text-emerald-200"
+            className="text-[11px] font-semibold text-primary"
           >
             Clear
           </button>
@@ -994,8 +967,7 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
       <div
         className={classNames(
           "flex gap-2",
-          compact ? "overflow-x-auto" : "flex-wrap",
-          !compact && "flex-wrap"
+          compact ? "overflow-x-auto" : "flex-wrap"
         )}
         style={compact ? { WebkitOverflowScrolling: "touch" } : undefined}
       >
@@ -1007,10 +979,10 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
                 type="button"
                 onClick={() => onCategoryChange(null)}
                 className={classNames(
-                  "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium",
+                  "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold",
                   selectedCategory === null
-                    ? "border-emerald-400 bg-emerald-400/10 text-emerald-200"
-                    : "border-white/15 bg-white/5 text-white/70"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/70 bg-card/60 text-muted-foreground"
                 )}
               >
                 <Sparkles className="h-4 w-4" />
@@ -1026,10 +998,10 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
               type="button"
               onClick={() => onCategoryChange(definition.id)}
               className={classNames(
-                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold",
                 selectedCategory === definition.id
-                  ? "border-emerald-400 bg-emerald-400/10 text-emerald-200"
-                  : "border-white/15 bg-white/5 text-white/70"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border/70 bg-card/60 text-muted-foreground"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -1054,7 +1026,7 @@ function ViewToggle({ current, onChange }: ViewToggleProps) {
   ];
 
   return (
-    <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1 text-sm text-white/70">
+    <div className="inline-flex rounded-full border border-border/70 bg-card/60 p-1 text-sm text-muted-foreground">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = option.value === current;
@@ -1064,8 +1036,8 @@ function ViewToggle({ current, onChange }: ViewToggleProps) {
             type="button"
             onClick={() => onChange(option.value)}
             className={classNames(
-              "flex items-center gap-1 rounded-full px-4 py-1.5",
-              isActive ? "bg-white text-slate-900 shadow" : "text-white/70"
+              "flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold",
+              isActive ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
             )}
             aria-pressed={isActive}
           >
@@ -1093,7 +1065,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
 
   if (events.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-10 text-center text-sm text-white/60">
+      <div className="rounded-3xl border border-dashed border-border/60 bg-card/40 p-10 text-center text-sm text-muted-foreground">
         <p>No nearby events yet within {radiusSummary}. Try widening your radius or refreshing.</p>
       </div>
     );
@@ -1110,29 +1082,29 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
             type="button"
             onClick={() => onSelect(event.id)}
             className={classNames(
-              "flex flex-col gap-3 rounded-3xl border bg-white/5 p-4 text-left transition",
+              "flex flex-col gap-3 rounded-3xl border border-border/70 bg-card/60 p-4 text-left transition",
               selectedEventId === event.id
-                ? "border-emerald-400/60 shadow-lg shadow-emerald-500/30"
-                : "border-white/10 hover:border-emerald-200/40"
+                ? "border-primary/60 shadow-lg shadow-primary/20"
+                : "hover:border-primary/40"
             )}
           >
             <div className="flex items-start gap-3">
               <div
                 className={classNames(
                   "flex h-12 w-12 items-center justify-center rounded-2xl border text-sm",
-                  definition?.accent ?? "border-white/10 bg-white/10"
+                  definition?.accent ?? "border-border/70 bg-background/60"
                 )}
               >
                 <Icon className="h-5 w-5" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-white">{event.title}</p>
-                <p className="text-xs text-white/60">{event.locationName}</p>
+                <p className="text-sm font-semibold text-foreground">{event.title}</p>
+                <p className="text-xs text-muted-foreground">{event.locationName}</p>
               </div>
-              <ChevronRight className="h-4 w-4 text-white/40" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="line-clamp-2 text-xs text-white/70">{event.description}</p>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
+            <p className="line-clamp-2 text-xs text-muted-foreground">{event.description}</p>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               {event.datetimeLabel && (
                 <span className="inline-flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
@@ -1146,8 +1118,8 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <span className="rounded-full border border-white/15 px-2 py-0.5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/70 px-2 py-0.5">
                 Up to {event.maxParticipants} people
               </span>
               {definition && (
@@ -1172,13 +1144,13 @@ type AlertPanelProps = {
 
 function AlertPanel({ title, description, actionLabel, onAction }: AlertPanelProps) {
   return (
-    <div className="rounded-3xl border border-amber-300/40 bg-amber-400/10 p-5 text-amber-100">
+    <div className="rounded-3xl border border-amber-400/40 bg-amber-400/10 p-5 text-amber-100">
       <h3 className="text-sm font-semibold">{title}</h3>
       <p className="mt-1 text-xs text-amber-100/80">{description}</p>
       <button
         type="button"
         onClick={onAction}
-        className="mt-4 rounded-full border border-amber-200/50 px-4 py-1.5 text-xs font-semibold text-amber-100"
+        className="mt-4 rounded-full border border-amber-200/60 px-4 py-1.5 text-xs font-semibold text-amber-100"
       >
         {actionLabel}
       </button>
@@ -1238,53 +1210,6 @@ function RangeSheet({ value, onChange, onApply, onClose }: RangeSheetProps) {
   );
 }
 
-type SidebarButtonProps = {
-  icon: typeof Compass;
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-};
-
-function SidebarButton({ icon: Icon, label, active, disabled }: SidebarButtonProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      className={classNames(
-        "flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-white/80",
-        active && "bg-white text-slate-900",
-        disabled && "opacity-40"
-      )}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </button>
-  );
-}
-
-type SidebarCategoryButtonProps = {
-  label: string;
-  icon?: typeof Sparkles;
-  active: boolean;
-  onClick: () => void;
-};
-
-function SidebarCategoryButton({ label, icon: Icon = Sparkles, active, onClick }: SidebarCategoryButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={classNames(
-        "flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm",
-        active ? "bg-emerald-400/20 text-emerald-200" : "text-white/70"
-      )}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </button>
-  );
-}
-
 type DiscoverySkeletonProps = {
   viewMode: ViewMode;
 };
@@ -1292,7 +1217,7 @@ type DiscoverySkeletonProps = {
 function DiscoverySkeleton({ viewMode }: DiscoverySkeletonProps) {
   if (viewMode === "map") {
     return (
-      <div className="h-[320px] animate-pulse rounded-3xl border border-white/10 bg-white/5 md:h-[420px]" />
+      <div className="h-[320px] animate-pulse rounded-3xl border border-border/70 bg-card/40 md:h-[420px]" />
     );
   }
 
@@ -1302,7 +1227,7 @@ function DiscoverySkeleton({ viewMode }: DiscoverySkeletonProps) {
         <div
           // eslint-disable-next-line react/no-array-index-key
           key={index}
-          className="h-40 animate-pulse rounded-3xl border border-white/5 bg-white/5"
+          className="h-40 animate-pulse rounded-3xl border border-border/60 bg-card/40"
         />
       ))}
     </div>
