@@ -52,6 +52,7 @@
 - Task 20.1: Add comprehensive error handling to all API routes (centralized response helper, middleware updates, deterministic property suite) — Commit `HEAD`.
 - Task 20.2: Add loading states to core pages (discovery landing, event creation, and chat views now show branded skeletons and pending indicators) — Commit `3fc95d9`.
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
+- Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) — Commit `af6a3b6`.
 
 
 ## In Progress / Priority Notes
@@ -59,5 +60,4 @@
 - **Next priority:** Task 20.4 — Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued message handling).
 
 ## Next Up
-1. Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued message handling).
-2. Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces.
+1. Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces.
