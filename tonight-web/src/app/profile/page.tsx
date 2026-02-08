@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import BlockUserButton from '@/components/BlockUserButton';
 import UserAvatar from '@/components/UserAvatar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -45,7 +46,7 @@ const fileToDataUrl = (file: File) =>
 const sanitize = (value: string) => value.trim();
 
 export default function ProfilePage() {
-  const { status: authStatus } = useRequireAuth();
+  const { status: authStatus, user: authUser } = useRequireAuth();
 
   if (authStatus === 'loading') {
     return <AuthStatusMessage label="Checking your session…" />;
@@ -59,10 +60,14 @@ export default function ProfilePage() {
     return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
-  return <AuthenticatedProfilePage />;
+  return <AuthenticatedProfilePage currentUserId={authUser?.id ?? null} />;
 }
 
-function AuthenticatedProfilePage() {
+type AuthenticatedProfilePageProps = {
+  currentUserId: string | null;
+};
+
+function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePageProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -286,6 +291,31 @@ function AuthenticatedProfilePage() {
                   </div>
                 </div>
               </div>
+            </section>
+
+            <section className="space-y-4 rounded-xl border border-zinc-100 p-6 shadow-sm">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-zinc-900">Safety</p>
+                <p className="text-xs text-zinc-500">
+                  Block someone if they make you uncomfortable. They won’t be able to chat with you or
+                  request to join your events.
+                </p>
+              </div>
+
+              <BlockUserButton
+                targetUserId={profile.id}
+                targetDisplayName={profile.displayName ?? profile.email}
+                className="items-start"
+                confirmTitle={profile.displayName ? `Block ${profile.displayName}?` : 'Block this user?'}
+                confirmMessage="They won’t be able to message you, join your events, or see your plans."
+                disabled={!currentUserId || profile.id === currentUserId}
+              />
+
+              {(!currentUserId || profile.id === currentUserId) ? (
+                <p className="text-xs text-zinc-500">
+                  Viewing your own profile. Visit another user’s profile to block them if needed.
+                </p>
+              ) : null}
             </section>
 
             {status ? <p className={`text-sm font-medium ${statusStyles}`}>{status.message}</p> : null}

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Flag, Info, Send, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Flag, Info, Send } from 'lucide-react';
 
+import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
 import { useSocket } from '@/hooks/useSocket';
@@ -93,6 +94,7 @@ export default function ChatConversation({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending'>('idle');
   const [socketNotice, setSocketNotice] = useState<string | null>(null);
+  const [hasBlockedCounterpart, setHasBlockedCounterpart] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
 
   const counterpart = useMemo(() => {
@@ -175,7 +177,10 @@ export default function ChatConversation({
   const handleSend = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (sendStatus === 'sending') {
+      if (sendStatus === 'sending' || hasBlockedCounterpart) {
+        if (hasBlockedCounterpart) {
+          setSendError('You blocked this user. Unblock them from your profile to keep chatting.');
+        }
         return;
       }
 
@@ -212,7 +217,7 @@ export default function ChatConversation({
         setSendStatus('idle');
       }
     },
-    [appendMessage, composerValue, joinRequestId, sendStatus]
+    [appendMessage, composerValue, hasBlockedCounterpart, joinRequestId, sendStatus]
   );
 
   const connectionLabel = STATUS_LABELS[connectionState] ?? 'Connecting…';
@@ -282,15 +287,21 @@ export default function ChatConversation({
             />
 
             <div className="flex items-center justify-center gap-4 border-t border-zinc-100 bg-zinc-50/80 px-6 py-3 text-[11px] text-zinc-500">
-              <button
-                type="button"
-                title="Blocking will be available soon"
-                className="flex items-center gap-1 rounded-full border border-transparent px-3 py-2 transition hover:border-zinc-200 hover:text-zinc-800"
-                disabled
-              >
-                <ShieldAlert className="h-3.5 w-3.5" />
-                Block
-              </button>
+              <BlockUserButton
+                targetUserId={counterpart.id}
+                targetDisplayName={counterpart.displayName ?? counterpart.email}
+                className="items-center text-[11px]"
+                label="Block"
+                confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
+                confirmMessage="They won’t be able to message you, join your events, or see your plans."
+                disabled={hasBlockedCounterpart}
+                onBlocked={() => {
+                  setHasBlockedCounterpart(true);
+                  setComposerValue('');
+                  setSendError('You blocked this user. Messages are now disabled.');
+                  setSocketNotice('You blocked this user. Messages are disabled going forward.');
+                }}
+              />
               <span className="h-3 w-px bg-zinc-200" />
               <button
                 type="button"
@@ -314,17 +325,23 @@ export default function ChatConversation({
                   onChange={(event) => setComposerValue(event.target.value)}
                   placeholder="Send a message"
                   rows={1}
-                  className="min-h-[48px] flex-1 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-pink-100"
+                  disabled={hasBlockedCounterpart}
+                  className="min-h-[48px] flex-1 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-pink-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-pink-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400"
                 />
                 <button
                   type="submit"
-                  disabled={sendStatus === 'sending' || composerValue.trim().length === 0}
+                  disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
                   className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-600 text-white transition hover:bg-pink-500 disabled:cursor-not-allowed disabled:bg-pink-200"
                   aria-label="Send message"
                 >
                   <Send className="h-5 w-5" />
                 </button>
               </form>
+              {hasBlockedCounterpart ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  You blocked this user. Manage safety settings from your profile if you change your mind.
+                </p>
+              ) : null}
               {sendError ? <p className="mt-2 text-sm text-rose-600">{sendError}</p> : null}
             </div>
           </div>
