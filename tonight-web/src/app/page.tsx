@@ -13,6 +13,7 @@ import {
   MapPin,
   Music,
   Plus,
+  RefreshCcw,
   SlidersHorizontal,
   Sparkles,
   UtensilsCrossed,
@@ -199,6 +200,7 @@ export default function HomePage() {
 
 function AuthenticatedHomePage() {
   const router = useRouter();
+  const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -420,12 +422,12 @@ function AuthenticatedHomePage() {
     locationStatus === "locating" || (eventsStatus === "loading" && visibleEvents.length === 0);
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] text-white">
-      <div className="mx-auto flex max-w-6xl flex-col md:flex-row">
+    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] px-4 pb-24 pt-4 text-white sm:px-6 md:pb-12 md:pt-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 md:flex-row md:gap-10">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
-          onCreate={() => router.push("/events/create")}
+          onCreate={handleCreate}
         />
 
         <div className="flex flex-1 flex-col">
@@ -545,6 +547,13 @@ function AuthenticatedHomePage() {
           </main>
         </div>
       </div>
+
+      <MobileActionBar
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onRefresh={handleRefresh}
+        onCreate={handleCreate}
+      />
 
       {rangeSheetOpen && (
         <RangeSheet
@@ -757,6 +766,13 @@ type MobileHeroProps = {
   onCategoryChange: (category: CategoryId | null) => void;
 };
 
+type MobileActionBarProps = {
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  onRefresh: () => void;
+  onCreate: () => void;
+};
+
 function MobileHero({
   viewMode,
   onViewModeChange,
@@ -773,7 +789,7 @@ function MobileHero({
   onCategoryChange,
 }: MobileHeroProps) {
   return (
-    <section className="rounded-3xl border border-white/5 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-4 py-5 text-white shadow-xl shadow-black/30 backdrop-blur md:hidden">
+    <section className="sticky top-0 z-30 rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-4 py-5 text-white shadow-xl shadow-black/40 backdrop-blur md:hidden">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-wide text-emerald-300">Tonight</p>
@@ -840,6 +856,61 @@ function MobileHero({
     </section>
   );
 }
+
+
+function MobileActionBar({ viewMode, onViewModeChange, onRefresh, onCreate }: MobileActionBarProps) {
+  const options: { value: ViewMode; label: string; icon: typeof ListIcon }[] = [
+    { value: 'list', label: 'List', icon: ListIcon },
+    { value: 'map', label: 'Map', icon: MapIcon },
+  ];
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-30 px-4 md:hidden">
+      <div className="pointer-events-auto space-y-3 rounded-3xl border border-white/10 bg-[#111428]/90 p-4 text-white shadow-2xl shadow-black/40 backdrop-blur">
+        <div className="flex items-center gap-2">
+          {options.map((option) => {
+            const Icon = option.icon;
+            const isActive = viewMode === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onViewModeChange(option.value)}
+                className={classNames(
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-2xl px-3 py-2 text-sm',
+                  isActive ? 'bg-white text-slate-900 shadow' : 'border border-white/10 bg-white/5 text-white/80'
+                )}
+                aria-pressed={isActive}
+              >
+                <Icon className="h-4 w-4" />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white/90"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={onCreate}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/40"
+          >
+            <Plus className="h-4 w-4" />
+            Host
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 type StatusCardsProps = {
   describeLocation: string;

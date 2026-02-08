@@ -53,7 +53,7 @@ export default function MessageList({
       return (
         <div className="space-y-3" role="status" aria-live="polite">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-16 w-full animate-pulse rounded-2xl bg-zinc-100" />
+            <div key={index} className="h-16 w-full animate-pulse rounded-2xl bg-white/10" />
           ))}
         </div>
       );
@@ -61,12 +61,12 @@ export default function MessageList({
 
     if (isError) {
       return (
-        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
+        <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 p-4 text-sm text-rose-100">
           <p>{error ?? 'We could not load this conversation.'}</p>
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 rounded-full border border-current px-4 py-2 text-xs font-semibold uppercase tracking-wide"
+            className="mt-3 rounded-full border border-rose-200/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-rose-100"
           >
             Try again
           </button>
@@ -76,7 +76,7 @@ export default function MessageList({
 
     if (!messages.length) {
       return (
-        <div className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-4 py-6 text-center text-sm text-zinc-500">
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 px-4 py-6 text-center text-sm text-white/70">
           No messages yet. Break the ice with a quick hello.
         </div>
       );
@@ -89,17 +89,17 @@ export default function MessageList({
           const bubbleClass = classNames(
             'max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
             message.deliveryStatus === 'failed'
-              ? 'border border-rose-200 bg-rose-50 text-rose-700'
+              ? 'border border-rose-400/50 bg-rose-500/10 text-rose-100'
               : isSelf
-                ? 'rounded-br-md bg-pink-600 text-white'
-                : 'rounded-bl-md border border-zinc-100 bg-white text-zinc-900'
+                ? 'rounded-br-md bg-emerald-400 text-slate-900'
+                : 'rounded-bl-md border border-white/15 bg-white/5 text-white'
           );
           const statusLabel = message.deliveryStatus ? DELIVERY_STATUS_LABELS[message.deliveryStatus] : null;
           const timestampLabel = formatMessageTimestamp(message.createdAt);
           const metaLabel = statusLabel
             ? [statusLabel, timestampLabel].filter(Boolean).join(' • ')
             : timestampLabel;
-          const metaTone = message.deliveryStatus === 'failed' ? 'text-rose-500' : 'text-zinc-400';
+          const metaTone = message.deliveryStatus === 'failed' ? 'text-rose-300' : 'text-white/50';
 
           return (
             <div key={message.id} className={classNames('flex flex-col gap-1', isSelf ? 'items-end' : 'items-start')}>
@@ -117,7 +117,7 @@ export default function MessageList({
   return (
     <div
       ref={scrollRef}
-      className={classNames('flex-1 space-y-4 overflow-y-auto px-6 py-6', className)}
+      className={classNames('flex-1 space-y-4 overflow-y-auto px-4 py-4 text-white sm:px-6 sm:py-6', className)}
       aria-live={isLoading ? 'polite' : undefined}
     >
       {content}
