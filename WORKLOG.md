@@ -41,12 +41,14 @@
 - Task 16.2: Write property tests for blocking (blocking service coverage, discovery filter assertion, chat guard enforcement) — Commit `0e3a7bf`.
 
 - Task 16.3: Harden geospatial block filtering (added bidirectional block parameter assertions in property suite) — Commit `c2aa6a6`.
+- Task 16.4: Update chat endpoints to check blocking. — Commit `dbc0bfc`.
+
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 16.3 — Update geospatial service to filter blocked users.
+- **Next priority:** Task 16.5 — Create BlockUserButton component.
 
 ## Next Up
-1. Task 16.4: Update chat endpoints to check blocking.
-2. Task 16.5: Create BlockUserButton component.
-3. Task 16.6: Add BlockUserButton to user profile and chat pages.
+1. Task 16.5: Create BlockUserButton component.
+2. Task 16.6: Add BlockUserButton to user profile and chat pages.
+3. Task 17.1: Create POST /api/reports.
