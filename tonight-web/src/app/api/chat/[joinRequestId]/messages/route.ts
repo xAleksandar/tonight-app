@@ -8,6 +8,7 @@ import {
   ChatUnauthorizedError,
   ChatJoinRequestNotAcceptedError,
   ChatMessageValidationError,
+  ChatBlockedError,
 } from '@/lib/chat';
 
 interface RouteContext {
@@ -76,6 +77,10 @@ export const getChatMessagesHandler: AuthenticatedRouteHandler<NextResponse> = a
       return NextResponse.json({ error: 'Chat is only available for accepted join requests' }, { status: 403 });
     }
 
+    if (error instanceof ChatBlockedError) {
+      return NextResponse.json({ error: 'Chat is not available between blocked users' }, { status: 403 });
+    }
+
     console.error('Failed to fetch chat messages', error);
     return NextResponse.json({ error: 'Unable to fetch chat messages' }, { status: 500 });
   }
@@ -125,6 +130,10 @@ export const postChatMessageHandler: AuthenticatedRouteHandler<NextResponse> = a
 
     if (error instanceof ChatMessageValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof ChatBlockedError) {
+      return NextResponse.json({ error: 'Chat is not available between blocked users' }, { status: 403 });
     }
 
     console.error('Failed to create chat message', error);
