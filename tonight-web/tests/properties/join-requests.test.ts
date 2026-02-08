@@ -3,8 +3,11 @@ import fc from 'fast-check';
 import {
   createJoinRequest,
   updateJoinRequestStatus,
+  listJoinRequestsForEvent,
   JoinRequestDuplicateError,
   JoinRequestEventFullError,
+  JoinRequestEventNotFoundError,
+  JoinRequestUnauthorizedError,
 } from '@/lib/join-requests';
 import { EventStatus, JoinRequestStatus } from '@/generated/prisma/client';
 
@@ -17,6 +20,7 @@ type MockPrisma = {
     count: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
   };
   $transaction: ReturnType<typeof vi.fn>;
 };
@@ -33,6 +37,7 @@ function createMockPrisma(): MockPrisma {
     count: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    findMany: vi.fn(),
   } as MockPrisma['joinRequest'];
 
   const prisma: MockPrisma = {
@@ -67,6 +72,7 @@ beforeEach(() => {
   prisma.joinRequest.count.mockReset();
   prisma.joinRequest.create.mockReset();
   prisma.joinRequest.update.mockReset();
+  prisma.joinRequest.findMany.mockReset();
   prisma.$transaction.mockReset();
   prisma.$transaction.mockImplementation(async (callback: (transactionClient: { event: typeof prisma.event; joinRequest: typeof prisma.joinRequest }) => Promise<unknown>) =>
     callback({ event: prisma.event, joinRequest: prisma.joinRequest })
@@ -249,5 +255,128 @@ describe('Property 26: Max Participants Enforcement', () => {
         expect(prisma.joinRequest.create).not.toHaveBeenCalled();
       })
     );
+  });
+});
+
+
+describe('Join request visibility for event hosts', () => {
+  it('returns serialized join requests with user information when the requester is the host', async () => {
+    const prisma = getMockPrisma();
+    const eventId = 'event-123';
+    const hostId = 'host-456';
+    const firstTimestamp = new Date('2030-01-01T00:00:00.000Z');
+    const secondTimestamp = new Date('2030-01-02T00:00:00.000Z');
+
+    prisma.event.findUnique.mockResolvedValue({
+      id: eventId,
+      hostId,
+    });
+
+    prisma.joinRequest.findMany.mockResolvedValue([
+      {
+        id: 'jr-1',
+        eventId,
+        userId: 'user-1',
+        status: JoinRequestStatus.PENDING,
+        createdAt: firstTimestamp,
+        updatedAt: firstTimestamp,
+        user: {
+          id: 'user-1',
+          email: 'user1@example.com',
+          displayName: 'User One',
+          photoUrl: null,
+          createdAt: firstTimestamp,
+        },
+      },
+      {
+        id: 'jr-2',
+        eventId,
+        userId: 'user-2',
+        status: JoinRequestStatus.ACCEPTED,
+        createdAt: secondTimestamp,
+        updatedAt: secondTimestamp,
+        user: {
+          id: 'user-2',
+          email: 'user2@example.com',
+          displayName: null,
+          photoUrl: 'https://example.com/photo.png',
+          createdAt: secondTimestamp,
+        },
+      },
+    ]);
+
+    const result = await listJoinRequestsForEvent({ eventId, hostId });
+
+    expect(prisma.joinRequest.findMany).toHaveBeenCalledWith({
+      where: { eventId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            photoUrl: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    expect(result).toEqual([
+      {
+        id: 'jr-1',
+        eventId,
+        userId: 'user-1',
+        status: JoinRequestStatus.PENDING,
+        createdAt: firstTimestamp.toISOString(),
+        updatedAt: firstTimestamp.toISOString(),
+        user: {
+          id: 'user-1',
+          email: 'user1@example.com',
+          displayName: 'User One',
+          photoUrl: null,
+          createdAt: firstTimestamp.toISOString(),
+        },
+      },
+      {
+        id: 'jr-2',
+        eventId,
+        userId: 'user-2',
+        status: JoinRequestStatus.ACCEPTED,
+        createdAt: secondTimestamp.toISOString(),
+        updatedAt: secondTimestamp.toISOString(),
+        user: {
+          id: 'user-2',
+          email: 'user2@example.com',
+          displayName: null,
+          photoUrl: 'https://example.com/photo.png',
+          createdAt: secondTimestamp.toISOString(),
+        },
+      },
+    ]);
+  });
+
+  it('throws when the requester is not the event host', async () => {
+    const prisma = getMockPrisma();
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'event-123',
+      hostId: 'host-actual',
+    });
+
+    await expect(
+      listJoinRequestsForEvent({ eventId: 'event-123', hostId: 'host-other' })
+    ).rejects.toBeInstanceOf(JoinRequestUnauthorizedError);
+    expect(prisma.joinRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it('throws when the event does not exist', async () => {
+    const prisma = getMockPrisma();
+    prisma.event.findUnique.mockResolvedValue(null);
+
+    await expect(
+      listJoinRequestsForEvent({ eventId: 'missing-event', hostId: 'host-any' })
+    ).rejects.toBeInstanceOf(JoinRequestEventNotFoundError);
+    expect(prisma.joinRequest.findMany).not.toHaveBeenCalled();
   });
 });

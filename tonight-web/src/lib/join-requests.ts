@@ -25,6 +25,16 @@ export type SerializedJoinRequest = {
   updatedAt: string;
 };
 
+export type SerializedJoinRequestWithUser = SerializedJoinRequest & {
+  user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    photoUrl: string | null;
+    createdAt: string;
+  };
+};
+
 export type CreateJoinRequestInput = {
   eventId: string;
   userId: string;
@@ -36,6 +46,11 @@ export type UpdateJoinRequestStatusInput = {
   status: JoinRequestStatus;
 };
 
+export type ListJoinRequestsForEventInput = {
+  eventId: string;
+  hostId: string;
+};
+
 const serializeJoinRequest = (record: JoinRequest): SerializedJoinRequest => ({
   id: record.id,
   eventId: record.eventId,
@@ -44,6 +59,29 @@ const serializeJoinRequest = (record: JoinRequest): SerializedJoinRequest => ({
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
 });
+
+const serializeJoinRequestWithUser = (
+  record: JoinRequest & {
+    user: {
+      id: string;
+      email: string;
+      displayName: string | null;
+      photoUrl: string | null;
+      createdAt: Date;
+    };
+  }
+): SerializedJoinRequestWithUser => {
+  return {
+    ...serializeJoinRequest(record),
+    user: {
+      id: record.user.id,
+      email: record.user.email,
+      displayName: record.user.displayName,
+      photoUrl: record.user.photoUrl,
+      createdAt: record.user.createdAt.toISOString(),
+    },
+  };
+};
 
 const calculateJoinCapacity = (maxParticipants: number) => {
   const capacity = Math.floor(maxParticipants) - 1;
@@ -168,4 +206,42 @@ export const updateJoinRequestStatus = async (
 
     return serializeJoinRequest(record);
   });
+};
+
+export const listJoinRequestsForEvent = async (
+  input: ListJoinRequestsForEventInput
+): Promise<SerializedJoinRequestWithUser[]> => {
+  const event = await prisma.event.findUnique({
+    where: { id: input.eventId },
+    select: {
+      id: true,
+      hostId: true,
+    },
+  });
+
+  if (!event) {
+    throw new JoinRequestEventNotFoundError('Event not found');
+  }
+
+  if (event.hostId !== input.hostId) {
+    throw new JoinRequestUnauthorizedError('You are not allowed to view join requests for this event');
+  }
+
+  const joinRequests = await prisma.joinRequest.findMany({
+    where: { eventId: input.eventId },
+    orderBy: { createdAt: 'asc' },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          photoUrl: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  return joinRequests.map((record) => serializeJoinRequestWithUser(record));
 };
