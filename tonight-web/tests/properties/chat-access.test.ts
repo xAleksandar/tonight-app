@@ -13,6 +13,9 @@ type MockPrisma = {
   message: {
     findMany: ReturnType<typeof vi.fn>;
   };
+  blockedUser: {
+    findFirst: ReturnType<typeof vi.fn>;
+  };
 };
 
 function createMockPrisma(): MockPrisma {
@@ -22,6 +25,9 @@ function createMockPrisma(): MockPrisma {
     },
     message: {
       findMany: vi.fn(),
+    },
+    blockedUser: {
+      findFirst: vi.fn(),
     },
   };
 }
@@ -45,6 +51,8 @@ beforeEach(() => {
   const prisma = getMockPrisma();
   prisma.joinRequest.findUnique.mockReset();
   prisma.message.findMany.mockReset();
+  prisma.blockedUser.findFirst.mockReset();
+  prisma.blockedUser.findFirst.mockResolvedValue(null);
 });
 
 const messagesArbitrary = fc.array(

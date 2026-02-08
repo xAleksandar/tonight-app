@@ -13,6 +13,7 @@ export class ChatJoinRequestNotFoundError extends ChatError {}
 export class ChatUnauthorizedError extends ChatError {}
 export class ChatJoinRequestNotAcceptedError extends ChatError {}
 export class ChatMessageValidationError extends ChatError {}
+export class ChatBlockedError extends ChatError {}
 
 export type SerializedMessage = {
   id: string;
@@ -69,6 +70,22 @@ const normalizeParticipantRole = (joinRequest: JoinRequestAccessRecord, userId: 
   return null;
 };
 
+const assertParticipantsNotBlocked = async (hostId: string, participantId: string) => {
+  const existingBlock = await prisma.blockedUser.findFirst({
+    where: {
+      OR: [
+        { blockerId: hostId, blockedId: participantId },
+        { blockerId: participantId, blockedId: hostId },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (existingBlock) {
+    throw new ChatBlockedError('Chat is not available between blocked users');
+  }
+};
+
 const ensureChatAccess = async (input: ChatAccessInput) => {
   const joinRequest = await prisma.joinRequest.findUnique({
     where: { id: input.joinRequestId },
@@ -96,6 +113,8 @@ const ensureChatAccess = async (input: ChatAccessInput) => {
   if (joinRequest.status !== JoinRequestStatus.ACCEPTED) {
     throw new ChatJoinRequestNotAcceptedError('Chat is only available for accepted join requests');
   }
+
+  await assertParticipantsNotBlocked(joinRequest.event.hostId, joinRequest.userId);
 
   return {
     joinRequestId: joinRequest.id,

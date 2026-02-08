@@ -153,3 +153,27 @@ describe('Property 21: Distance-Based Result Ordering', () => {
     );
   });
 });
+
+describe('Property 32: Bidirectional Event Discovery Blocking', () => {
+  it('injects a bidirectional block clause into the spatial query', async () => {
+    await fc.assert(
+      fc.asyncProperty(finiteLatitude(), finiteLongitude(), fc.uuid(), async (lat, lng, userId) => {
+        const prisma = getMockPrisma();
+        prisma.$queryRaw.mockClear();
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await findNearbyEvents(lat, lng, undefined, userId);
+
+        const callArgs = prisma.$queryRaw.mock.calls.at(-1) ?? [];
+        const strings = Array.isArray(callArgs[0]) ? (callArgs[0] as readonly string[]) : [];
+        const queryText = strings.join(' ');
+
+        expect(queryText).toContain('FROM "BlockedUser"');
+        expect(queryText).toContain('b."blockerId" = ');
+        expect(queryText).toContain('b."blockedId" = e."hostId"');
+        expect(queryText).toContain('b."blockerId" = e."hostId"');
+        expect(queryText).toContain('b."blockedId" = ');
+      })
+    );
+  });
+});

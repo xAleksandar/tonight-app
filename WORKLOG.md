@@ -38,12 +38,13 @@
 - Task 15.6: Create MessageList component (scrollable conversation view, shared loading/empty/error states, timestamped bubbles) — Commit `b4d7ce6`.
 - Task 18.1-18.4: Implement welcome/login experience, AuthProvider wrapping, and protected routing (login page, session checks, redirects) — Commit `17e347d`.
 - Task 16.1: Create POST /api/users/block (validation, duplicate prevention, target existence checks) — Commit `446d2a7`.
+- Task 16.2: Write property tests for blocking (blocking service coverage, discovery filter assertion, chat guard enforcement) — Commit `0e3a7bf`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 16.2 — Write property tests for blocking.
+- **Next priority:** Task 16.3 — Update geospatial service to filter blocked users.
 
 ## Next Up
-1. Task 16.2: Write property tests for blocking.
-2. Task 16.3: Update geospatial service to filter blocked users.
-3. Task 16.4: Update chat endpoints to check blocking.
+1. Task 16.3: Update geospatial service to filter blocked users.
+2. Task 16.4: Update chat endpoints to check blocking.
+3. Task 16.5: Create BlockUserButton component.

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { JoinRequestStatus } from '@/generated/prisma/client';
-import { createMessageForJoinRequest, CHAT_MESSAGE_MAX_LENGTH } from '@/lib/chat';
+import { createMessageForJoinRequest, CHAT_MESSAGE_MAX_LENGTH, ChatBlockedError } from '@/lib/chat';
 
 type MockPrisma = {
   joinRequest: {
@@ -9,6 +9,9 @@ type MockPrisma = {
   };
   message: {
     create: ReturnType<typeof vi.fn>;
+  };
+  blockedUser: {
+    findFirst: ReturnType<typeof vi.fn>;
   };
 };
 
@@ -28,6 +31,9 @@ function createMockPrisma(): MockPrisma {
     },
     message: {
       create: vi.fn(),
+    },
+    blockedUser: {
+      findFirst: vi.fn(),
     },
   };
 }
@@ -83,6 +89,8 @@ beforeEach(() => {
   const prisma = getMockPrisma();
   prisma.joinRequest.findUnique.mockReset();
   prisma.message.create.mockReset();
+  prisma.blockedUser.findFirst.mockReset();
+  prisma.blockedUser.findFirst.mockResolvedValue(null);
 
   const socketService = getMockSocketService();
   socketService.emitMessage.mockReset();
@@ -234,6 +242,44 @@ describe('Property 30: Real-Time Message Delivery', () => {
           }
 
           consoleErrorSpy.mockRestore();
+        }
+      )
+    );
+  });
+});
+
+describe('Property 33: Message Blocking', () => {
+  it('prevents chat messages between any blocked host/participant pair', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        messageContentArbitrary,
+        fc.boolean(),
+        async (joinRequestId, hostId, participantId, content, requesterIsHost) => {
+          const prisma = getMockPrisma();
+          const socketService = getMockSocketService();
+
+          prisma.joinRequest.findUnique.mockResolvedValue(
+            buildAcceptedJoinRequest(joinRequestId, hostId, participantId)
+          );
+
+          prisma.blockedUser.findFirst.mockResolvedValue({
+            id: 'blocked-record',
+            blockerId: requesterIsHost ? hostId : participantId,
+            blockedId: requesterIsHost ? participantId : hostId,
+            createdAt: new Date('2030-01-01T00:00:00.000Z'),
+          });
+
+          const userId = requesterIsHost ? hostId : participantId;
+
+          await expect(createMessageForJoinRequest({ joinRequestId, userId, content })).rejects.toBeInstanceOf(
+            ChatBlockedError
+          );
+
+          expect(prisma.message.create).not.toHaveBeenCalled();
+          expect(socketService.emitMessage).not.toHaveBeenCalled();
         }
       )
     );
