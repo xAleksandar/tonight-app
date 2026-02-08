@@ -15,9 +15,9 @@ const STATUS_LABELS: Record<JoinRequestStatus, string> = {
 };
 
 const STATUS_BADGE_STYLES: Record<JoinRequestStatus, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border border-amber-100',
-  ACCEPTED: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-  REJECTED: 'bg-rose-50 text-rose-700 border border-rose-100',
+  PENDING: 'border border-amber-400/40 bg-amber-400/10 text-amber-200',
+  ACCEPTED: 'border border-emerald-400/40 bg-emerald-400/10 text-emerald-200',
+  REJECTED: 'border border-rose-400/40 bg-rose-400/10 text-rose-200',
 };
 
 type JoinRequestWithUser = {
@@ -232,6 +232,19 @@ export default function JoinRequestsManagementPage() {
     void loadData();
   }, [loadData]);
 
+  const heroMeta = useMemo(
+    () => [
+      { label: 'Plan', value: eventTitle || 'Waiting for event…' },
+      { label: 'When', value: eventDate ?? 'TBD' },
+      { label: 'Where', value: eventLocation || 'TBD' },
+      {
+        label: 'Capacity',
+        value: typeof maxParticipants === 'number' ? `${maxParticipants} guests` : '—',
+      },
+    ],
+    [eventDate, eventLocation, eventTitle, maxParticipants]
+  );
+
   const updateStatus = useCallback(
     async (joinRequestId: string, nextStatus: 'accepted' | 'rejected') => {
       setActionState((prev) => ({
@@ -293,60 +306,64 @@ export default function JoinRequestsManagementPage() {
   );
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 py-10 text-zinc-900">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <header className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-pink-600">Host tools</p>
-          <h1 className="text-4xl font-semibold">Join requests</h1>
-          {eventTitle ? <p className="text-sm text-zinc-500">{eventTitle}</p> : null}
-          <div className="flex flex-col gap-2 text-sm text-zinc-500 sm:flex-row sm:items-center sm:gap-4">
-            {eventDate ? <span>{eventDate}</span> : null}
-            {eventLocation ? (
-              <span className="text-zinc-600">
-                {eventDate ? <span className="mx-2">•</span> : null}
-                {eventLocation}
-              </span>
-            ) : null}
-            {typeof maxParticipants === 'number' ? (
-              <span className="text-zinc-600">
-                {(eventDate || eventLocation) ? <span className="mx-2">•</span> : null}
-                Capacity: {maxParticipants}
-              </span>
-            ) : null}
+    <div className="min-h-dvh bg-gradient-to-b from-[#0c1024] via-[#090f1d] to-[#05070f] px-4 py-10 text-foreground sm:px-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8">
+        <header className="rounded-[32px] border border-white/10 bg-white/5 px-6 py-8 shadow-2xl shadow-black/40 backdrop-blur">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Host tools</p>
+              <h1 className="mt-2 text-4xl font-semibold text-white">Join requests</h1>
+              <p className="mt-3 text-sm text-white/70">
+                {eventTitle
+                  ? `Review and confirm guests for ${eventTitle}.`
+                  : 'Review tonight’s guests and confirm who’s in.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={refresh}
+                className="rounded-full border border-white/30 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
+                disabled={pageStatus === 'loading'}
+              >
+                {pageStatus === 'loading' ? 'Refreshing…' : 'Refresh list'}
+              </button>
+              <Link
+                href="/events/create"
+                className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90"
+              >
+                Create another event
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <button
-              type="button"
-              onClick={refresh}
-              className="rounded-full border border-zinc-200 px-4 py-2 font-semibold text-zinc-700 transition hover:border-violet-500 hover:text-violet-600 disabled:cursor-not-allowed disabled:border-zinc-100"
-              disabled={pageStatus === 'loading'}
-            >
-              {pageStatus === 'loading' ? 'Refreshing…' : 'Refresh list'}
-            </button>
-            <Link
-              href="/events/create"
-              className="rounded-full border border-transparent bg-violet-600 px-4 py-2 font-semibold text-white transition hover:bg-violet-500"
-            >
-              Create another event
-            </Link>
+          <div className="mt-6 grid gap-4 text-sm text-white/80 sm:grid-cols-2 lg:grid-cols-4">
+            {heroMeta.map((entry) => (
+              <div
+                key={entry.label}
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-inner shadow-black/20"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">{entry.label}</p>
+                <p className="mt-1 text-base font-semibold text-white">{entry.value}</p>
+              </div>
+            ))}
           </div>
         </header>
 
         {pageError ? (
-          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
+          <div className="rounded-3xl border border-rose-400/40 bg-rose-500/10 px-5 py-4 text-sm text-rose-100 shadow-lg shadow-rose-900/20">
             {pageError}
           </div>
         ) : null}
 
         {pageStatus === 'loading' ? (
-          <div className="rounded-2xl border border-zinc-100 bg-white p-6 text-sm text-zinc-500">Loading join requests…</div>
+          <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-6 text-sm text-white/70 shadow-lg shadow-black/20">Loading join requests…</div>
         ) : null}
 
         {pageStatus === 'idle' && !pageError ? (
           <section className="grid gap-4 sm:grid-cols-3">
-            <StatCard label="Pending" value={statistics.pending} accent="text-amber-600" />
-            <StatCard label="Accepted" value={statistics.accepted} accent="text-emerald-600" />
-            <StatCard label="Rejected" value={statistics.rejected} accent="text-rose-600" />
+            <StatCard label="Pending" value={statistics.pending} accent="text-amber-200" />
+            <StatCard label="Accepted" value={statistics.accepted} accent="text-emerald-200" />
+            <StatCard label="Rejected" value={statistics.rejected} accent="text-rose-200" />
           </section>
         ) : null}
 
@@ -412,11 +429,11 @@ const RequestSection = ({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-2xl font-semibold">{title}</h2>
-        <p className="text-sm text-zinc-500">{description}</p>
+        <h2 className="text-2xl font-semibold text-white">{title}</h2>
+        <p className="text-sm text-white/70">{description}</p>
       </div>
       {requests.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+        <p className="rounded-3xl border border-dashed border-white/15 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
           {emptyMessage}
         </p>
       ) : (
@@ -453,7 +470,7 @@ const RequestCard = ({ request, actionState, notice, onDecision, readOnly = fals
   const waiting = isAccepting || isRejecting;
 
   return (
-    <div className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm">
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-white shadow-xl shadow-black/20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 items-center gap-3">
           <UserAvatar
@@ -463,13 +480,13 @@ const RequestCard = ({ request, actionState, notice, onDecision, readOnly = fals
             size="md"
           />
           <div className="space-y-1">
-            <p className="text-base font-semibold text-zinc-900">
+            <p className="text-base font-semibold text-white">
               {request.user.displayName ?? request.user.email}
             </p>
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-white/70">
               {relativeTime ? `Requested ${relativeTime}` : 'Request time unavailable'}
             </p>
-            {joined ? <p className="text-xs text-zinc-400">On Tonight since {joined}</p> : null}
+            {joined ? <p className="text-xs text-white/50">On Tonight since {joined}</p> : null}
           </div>
         </div>
         <span className={`inline-flex h-fit items-center rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE_STYLES[request.status]}`}>
@@ -483,7 +500,7 @@ const RequestCard = ({ request, actionState, notice, onDecision, readOnly = fals
             type="button"
             onClick={() => onDecision?.(request.id, 'rejected')}
             disabled={waiting}
-            className="rounded-full border border-zinc-200 px-5 py-2 text-sm font-semibold text-zinc-700 transition hover:border-rose-300 hover:text-rose-600 disabled:cursor-not-allowed disabled:border-zinc-100 disabled:text-zinc-400"
+            className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white/80 transition hover:border-rose-200/60 hover:text-rose-200 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
           >
             {waiting && isRejecting ? 'Passing…' : 'Pass'}
           </button>
@@ -491,7 +508,7 @@ const RequestCard = ({ request, actionState, notice, onDecision, readOnly = fals
             type="button"
             onClick={() => onDecision?.(request.id, 'accepted')}
             disabled={waiting}
-            className="rounded-full bg-pink-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-pink-500 disabled:cursor-not-allowed disabled:bg-zinc-200"
+            className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
           >
             {waiting && isAccepting ? 'Inviting…' : 'Invite'}
           </button>
@@ -500,7 +517,7 @@ const RequestCard = ({ request, actionState, notice, onDecision, readOnly = fals
 
       {notice ? (
         <p
-          className={`mt-3 text-sm ${notice.intent === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}
+          className={`mt-3 text-sm ${notice.intent === 'error' ? 'text-rose-200' : 'text-emerald-200'}`}
         >
           {notice.message}
         </p>
@@ -517,9 +534,9 @@ type StatCardProps = {
 
 const StatCard = ({ label, value, accent }: StatCardProps) => {
   return (
-    <div className="rounded-3xl border border-zinc-100 bg-white p-6 shadow-sm">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className={`mt-2 text-4xl font-semibold ${accent}`}>{value}</p>
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
+      <p className="text-xs font-semibold uppercase tracking-wide text-white/60">{label}</p>
+      <p className={`mt-3 text-4xl font-semibold ${accent}`}>{value}</p>
     </div>
   );
 };
