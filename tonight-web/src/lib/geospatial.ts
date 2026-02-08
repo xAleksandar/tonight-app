@@ -1,5 +1,6 @@
 import { Prisma, EventStatus } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
+import { expirePastEvents } from '@/lib/event-expiration';
 
 const EARTH_SRID = 4326;
 export const DEFAULT_RADIUS_METERS = 10_000;
@@ -54,6 +55,8 @@ export const findNearbyEvents = async (
   if (!userId) {
     throw new Error('userId is required');
   }
+
+  await expirePastEvents();
 
   const lat = assertFiniteCoordinate(latitude, 'latitude');
   const lng = assertFiniteCoordinate(longitude, 'longitude');

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { findNearbyEvents, DEFAULT_RADIUS_METERS, type NearbyEventRecord } from '@/lib/geospatial';
+import { expirePastEvents } from '@/lib/event-expiration';
 
 interface MockPrisma {
   $queryRaw: ReturnType<typeof vi.fn>;
@@ -20,6 +21,12 @@ vi.mock('@/lib/prisma', () => {
   return { prisma };
 });
 
+vi.mock('@/lib/event-expiration', () => ({
+  expirePastEvents: vi.fn(),
+}));
+
+const mockedExpirePastEvents = vi.mocked(expirePastEvents);
+
 const getMockPrisma = (): MockPrisma => {
   const prisma = (globalThis as GlobalWithPrisma).__TEST_PRISMA__;
   if (!prisma) {
@@ -31,6 +38,7 @@ const getMockPrisma = (): MockPrisma => {
 beforeEach(() => {
   const prisma = getMockPrisma();
   prisma.$queryRaw.mockReset();
+  mockedExpirePastEvents.mockReset();
 });
 
 const finiteLatitude = () => fc.double({ min: -89.999, max: 89.999, noDefaultInfinity: true, noNaN: true });
@@ -52,6 +60,26 @@ const stubNearbyEvents = (distances: Array<number | string>): NearbyEventRecord[
     distanceMeters: distance as number,
   })) as NearbyEventRecord[];
 };
+
+describe('Property 17: Expired Event Exclusion from Discovery', () => {
+  it('triggers the expiration routine before executing the spatial query', async () => {
+    await fc.assert(
+      fc.asyncProperty(finiteLatitude(), finiteLongitude(), fc.uuid(), async (lat, lng, userId) => {
+        const prisma = getMockPrisma();
+        prisma.$queryRaw.mockResolvedValue([]);
+        mockedExpirePastEvents.mockClear();
+        prisma.$queryRaw.mockClear();
+
+        await findNearbyEvents(lat, lng, undefined, userId);
+
+        expect(mockedExpirePastEvents).toHaveBeenCalledTimes(1);
+        const expireOrder = mockedExpirePastEvents.mock.invocationCallOrder[0] ?? 0;
+        const queryOrder = prisma.$queryRaw.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER;
+        expect(expireOrder).toBeLessThan(queryOrder);
+      })
+    );
+  });
+});
 
 describe('Property 18: Radius-Based Event Discovery', () => {
   it('injects the provided radius into the spatial query fragment', async () => {

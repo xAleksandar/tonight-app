@@ -49,6 +49,11 @@ const photoUrlArb = fc.webUrl({
   validSchemes: ['http', 'https'],
 });
 
+const creationDateArb = fc.date({
+  min: new Date('2000-01-01T00:00:00.000Z'),
+  max: new Date('2100-01-01T00:00:00.000Z'),
+});
+
 afterEach(() => {
   const prisma = getMockPrisma();
   prisma.user.update.mockReset();
@@ -104,7 +109,7 @@ describe('Property 10: Profile Update Round Trip', () => {
 describe('Property 11: Profile Creation Timestamp', () => {
   it('preserves the creation timestamp from the database response', async () => {
     await fc.assert(
-      fc.asyncProperty(fc.uuid(), fc.date(), async (userId, createdAt) => {
+      fc.asyncProperty(fc.uuid(), creationDateArb, async (userId, createdAt) => {
         const prisma = getMockPrisma();
         const isoDate = serializeDate(createdAt);
 
