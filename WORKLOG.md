@@ -52,12 +52,12 @@
 - Task 20.1: Add comprehensive error handling to all API routes (centralized response helper, middleware updates, deterministic property suite) — Commit `90a31dd`.
 - Task 20.2: Add loading states to core pages (discovery landing, event creation, and chat views now show branded skeletons and pending indicators) — Commit `3fc95d9`.
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
-- Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) — Commit `af6a3b6`.
+- Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces (sticky mobile hero/action bar, redesigned profile editor, chat conversation/message theming) — Commit `1a26c6c`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
 - **Immediate priority:** Task 20.5 — extend the refreshed design system to responsive states across discovery, profile, and chat surfaces.
 
 ## Next Up
-1. Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces.
-2. Task 20.6+: Continue the polish backlog (QA the remaining Tonight UI screens against the design package).
+1. Task 20.6: Continue the polish backlog (QA the remaining Tonight UI screens against the design package).
+2. Task 21: Write UI tests to lock in the refreshed experience.
