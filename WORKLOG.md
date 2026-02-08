@@ -18,7 +18,10 @@
 - Task 10.6: Write Property 22 (list view required fields) tests — Commit `49aa908`.
 - Task 11.1: Create event creation page (Mapbox-integrated creation form, validation, geolocation helper, POST /api/events wiring) — Commit `2241eec`.
 - Task 11.2: Create home/discovery page (App Router entry with location detection, map/list toggles, radius summary, and CTA wiring) — Commit `4185c8c`.
+- Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx with host summary, capacity details, CTA wiring) — Commit `46870cc`.
+- Task 12.1: Create POST /api/join-requests (validation, service orchestration, API wiring) — Commit `30018a13`.
+- Task 12.2: Write property tests for join request creation (pending status, duplicate prevention, capacity enforcement) — Commit `30018a13`.
 
 ## Next Up
-1. Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx).
-2. Task 12.1: Create POST /api/join-requests.
+1. Task 12.3: Create PATCH /api/join-requests/[id].
+2. Task 12.4: Write property test for join request status transitions.
