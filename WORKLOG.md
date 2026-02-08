@@ -54,11 +54,12 @@
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
 - Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces (sticky mobile hero/action bar, redesigned profile editor, chat conversation/message theming) — Commit `1a26c6c`.
 - Task 20.5 follow-up: Matched the home/discovery screen to the tonight-meetup-app-designs system (desktop sidebar/header parity, refreshed discovery cards, mobile hero/action bar + toolbar, map/list toggle updates) — Commit `341c605`.
+- Task 20.6.1: Restyled the create event surface to mirror the tonight-meetup-app-designs package (dark hero, glass form cards, refreshed Mapbox picker tone, hosting guidance) — Commit `50310f3`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
 - **Immediate priority:** Task 20.5 — extend the refreshed design system to responsive states across discovery, profile, and chat surfaces.
 
 ## Next Up
-1. Task 20.6: Continue the polish backlog (QA the remaining Tonight UI screens against the design package).
+1. Task 20.6 (cont.): Bring the remaining screens (join-requests dashboard, chat surfaces, welcome/auth) to the tonight-meetup-app-designs visual baseline.
 2. Task 21: Write UI tests to lock in the refreshed experience.
