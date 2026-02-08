@@ -18,6 +18,7 @@
 - Task 10.6: Write Property 22 (list view required fields) tests — Commit `49aa908`.
 - Task 11.1: Create event creation page (Mapbox-integrated creation form, validation, geolocation helper, POST /api/events wiring) — Commit `2241eec`.
 - Task 11.2: Create home/discovery page (App Router entry with location detection, map/list toggles, radius summary, and CTA wiring) — Commit `4185c8c`.
+- Task 11.2a: Rebuild the home/discovery screen to match the tonight-meetup-app-designs experience (desktop sidebar/header, mobile hero, range selector, category filters, refreshed list/map UI, and status cards) — Commit `14e2776`.
 - Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx with host summary, capacity details, CTA wiring) — Commit `46870cc`.
 - Task 12.1: Create POST /api/join-requests (validation, service orchestration, API wiring) — Commit `30018a13`.
 - Task 12.2: Write property tests for join request creation (pending status, duplicate prevention, capacity enforcement) — Commit `30018a13`.
@@ -39,7 +40,6 @@
 - Task 18.1-18.4: Implement welcome/login experience, AuthProvider wrapping, and protected routing (login page, session checks, redirects) — Commit `17e347d`.
 - Task 16.1: Create POST /api/users/block (validation, duplicate prevention, target existence checks) — Commit `446d2a7`.
 - Task 16.2: Write property tests for blocking (blocking service coverage, discovery filter assertion, chat guard enforcement) — Commit `0e3a7bf`.
-
 - Task 16.3: Harden geospatial block filtering (added bidirectional block parameter assertions in property suite) — Commit `c2aa6a6`.
 - Task 16.4: Update chat endpoints to check blocking. — Commit `dbc0bfc`.
 - Task 16.5: Create BlockUserButton component (confirmation popover, API orchestration, RTL coverage) — Commit `31c2443`.
@@ -49,15 +49,15 @@
 - Task 17.3: Create ReportModal component (design-aligned modal, optimistic submission UX, RTL coverage) — Commit `06c0dd5`.
 - Task 17.4: Add report actions to event detail modal and user profile safety settings (ReportModal wiring + success messaging + design-aligned CTAs) — Commit `74aab95`.
 - Task 19: Final checkpoint — reran full `npm test` property suite (62 tests / 40 properties) to ensure chat, safety, and reporting changes stayed green — Commit `cc41d55`.
-- Task 20.1: Add comprehensive error handling to all API routes (centralized response helper, middleware updates, deterministic property suite) — Commit `HEAD`.
+- Task 20.1: Add comprehensive error handling to all API routes (centralized response helper, middleware updates, deterministic property suite) — Commit `90a31dd`.
 - Task 20.2: Add loading states to core pages (discovery landing, event creation, and chat views now show branded skeletons and pending indicators) — Commit `3fc95d9`.
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
 - Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) — Commit `af6a3b6`.
 
-
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 20.4 — Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued message handling).
+- **Immediate priority:** Task 20.5 — extend the refreshed design system to responsive states across discovery, profile, and chat surfaces.
 
 ## Next Up
 1. Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces.
+2. Task 20.6+: Continue the polish backlog (QA the remaining Tonight UI screens against the design package).
