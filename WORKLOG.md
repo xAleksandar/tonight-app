@@ -44,7 +44,7 @@
 - Task 16.4: Update chat endpoints to check blocking. — Commit `dbc0bfc`.
 - Task 16.5: Create BlockUserButton component (confirmation popover, API orchestration, RTL coverage) — Commit `31c2443`.
 - Task 16.6: Add BlockUserButton to user profile and chat pages (profile safety card, chat action rail, composer blocking state) — Commit `8b7c9e0`.
-- Task 17.1: Create POST /api/reports (validation + service layer + authenticated route, npm test) — Commit `3d92986`.
+- Task 17.1: Create POST /api/reports (validation + service layer + authenticated route, npm test) — Commit `b34a35d`.
 
 
 ## In Progress / Priority Notes
