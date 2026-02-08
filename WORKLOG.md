@@ -25,7 +25,10 @@
 - Task 12.4: Write property test for join request status transitions (hosts can accept/reject pending requests and persist new status) — Commit `e9ad105`.
 - Task 12.5: Create GET /api/join-requests/for-event/[eventId] (host-only join request listing API + property tests) — Commit `8378dc5`.
 - Task 12.6: Add join request handling to EventDetailModal. — Commit `e16069b`.
+- Task 12.7: Create join requests management page (host dashboard with pending/accepted/rejected filters, inline accept/reject actions, refresh controls) — Commit `db3be8b`.
+- Task 13: Join request checkpoint (ran full `npm test` suite to ensure join request properties stay green) — Commit `55cdcc2`.
 
 ## Next Up
-1. Task 12.7: Create join requests management page (app/events/[id]/requests/page.tsx).
-2. Task 13: Checkpoint - Ensure join request tests pass.
+1. Task 14.1: Create Socket.IO service (lib/socket.ts).
+2. Task 14.2: Set up Socket.IO server in Next.js.
+3. Task 14.3: Create Socket.IO client hook (hooks/useSocket.ts).
