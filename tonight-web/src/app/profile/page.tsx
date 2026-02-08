@@ -1,7 +1,9 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Flag } from 'lucide-react';
 import BlockUserButton from '@/components/BlockUserButton';
+import ReportModal from '@/components/ReportModal';
 import UserAvatar from '@/components/UserAvatar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -74,6 +76,8 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
   const [photoInput, setPhotoInput] = useState('');
   const [status, setStatus] = useState<StatusState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportNotice, setReportNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -106,8 +110,16 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
     };
   }, []);
 
+  useEffect(() => {
+    setReportNotice(null);
+    setReportModalOpen(false);
+  }, [profile?.id]);
+
   const initialDisplayName = profile?.displayName ?? '';
   const initialPhoto = profile?.photoUrl ?? '';
+
+  const viewingOwnProfile = !currentUserId || (profile ? profile.id === currentUserId : true);
+  const canReportUser = Boolean(profile && currentUserId && profile.id !== currentUserId);
 
   const hasDisplayNameChange = displayNameInput !== initialDisplayName;
   const hasPhotoChange = photoInput !== initialPhoto;
@@ -194,8 +206,9 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
   }, [status]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 py-8 text-zinc-900">
-      <div className="mx-auto max-w-3xl space-y-8 rounded-2xl bg-white p-8 shadow-sm">
+    <>
+      <div className="min-h-screen bg-zinc-50 px-4 py-8 text-zinc-900">
+        <div className="mx-auto max-w-3xl space-y-8 rounded-2xl bg-white p-8 shadow-sm">
         <div className="space-y-1">
           <p className="text-sm font-semibold uppercase text-violet-600">Account</p>
           <h1 className="text-3xl font-semibold">Profile</h1>
@@ -297,25 +310,41 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-zinc-900">Safety</p>
                 <p className="text-xs text-zinc-500">
-                  Block someone if they make you uncomfortable. They won’t be able to chat with you or
-                  request to join your events.
+                  Block or report someone if they make you uncomfortable. Safety notes stay private with the
+                  Tonight team.
                 </p>
               </div>
 
-              <BlockUserButton
-                targetUserId={profile.id}
-                targetDisplayName={profile.displayName ?? profile.email}
-                className="items-start"
-                confirmTitle={profile.displayName ? `Block ${profile.displayName}?` : 'Block this user?'}
-                confirmMessage="They won’t be able to message you, join your events, or see your plans."
-                disabled={!currentUserId || profile.id === currentUserId}
-              />
+              <div className="flex flex-wrap gap-3">
+                <BlockUserButton
+                  targetUserId={profile.id}
+                  targetDisplayName={profile.displayName ?? profile.email}
+                  className="items-start"
+                  confirmTitle={profile.displayName ? `Block ${profile.displayName}?` : 'Block this user?'}
+                  confirmMessage="They won’t be able to message you, join your events, or see your plans."
+                  disabled={viewingOwnProfile}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canReportUser) return;
+                    setReportModalOpen(true);
+                  }}
+                  disabled={!canReportUser}
+                  className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Flag className="h-4 w-4" />
+                  Report user
+                </button>
+              </div>
 
-              {(!currentUserId || profile.id === currentUserId) ? (
-                <p className="text-xs text-zinc-500">
-                  Viewing your own profile. Visit another user’s profile to block them if needed.
-                </p>
-              ) : null}
+              <p className={`text-xs ${reportNotice ? 'text-emerald-600' : 'text-zinc-500'}`}>
+                {reportNotice
+                  ? reportNotice
+                  : viewingOwnProfile
+                    ? 'Viewing your own profile. Visit another person’s profile to manage safety settings.'
+                    : 'Reports alert Tonight’s safety team discreetly. Share details if something feels off.'}
+              </p>
             </section>
 
             {status ? <p className={`text-sm font-medium ${statusStyles}`}>{status.message}</p> : null}
@@ -345,5 +374,24 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
         )}
       </div>
     </div>
+
+      {profile ? (
+        <ReportModal
+          isOpen={Boolean(reportModalOpen && canReportUser)}
+          target={{
+            type: 'user',
+            userId: profile.id,
+            displayName: profile.displayName ?? profile.email,
+            subtitle: profile.email,
+          }}
+          onClose={() => setReportModalOpen(false)}
+          onSubmitted={() => {
+            setReportNotice('Thanks for speaking up. Our safety team will review ASAP.');
+            setReportModalOpen(false);
+          }}
+          titleOverride={profile.displayName ? `Report ${profile.displayName}` : undefined}
+        />
+      ) : null}
+    </>
   );
 }

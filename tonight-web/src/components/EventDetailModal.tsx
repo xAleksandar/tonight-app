@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Flag } from "lucide-react";
 
+import ReportModal from "@/components/ReportModal";
 import UserAvatar from "./UserAvatar";
 
 export type EventDetail = {
@@ -58,6 +60,8 @@ export default function EventDetailModal({
   const [mounted, setMounted] = useState(false);
   const [internalJoinStatus, setInternalJoinStatus] = useState<JoinRequestStatus>("idle");
   const [internalJoinMessage, setInternalJoinMessage] = useState<string | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportNotice, setReportNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -118,6 +122,17 @@ export default function EventDetailModal({
   useEffect(() => {
     resetJoinState();
   }, [event.id, resetJoinState]);
+
+  useEffect(() => {
+    setReportNotice(null);
+    setIsReportModalOpen(false);
+  }, [event.id]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsReportModalOpen(false);
+    }
+  }, [isOpen]);
 
   const setJoinStatus = useCallback((status: JoinRequestStatus, message: string | null) => {
     setInternalJoinStatus(status);
@@ -200,6 +215,15 @@ export default function EventDetailModal({
     void handleInternalJoinRequest();
   }, [event.id, handleInternalJoinRequest, onRequestJoin]);
 
+  const handleReportClose = useCallback(() => {
+    setIsReportModalOpen(false);
+  }, []);
+
+  const handleReportSubmitted = useCallback(() => {
+    setReportNotice("Thanks for looking out. Our safety team will review ASAP.");
+    setIsReportModalOpen(false);
+  }, []);
+
   const effectiveJoinStatus = typeof joinStatus === "undefined" ? internalJoinStatus : joinStatus;
   const effectiveJoinMessage =
     typeof joinStatusMessage === "undefined" ? internalJoinMessage : joinStatusMessage;
@@ -216,6 +240,16 @@ export default function EventDetailModal({
       : effectiveJoinStatus === "success" && isInternalHandler
         ? "Requested"
         : requestButtonLabel;
+
+  const reportTarget = useMemo(
+    () => ({
+      type: "event" as const,
+      eventId: event.id,
+      eventTitle: event.title,
+      hostName: host.displayName ?? host.email ?? null,
+    }),
+    [event.id, event.title, host.displayName, host.email]
+  );
 
   const capacitySummary = useMemo(() => {
     const { attendeeCount, maxParticipants } = event;
@@ -234,11 +268,11 @@ export default function EventDetailModal({
   const formattedDatetime = useMemo(() => formatDateTime(event.datetimeISO), [event.datetimeISO]);
   const coordinateSummary = useMemo(() => formatCoordinates(event.location), [event.location]);
 
-  if (!mounted || !isOpen) {
+  if (!mounted) {
     return null;
   }
 
-  return createPortal(
+  const modalContent = (
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
@@ -289,6 +323,21 @@ export default function EventDetailModal({
             </div>
           </section>
 
+          <section className="flex flex-col items-center gap-2 rounded-2xl border border-zinc-100 bg-white/70 p-4 text-center text-xs text-zinc-500">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Safety</p>
+            <button
+              type="button"
+              onClick={() => setIsReportModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:border-pink-200 hover:text-pink-600"
+            >
+              <Flag className="h-3.5 w-3.5" />
+              Report event
+            </button>
+            <p className={`text-xs ${reportNotice ? "text-emerald-600" : "text-zinc-500"}`}>
+              {reportNotice ?? "Flag anything that feels off. Reports stay private."}
+            </p>
+          </section>
+
           <footer className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-zinc-500">
               Bring your best vibe. Hosts accept guests manually and may ask quick follow-up questions.
@@ -321,8 +370,21 @@ export default function EventDetailModal({
           )}
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
+  );
+
+  return (
+    <>
+      {isOpen ? createPortal(modalContent, document.body) : null}
+      {isReportModalOpen ? (
+        <ReportModal
+          isOpen={isReportModalOpen}
+          target={reportTarget}
+          onClose={handleReportClose}
+          onSubmitted={handleReportSubmitted}
+        />
+      ) : null}
+    </>
   );
 }
 
