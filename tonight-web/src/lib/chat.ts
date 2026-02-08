@@ -1,5 +1,6 @@
-import { JoinRequestStatus, type Message } from '@/generated/prisma/client';
+import { JoinRequestStatus, type Message, type JoinRequest } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
+import { socketService } from '@/lib/socket';
 
 export class ChatError extends Error {
   constructor(message: string) {
@@ -11,6 +12,7 @@ export class ChatError extends Error {
 export class ChatJoinRequestNotFoundError extends ChatError {}
 export class ChatUnauthorizedError extends ChatError {}
 export class ChatJoinRequestNotAcceptedError extends ChatError {}
+export class ChatMessageValidationError extends ChatError {}
 
 export type SerializedMessage = {
   id: string;
@@ -32,6 +34,10 @@ export type ChatAccessContext = {
   requesterRole: 'host' | 'participant';
 };
 
+export type CreateChatMessageInput = ChatAccessInput & {
+  content: string;
+};
+
 type JoinRequestAccessRecord = {
   id: string;
   status: JoinRequestStatus;
@@ -40,6 +46,8 @@ type JoinRequestAccessRecord = {
     hostId: string;
   };
 };
+
+export const CHAT_MESSAGE_MAX_LENGTH = 1000;
 
 const serializeMessage = (record: Message): SerializedMessage => ({
   id: record.id,
@@ -97,6 +105,21 @@ const ensureChatAccess = async (input: ChatAccessInput) => {
   } satisfies ChatAccessContext;
 };
 
+const normalizeMessageContent = (content: string): string => {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    throw new ChatMessageValidationError('Message content is required');
+  }
+
+  if (trimmed.length > CHAT_MESSAGE_MAX_LENGTH) {
+    throw new ChatMessageValidationError(
+      `Message content must be at most ${CHAT_MESSAGE_MAX_LENGTH} characters`
+    );
+  }
+
+  return trimmed;
+};
+
 export const listMessagesForJoinRequest = async (
   input: ChatAccessInput
 ): Promise<SerializedMessage[]> => {
@@ -112,6 +135,35 @@ export const listMessagesForJoinRequest = async (
   });
 
   return messages.map((record) => serializeMessage(record));
+};
+
+export const createMessageForJoinRequest = async (
+  input: CreateChatMessageInput
+): Promise<SerializedMessage> => {
+  const context = await ensureChatAccess({
+    joinRequestId: input.joinRequestId,
+    userId: input.userId,
+  });
+
+  const content = normalizeMessageContent(input.content);
+
+  const created = await prisma.message.create({
+    data: {
+      joinRequestId: context.joinRequestId,
+      senderId: input.userId,
+      content,
+    },
+  });
+
+  const serialized = serializeMessage(created);
+
+  try {
+    socketService.emitMessage(context.joinRequestId, serialized);
+  } catch (error) {
+    console.error('Failed to emit chat message via Socket.IO', error);
+  }
+
+  return serialized;
 };
 
 export const getChatAccessContext = ensureChatAccess;
