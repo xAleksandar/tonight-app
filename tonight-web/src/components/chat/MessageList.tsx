@@ -53,7 +53,10 @@ export default function MessageList({
       return (
         <div className="space-y-3" role="status" aria-live="polite">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-16 w-full animate-pulse rounded-2xl bg-white/10" />
+            <div
+              key={index}
+              className="h-16 w-full animate-pulse rounded-2xl bg-card/60"
+            />
           ))}
         </div>
       );
@@ -61,12 +64,12 @@ export default function MessageList({
 
     if (isError) {
       return (
-        <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 p-4 text-sm text-rose-100">
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-foreground">
           <p>{error ?? 'We could not load this conversation.'}</p>
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 rounded-full border border-rose-200/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-rose-100"
+            className="mt-3 rounded-full border border-destructive/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide"
           >
             Try again
           </button>
@@ -76,7 +79,7 @@ export default function MessageList({
 
     if (!messages.length) {
       return (
-        <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 px-4 py-6 text-center text-sm text-white/70">
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 px-4 py-6 text-center text-sm text-muted-foreground">
           No messages yet. Break the ice with a quick hello.
         </div>
       );
@@ -87,26 +90,24 @@ export default function MessageList({
         {messages.map((message) => {
           const isSelf = message.senderId === currentUserId;
           const bubbleClass = classNames(
-            'max-w-[80%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm',
+            'max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm',
             message.deliveryStatus === 'failed'
-              ? 'border border-rose-400/50 bg-rose-500/10 text-rose-100'
+              ? 'border border-destructive/40 bg-destructive/10 text-destructive-foreground'
               : isSelf
-                ? 'rounded-br-md bg-emerald-400 text-slate-900'
-                : 'rounded-bl-md border border-white/15 bg-white/5 text-white'
+                ? 'rounded-br-md bg-primary text-primary-foreground'
+                : 'rounded-bl-md border border-border bg-card/60 text-foreground'
           );
           const statusLabel = message.deliveryStatus ? DELIVERY_STATUS_LABELS[message.deliveryStatus] : null;
           const timestampLabel = formatMessageTimestamp(message.createdAt);
           const metaLabel = statusLabel
             ? [statusLabel, timestampLabel].filter(Boolean).join(' • ')
             : timestampLabel;
-          const metaTone = message.deliveryStatus === 'failed' ? 'text-rose-300' : 'text-white/50';
+          const metaTone = message.deliveryStatus === 'failed' ? 'text-destructive-foreground' : 'text-muted-foreground';
 
           return (
-            <div key={message.id} className={classNames('flex flex-col gap-1', isSelf ? 'items-end' : 'items-start')}>
+            <div key={message.id} className={classNames('flex flex-col gap-0.5', isSelf ? 'items-end' : 'items-start')}>
               <div className={bubbleClass}>{message.content}</div>
-              <span className={classNames('px-2 text-[10px] uppercase tracking-wide', metaTone)}>
-                {metaLabel}
-              </span>
+              <span className={classNames('px-1 text-[10px]', metaTone)}>{metaLabel}</span>
             </div>
           );
         })}
@@ -117,7 +118,7 @@ export default function MessageList({
   return (
     <div
       ref={scrollRef}
-      className={classNames('flex-1 space-y-4 overflow-y-auto px-4 py-4 text-white sm:px-6 sm:py-6', className)}
+      className={classNames('flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5', className)}
       aria-live={isLoading ? 'polite' : undefined}
     >
       {content}

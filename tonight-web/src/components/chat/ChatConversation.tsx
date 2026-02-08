@@ -428,28 +428,28 @@ export default function ChatConversation({
           : null);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-gradient-to-b from-[#0a0f21] via-[#090f1d] to-[#050812] text-white">
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0f1426]/80 backdrop-blur supports-[backdrop-filter]:bg-[#0f1426]/60">
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-4">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+        <div className="flex items-center gap-3 px-4 py-3">
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-full border border-white/15 p-2 text-white/70 transition hover:border-white/40 hover:text-white"
+            className="rounded-full border border-border/60 p-2 text-muted-foreground transition hover:text-foreground"
             aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <UserAvatar displayName={counterpart.displayName ?? undefined} email={counterpart.email} photoUrl={counterpart.photoUrl ?? undefined} size="sm" />
           <div className="flex flex-1 flex-col overflow-hidden">
-            <p className="truncate text-base font-semibold text-white">
+            <p className="truncate text-base font-semibold">
               {counterpart.displayName ?? counterpart.email}
             </p>
-            <p className="text-sm text-white/60">{context.event.title}</p>
+            <p className="text-xs text-muted-foreground">{context.event.title}</p>
           </div>
           <button
             type="button"
             title="Event details coming soon"
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/70 transition hover:text-white"
+            className="rounded-xl border border-border/60 bg-card/60 p-2 text-muted-foreground"
             aria-label="Event info"
           >
             <Info className="h-4 w-4" />
@@ -457,102 +457,101 @@ export default function ChatConversation({
         </div>
       </header>
 
-      <main className="flex flex-1 justify-center px-4 pb-28 pt-4 sm:px-6 md:px-8">
-        <div className="flex w-full max-w-3xl flex-1 flex-col rounded-3xl border border-white/10 bg-white/5 shadow-2xl shadow-black/30">
-          <div className="border-b border-white/10 p-6">
-            <div className="flex flex-wrap items-center gap-3">
+      <main className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-3 px-4 pt-4">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/70 px-4 py-1 text-xs font-semibold text-emerald-900">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Join request accepted
+          </div>
+          <div className="rounded-2xl border border-border bg-card/70 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-white/70">Tonight&apos;s plan</p>
-                <p className="text-2xl font-semibold text-white">{context.event.title}</p>
-                <p className="text-sm text-white/60">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
+                <p className="text-xs font-semibold text-muted-foreground">Tonight&apos;s plan</p>
+                <p className="text-base font-semibold text-foreground">{context.event.title}</p>
+                <p className="text-xs text-muted-foreground">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
               </div>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${connectionAccent}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${connectionDot}`} />
+              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-semibold">
+                <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
                 {connectionLabel}
               </span>
             </div>
-            <p className="mt-2 text-xs text-white/60">{connectionHelperText}</p>
-            <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-300/50 bg-emerald-400/20 px-4 py-1.5 text-sm font-semibold text-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-              Join request accepted
-            </p>
-            {derivedNotice ? (
-              <p className="mt-2 text-sm text-amber-300">{derivedNotice}</p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-1 flex-col">
-            <MessageList
-              status={messagesStatus}
-              error={messagesError}
-              messages={messages}
-              currentUserId={currentUserId}
-              onRetry={() => fetchMessages().catch(() => {})}
-            />
-
-            <div className="flex items-center justify-center gap-4 border-t border-white/10 bg-white/5 px-6 py-3 text-[11px] text-white/70">
-              <BlockUserButton
-                targetUserId={counterpart.id}
-                targetDisplayName={counterpart.displayName ?? counterpart.email}
-                className="items-center text-[11px]"
-                label="Block"
-                confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
-                confirmMessage="They won’t be able to message you, join your events, or see your plans."
-                disabled={hasBlockedCounterpart}
-                onBlocked={() => {
-                  setHasBlockedCounterpart(true);
-                  setComposerValue('');
-                  setSendError('You blocked this user. Messages are now disabled.');
-                }}
-              />
-              <span className="h-3 w-px bg-white/20" />
-              <button
-                type="button"
-                title="Reporting will be available soon"
-                className="flex items-center gap-1 rounded-full border border-transparent px-3 py-2 text-white/70 transition hover:border-white/20 hover:text-white"
-                disabled
-              >
-                <Flag className="h-3.5 w-3.5" />
-                Report
-              </button>
-            </div>
-
-            <div className="border-t border-white/10 bg-[#0f1426]/60 px-6 py-4 backdrop-blur">
-              <form onSubmit={handleSend} className="flex items-end gap-3">
-                <label htmlFor="chat-message" className="sr-only">
-                  Message
-                </label>
-                <textarea
-                  id="chat-message"
-                  value={composerValue}
-                  onChange={(event) => setComposerValue(event.target.value)}
-                  placeholder="Send a message"
-                  rows={1}
-                  disabled={hasBlockedCounterpart}
-                  className="min-h-[48px] flex-1 rounded-2xl border border-white/15 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:bg-transparent focus:outline-none focus:ring-2 focus:ring-emerald-300/40 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
-                />
-                <button
-                  type="submit"
-                  disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400 text-slate-900 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60"
-                  aria-label="Send message"
-                >
-                  <Send className="h-5 w-5" />
-                </button>
-              </form>
-              {hasBlockedCounterpart ? (
-                <p className="mt-2 text-sm text-white/60">
-                  You blocked this user. Manage safety settings from your profile if you change your mind.
-                </p>
-              ) : null}
-              {queuedHelperText ? (
-                <p className="mt-2 text-sm text-amber-300">{queuedHelperText}</p>
-              ) : null}
-              {sendError ? <p className="mt-2 text-sm text-rose-300">{sendError}</p> : null}
-            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">{connectionHelperText}</p>
+            {derivedNotice ? <p className="mt-2 text-xs text-amber-600">{derivedNotice}</p> : null}
           </div>
         </div>
+
+        <div className="flex flex-1 flex-col px-4 pb-28 pt-2">
+          <MessageList
+            status={messagesStatus}
+            error={messagesError}
+            messages={messages}
+            currentUserId={currentUserId}
+            onRetry={() => fetchMessages().catch(() => {})}
+            className="!px-0"
+          />
+        </div>
       </main>
+
+      <div className="flex items-center justify-center gap-4 border-t border-border bg-card/60 px-4 py-2 text-[10px] text-muted-foreground">
+        <BlockUserButton
+          targetUserId={counterpart.id}
+          targetDisplayName={counterpart.displayName ?? counterpart.email}
+          className="items-center text-[10px]"
+          label="Block"
+          confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
+          confirmMessage="They won’t be able to message you, join your events, or see your plans."
+          disabled={hasBlockedCounterpart}
+          onBlocked={() => {
+            setHasBlockedCounterpart(true);
+            setComposerValue('');
+            setSendError('You blocked this user. Messages are now disabled.');
+          }}
+        />
+        <span className="h-3 w-px bg-border" />
+        <button
+          type="button"
+          title="Reporting will be available soon"
+          className="flex items-center gap-1 text-[10px] text-muted-foreground"
+          disabled
+        >
+          <Flag className="h-3 w-3" />
+          Report
+        </button>
+      </div>
+
+      <div className="border-t border-border bg-background px-4 py-3">
+        <form onSubmit={handleSend} className="flex items-end gap-2">
+          <label htmlFor="chat-message" className="sr-only">
+            Message
+          </label>
+          <textarea
+            id="chat-message"
+            value={composerValue}
+            onChange={(event) => setComposerValue(event.target.value)}
+            placeholder="Type a message"
+            rows={1}
+            disabled={hasBlockedCounterpart}
+            className="min-h-[48px] flex-1 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+        {hasBlockedCounterpart ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            You blocked this user. Manage safety settings from your profile if you change your mind.
+          </p>
+        ) : null}
+        {queuedHelperText ? (
+          <p className="mt-2 text-xs text-amber-600">{queuedHelperText}</p>
+        ) : null}
+        {sendError ? <p className="mt-2 text-xs text-destructive">{sendError}</p> : null}
+      </div>
     </div>
   );
 }
