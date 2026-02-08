@@ -173,6 +173,10 @@ describe('Property 32: Bidirectional Event Discovery Blocking', () => {
         expect(queryText).toContain('b."blockedId" = e."hostId"');
         expect(queryText).toContain('b."blockerId" = e."hostId"');
         expect(queryText).toContain('b."blockedId" = ');
+
+        const values = callArgs.slice(1);
+        const userIdOccurrences = values.filter((value) => value === userId).length;
+        expect(userIdOccurrences).toBeGreaterThanOrEqual(2);
       })
     );
   });
