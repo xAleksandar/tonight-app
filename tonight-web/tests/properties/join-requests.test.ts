@@ -1,0 +1,169 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fc from 'fast-check';
+import {
+  createJoinRequest,
+  JoinRequestDuplicateError,
+  JoinRequestEventFullError,
+} from '@/lib/join-requests';
+import { EventStatus, JoinRequestStatus } from '@/generated/prisma/client';
+
+type MockPrisma = {
+  event: {
+    findUnique: ReturnType<typeof vi.fn>;
+  };
+  joinRequest: {
+    findUnique: ReturnType<typeof vi.fn>;
+    count: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+  };
+  $transaction: ReturnType<typeof vi.fn>;
+};
+
+type GlobalWithPrisma = typeof globalThis & { __TEST_PRISMA__?: MockPrisma };
+
+function createMockPrisma(): MockPrisma {
+  const eventDelegate = {
+    findUnique: vi.fn(),
+  } as MockPrisma['event'];
+
+  const joinRequestDelegate = {
+    findUnique: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+  } as MockPrisma['joinRequest'];
+
+  const prisma: MockPrisma = {
+    event: eventDelegate,
+    joinRequest: joinRequestDelegate,
+    $transaction: vi.fn(async (callback: (transactionClient: { event: typeof eventDelegate; joinRequest: typeof joinRequestDelegate }) => Promise<unknown>) =>
+      callback({ event: eventDelegate, joinRequest: joinRequestDelegate })
+    ),
+  };
+
+  return prisma;
+}
+
+vi.mock('@/lib/prisma', () => {
+  const prisma = createMockPrisma();
+  (globalThis as GlobalWithPrisma).__TEST_PRISMA__ = prisma;
+  return { prisma };
+});
+
+const getMockPrisma = (): MockPrisma => {
+  const prisma = (globalThis as GlobalWithPrisma).__TEST_PRISMA__;
+  if (!prisma) {
+    throw new Error('Mock Prisma is not initialized');
+  }
+  return prisma;
+};
+
+beforeEach(() => {
+  const prisma = getMockPrisma();
+  prisma.event.findUnique.mockReset();
+  prisma.joinRequest.findUnique.mockReset();
+  prisma.joinRequest.count.mockReset();
+  prisma.joinRequest.create.mockReset();
+  prisma.$transaction.mockReset();
+  prisma.$transaction.mockImplementation(async (callback: (transactionClient: { event: typeof prisma.event; joinRequest: typeof prisma.joinRequest }) => Promise<unknown>) =>
+    callback({ event: prisma.event, joinRequest: prisma.joinRequest })
+  );
+});
+
+describe('Property 23: Join Request Creation with Pending Status', () => {
+  it('creates a pending join request for any valid user-event pair', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.uuid(),
+        fc.uuid(),
+        fc.integer({ min: 2, max: 12 }),
+        fc.uuid(),
+        async (eventId, userId, maxParticipants, joinRequestId) => {
+          const prisma = getMockPrisma();
+          const timestamp = new Date('2030-01-01T00:00:00.000Z');
+
+          prisma.event.findUnique.mockResolvedValue({
+            id: eventId,
+            status: EventStatus.ACTIVE,
+            maxParticipants,
+          });
+          prisma.joinRequest.findUnique.mockResolvedValue(null);
+          prisma.joinRequest.count.mockResolvedValue(0);
+          prisma.joinRequest.create.mockResolvedValue({
+            id: joinRequestId,
+            eventId,
+            userId,
+            status: JoinRequestStatus.PENDING,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          });
+
+          const result = await createJoinRequest({ eventId, userId });
+          expect(prisma.joinRequest.create).toHaveBeenCalledWith({
+            data: {
+              eventId,
+              userId,
+              status: JoinRequestStatus.PENDING,
+            },
+          });
+          expect(result).toEqual({
+            id: joinRequestId,
+            eventId,
+            userId,
+            status: JoinRequestStatus.PENDING,
+            createdAt: timestamp.toISOString(),
+            updatedAt: timestamp.toISOString(),
+          });
+        }
+      )
+    );
+  });
+});
+
+describe('Property 24: Duplicate Join Request Prevention', () => {
+  it('rejects attempts to create multiple join requests for the same user and event', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.uuid(), fc.uuid(), fc.uuid(), async (eventId, userId, existingJoinRequestId) => {
+        const prisma = getMockPrisma();
+        const existingRecord = {
+          id: existingJoinRequestId,
+          eventId,
+          userId,
+          status: JoinRequestStatus.PENDING,
+          createdAt: new Date('2030-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2030-01-01T00:00:00.000Z'),
+        };
+
+        prisma.event.findUnique.mockResolvedValue({
+          id: eventId,
+          status: EventStatus.ACTIVE,
+          maxParticipants: 5,
+        });
+        prisma.joinRequest.findUnique.mockResolvedValue(existingRecord);
+
+        await expect(createJoinRequest({ eventId, userId })).rejects.toBeInstanceOf(JoinRequestDuplicateError);
+        expect(prisma.joinRequest.create).not.toHaveBeenCalled();
+      })
+    );
+  });
+});
+
+describe('Property 26: Max Participants Enforcement', () => {
+  it('prevents creating join requests when the event has already reached its accepted limit', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.uuid(), fc.uuid(), async (eventId, userId) => {
+        const prisma = getMockPrisma();
+
+        prisma.event.findUnique.mockResolvedValue({
+          id: eventId,
+          status: EventStatus.ACTIVE,
+          maxParticipants: 2,
+        });
+        prisma.joinRequest.findUnique.mockResolvedValue(null);
+        prisma.joinRequest.count.mockResolvedValue(1);
+
+        await expect(createJoinRequest({ eventId, userId })).rejects.toBeInstanceOf(JoinRequestEventFullError);
+        expect(prisma.joinRequest.create).not.toHaveBeenCalled();
+      })
+    );
+  });
+});
