@@ -1,0 +1,64 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import {
+  computeMagicLinkExpiration,
+  generateMagicLinkToken,
+  hashToken,
+} from '@/lib/auth';
+import { sendMagicLink } from '@/lib/email';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const invalidEmailResponse = () =>
+  NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+
+const parseBody = async (request: Request): Promise<Record<string, unknown>> => {
+  try {
+    return (await request.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+};
+
+export async function POST(request: Request) {
+  try {
+    const body = await parseBody(request);
+    const inputEmail = typeof body.email === 'string' ? body.email : '';
+    const email = normalizeEmail(inputEmail);
+
+    if (!EMAIL_REGEX.test(email)) {
+      return invalidEmailResponse();
+    }
+
+    await prisma.magicLink.deleteMany({
+      where: {
+        email,
+        usedAt: null,
+      },
+    });
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+
+    const token = generateMagicLinkToken();
+    const hashedToken = hashToken(token);
+    const expiresAt = computeMagicLinkExpiration();
+
+    await prisma.magicLink.create({
+      data: {
+        token: hashedToken,
+        email,
+        userId: existingUser?.id ?? null,
+        expiresAt,
+      },
+    });
+
+    await sendMagicLink(email, token);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error('Failed to request magic link', error);
+    return NextResponse.json({ error: 'Unable to process request' }, { status: 500 });
+  }
+}
