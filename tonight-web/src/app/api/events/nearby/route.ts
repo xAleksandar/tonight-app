@@ -71,6 +71,10 @@ const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
     distanceMeters: event.distanceMeters,
+    location: {
+      latitude: event.latitude,
+      longitude: event.longitude,
+    },
   };
 };
 

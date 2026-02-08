@@ -42,6 +42,8 @@ const buildNearbyEventRecord = (overrides: Partial<NearbyEventRecord> = {}): Nea
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     distanceMeters: overrides.distanceMeters ?? 123,
+    latitude: overrides.latitude ?? 37.7749,
+    longitude: overrides.longitude ?? -122.4194,
   };
 };
 
@@ -92,6 +94,10 @@ describe('Event discovery API', () => {
           datetime: record.datetime.toISOString(),
           createdAt: record.createdAt.toISOString(),
           updatedAt: record.updatedAt.toISOString(),
+          location: {
+            latitude: record.latitude,
+            longitude: record.longitude,
+          },
         });
       })
     );

@@ -17,6 +17,8 @@ export type NearbyEventRecord = {
   createdAt: Date;
   updatedAt: Date;
   distanceMeters: number;
+  latitude: number;
+  longitude: number;
 };
 
 const assertFiniteCoordinate = (value: number, label: 'latitude' | 'longitude'): number => {
@@ -75,6 +77,8 @@ export const findNearbyEvents = async (
       e."hostId",
       e."createdAt",
       e."updatedAt",
+      ST_Y(e."location"::geometry) AS "latitude",
+      ST_X(e."location"::geometry) AS "longitude",
       ST_Distance(e."location", ${origin}) AS "distanceMeters"
     FROM "Event" e
     WHERE e."status" = 'ACTIVE'
@@ -90,7 +94,12 @@ export const findNearbyEvents = async (
   return events
     .map((event) => ({
       ...event,
-      distanceMeters: typeof event.distanceMeters === 'number' ? event.distanceMeters : Number(event.distanceMeters),
+      distanceMeters:
+        typeof event.distanceMeters === 'number'
+          ? event.distanceMeters
+          : Number(event.distanceMeters),
+      latitude: typeof event.latitude === 'number' ? event.latitude : Number(event.latitude),
+      longitude: typeof event.longitude === 'number' ? event.longitude : Number(event.longitude),
     }))
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 };
