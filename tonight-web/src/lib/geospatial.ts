@@ -9,16 +9,16 @@ export type NearbyEventRecord = {
   id: string;
   title: string;
   description: string;
-  datetime: Date;
+  datetime: Date | string;
   locationName: string;
   maxParticipants: number;
   status: EventStatus;
   hostId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  distanceMeters: number;
-  latitude: number;
-  longitude: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  distanceMeters: number | string;
+  latitude: number | string;
+  longitude: number | string;
 };
 
 const assertFiniteCoordinate = (value: number, label: 'latitude' | 'longitude'): number => {
@@ -46,6 +46,10 @@ const resolveRadius = (radiusMeters?: number | null): number => {
 
 const buildOriginFragment = (latitude: number, longitude: number) => {
   return Prisma.sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), ${EARTH_SRID})::geography`;
+};
+
+const toDate = (value: Date | string): Date => {
+  return value instanceof Date ? value : new Date(value);
 };
 
 export const findNearbyEvents = async (
@@ -94,6 +98,9 @@ export const findNearbyEvents = async (
   return events
     .map((event) => ({
       ...event,
+      datetime: toDate(event.datetime),
+      createdAt: toDate(event.createdAt),
+      updatedAt: toDate(event.updatedAt),
       distanceMeters:
         typeof event.distanceMeters === 'number'
           ? event.distanceMeters

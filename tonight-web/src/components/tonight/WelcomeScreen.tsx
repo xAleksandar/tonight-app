@@ -7,7 +7,7 @@ const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
 type Status = "idle" | "submitting" | "success" | "error";
 
-type ApiResponse = { error?: string };
+type ApiResponse = { error?: string; magicLinkUrl?: string };
 
 type WelcomeScreenProps = {
   defaultEmail?: string;
@@ -19,6 +19,7 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string>("");
+  const [magicLinkUrl, setMagicLinkUrl] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,7 +46,9 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
         throw new Error(payload.error ?? "Unable to send magic link.");
       }
 
+      const payload = (await response.json()) as ApiResponse;
       setSubmittedEmail(normalized);
+      setMagicLinkUrl(payload.magicLinkUrl ?? null);
       setStatus("success");
       setMessage(null);
     } catch (error) {
@@ -60,8 +63,11 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
   return (
     <div className="relative flex min-h-dvh flex-col text-foreground">
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(/hero-friends.jpg)' }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/85 to-background" />
       </div>
 
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12">
@@ -127,11 +133,20 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
                 <p className="text-xs text-muted-foreground">
                   Open the link on this device to jump into Tonight.
                 </p>
+                {magicLinkUrl ? (
+                  <a
+                    href={magicLinkUrl}
+                    className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                  >
+                    Direct login (Dev only)
+                  </a>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
                     setStatus("idle");
                     setMessage(null);
+                    setMagicLinkUrl(null);
                   }}
                   className="rounded-full border border-border/70 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                 >

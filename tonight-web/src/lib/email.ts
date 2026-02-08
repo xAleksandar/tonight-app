@@ -21,7 +21,7 @@ export interface MagicLinkEmailPayload {
   html: string;
 }
 
-const DEFAULT_FROM = 'Tonight <auth@tonight.local>';
+const DEFAULT_FROM = 'Tonight <onboarding@resend.dev>';
 const MAGIC_LINK_SUBJECT = 'Your Tonight login link';
 let cachedClient: ResendLike | null | undefined;
 

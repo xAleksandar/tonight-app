@@ -11,6 +11,8 @@
     "test:property": "vitest run"
   },
   "dependencies": {
+    "@paralleldrive/cuid2": "^3.3.0",
+    "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "fast-check": "^4.5.3",
     "jose": "^6.1.3",

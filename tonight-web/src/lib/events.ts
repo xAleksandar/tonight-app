@@ -1,5 +1,6 @@
 import { Prisma, EventStatus } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
+import { createId } from '@paralleldrive/cuid2';
 
 const EARTH_SRID = 4326;
 
@@ -124,9 +125,12 @@ export const serializeEvent = (record: EventRecordWithHost): SerializedEvent => 
 
 export const createEvent = async (input: CreateEventInput): Promise<SerializedEvent> => {
   const locationFragment = buildLocationFragment(input.latitude, input.longitude);
+  const eventId = createId();
+  const now = new Date();
 
   const inserted = await prisma.$queryRaw<Array<{ id: string }>>`
     INSERT INTO "Event" (
+      "id",
       "title",
       "description",
       "datetime",
@@ -134,9 +138,12 @@ export const createEvent = async (input: CreateEventInput): Promise<SerializedEv
       "locationName",
       "maxParticipants",
       "status",
-      "hostId"
+      "hostId",
+      "createdAt",
+      "updatedAt"
     )
     VALUES (
+      ${eventId},
       ${input.title},
       ${input.description},
       ${input.datetime},
@@ -144,13 +151,14 @@ export const createEvent = async (input: CreateEventInput): Promise<SerializedEv
       ${input.locationName},
       ${input.maxParticipants},
       ${EventStatus.ACTIVE},
-      ${input.hostId}
+      ${input.hostId},
+      ${now},
+      ${now}
     )
     RETURNING "id"
   `;
 
-  const eventId = inserted[0]?.id;
-  if (!eventId) {
+  if (!inserted[0]?.id) {
     throw new Error('Failed to create event');
   }
 

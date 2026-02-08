@@ -1,12 +1,13 @@
 import { WelcomeScreen } from "@/components/tonight/WelcomeScreen";
 
 type LoginPageProps = {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
-  const emailParam = searchParams?.email;
-  const nextParam = searchParams?.next;
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const emailParam = params?.email;
+  const nextParam = params?.next;
 
   const defaultEmail = typeof emailParam === "string" ? emailParam : "";
   const redirectMessage =
