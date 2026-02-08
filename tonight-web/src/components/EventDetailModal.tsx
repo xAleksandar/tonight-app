@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import UserAvatar from "./UserAvatar";
@@ -48,17 +48,26 @@ export default function EventDetailModal({
   isOpen,
   onClose,
   onRequestJoin,
-  joinStatus = "idle",
-  joinStatusMessage = null,
+  joinStatus,
+  joinStatusMessage,
   requestButtonLabel = defaultButtonLabel,
   disableRequest = false,
 }: EventDetailModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const joinRequestAbortRef = useRef<AbortController | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [internalJoinStatus, setInternalJoinStatus] = useState<JoinRequestStatus>("idle");
+  const [internalJoinMessage, setInternalJoinMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      joinRequestAbortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -93,6 +102,120 @@ export default function EventDetailModal({
       onClose?.();
     }
   };
+
+  const resetJoinState = useCallback(() => {
+    joinRequestAbortRef.current?.abort();
+    setInternalJoinStatus("idle");
+    setInternalJoinMessage(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetJoinState();
+    }
+  }, [isOpen, resetJoinState]);
+
+  useEffect(() => {
+    resetJoinState();
+  }, [event.id, resetJoinState]);
+
+  const setJoinStatus = useCallback((status: JoinRequestStatus, message: string | null) => {
+    setInternalJoinStatus(status);
+    setInternalJoinMessage(message);
+  }, []);
+
+  const inferErrorMessage = useCallback(
+    (status: number, fallback: string, payload?: Record<string, unknown> | null) => {
+      if (status === 401) {
+        return "Please log in to request a spot.";
+      }
+      if (status === 404) {
+        return "This event could not be found.";
+      }
+      if (status === 409) {
+        if (payload && typeof payload.error === "string") {
+          return payload.error;
+        }
+        return "This event is no longer accepting requests.";
+      }
+      if (payload && typeof payload.error === "string") {
+        return payload.error;
+      }
+      return fallback;
+    },
+    []
+  );
+
+  const handleInternalJoinRequest = useCallback(async () => {
+    joinRequestAbortRef.current?.abort();
+    const controller = new AbortController();
+    joinRequestAbortRef.current = controller;
+
+    setJoinStatus("loading", null);
+
+    try {
+      const response = await fetch("/api/join-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ eventId: event.id }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        let payload: Record<string, unknown> | null = null;
+        try {
+          payload = (await response.json()) as Record<string, unknown>;
+        } catch {
+          payload = null;
+        }
+
+        const errorMessage = inferErrorMessage(
+          response.status,
+          "Unable to send join request. Please try again.",
+          payload
+        );
+        throw new Error(errorMessage);
+      }
+
+      setJoinStatus("success", "Request sent! The host will follow up soon.");
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return;
+      }
+      console.error("Join request failed", error);
+      setJoinStatus(
+        "error",
+        (error as Error).message || "Unable to send join request. Please try again."
+      );
+    }
+  }, [event.id, inferErrorMessage, setJoinStatus]);
+
+  const handleJoinRequestClick = useCallback(() => {
+    if (onRequestJoin) {
+      onRequestJoin(event.id);
+      return;
+    }
+    void handleInternalJoinRequest();
+  }, [event.id, handleInternalJoinRequest, onRequestJoin]);
+
+  const effectiveJoinStatus = typeof joinStatus === "undefined" ? internalJoinStatus : joinStatus;
+  const effectiveJoinMessage =
+    typeof joinStatusMessage === "undefined" ? internalJoinMessage : joinStatusMessage;
+
+  const isInternalHandler = !onRequestJoin;
+  const isButtonDisabled =
+    disableRequest ||
+    effectiveJoinStatus === "loading" ||
+    (isInternalHandler && effectiveJoinStatus === "success");
+
+  const computedButtonLabel =
+    effectiveJoinStatus === "loading"
+      ? "Sending…"
+      : effectiveJoinStatus === "success" && isInternalHandler
+        ? "Requested"
+        : requestButtonLabel;
 
   const capacitySummary = useMemo(() => {
     const { attendeeCount, maxParticipants } = event;
@@ -140,9 +263,7 @@ export default function EventDetailModal({
             <h2 id="event-detail-title" className="text-3xl font-semibold text-zinc-900">
               {event.title}
             </h2>
-            {event.description && (
-              <p className="text-sm text-zinc-600">{event.description}</p>
-            )}
+            {event.description && <p className="text-sm text-zinc-600">{event.description}</p>}
           </header>
 
           <section className="grid gap-4 rounded-2xl border border-zinc-100 bg-zinc-50/80 p-4 sm:grid-cols-2">
@@ -174,25 +295,28 @@ export default function EventDetailModal({
             </div>
             <button
               type="button"
-              onClick={() => onRequestJoin?.(event.id)}
-              disabled={disableRequest || joinStatus === "loading"}
+              data-testid="join-request-button"
+              onClick={handleJoinRequestClick}
+              disabled={isButtonDisabled}
               className="flex items-center justify-center rounded-full bg-pink-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-pink-500 disabled:cursor-not-allowed disabled:bg-zinc-200"
             >
-              {joinStatus === "loading" ? "Sending…" : requestButtonLabel}
+              {computedButtonLabel}
             </button>
           </footer>
 
-          {joinStatusMessage && (
+          {effectiveJoinMessage && (
             <p
+              data-testid="join-request-message"
+              data-status={effectiveJoinStatus}
               className={
-                joinStatus === "error"
+                effectiveJoinStatus === "error"
                   ? "text-sm text-red-600"
-                  : joinStatus === "success"
+                  : effectiveJoinStatus === "success"
                     ? "text-sm text-emerald-600"
                     : "text-sm text-zinc-500"
               }
             >
-              {joinStatusMessage}
+              {effectiveJoinMessage}
             </p>
           )}
         </div>
