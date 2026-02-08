@@ -12,6 +12,9 @@ export class JoinRequestEventNotFoundError extends JoinRequestError {}
 export class JoinRequestInactiveEventError extends JoinRequestError {}
 export class JoinRequestDuplicateError extends JoinRequestError {}
 export class JoinRequestEventFullError extends JoinRequestError {}
+export class JoinRequestNotFoundError extends JoinRequestError {}
+export class JoinRequestUnauthorizedError extends JoinRequestError {}
+export class JoinRequestInvalidStatusError extends JoinRequestError {}
 
 export type SerializedJoinRequest = {
   id: string;
@@ -25,6 +28,12 @@ export type SerializedJoinRequest = {
 export type CreateJoinRequestInput = {
   eventId: string;
   userId: string;
+};
+
+export type UpdateJoinRequestStatusInput = {
+  joinRequestId: string;
+  hostId: string;
+  status: JoinRequestStatus;
 };
 
 const serializeJoinRequest = (record: JoinRequest): SerializedJoinRequest => ({
@@ -96,6 +105,65 @@ export const createJoinRequest = async (
         userId: input.userId,
         status: JoinRequestStatus.PENDING,
       },
+    });
+
+    return serializeJoinRequest(record);
+  });
+};
+
+export const updateJoinRequestStatus = async (
+  input: UpdateJoinRequestStatusInput
+): Promise<SerializedJoinRequest> => {
+  const nextStatus = input.status;
+  if (nextStatus !== JoinRequestStatus.ACCEPTED && nextStatus !== JoinRequestStatus.REJECTED) {
+    throw new JoinRequestInvalidStatusError('Status must be accepted or rejected');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const joinRequest = await tx.joinRequest.findUnique({
+      where: { id: input.joinRequestId },
+      include: {
+        event: {
+          select: {
+            id: true,
+            hostId: true,
+            status: true,
+            maxParticipants: true,
+          },
+        },
+      },
+    });
+
+    if (!joinRequest) {
+      throw new JoinRequestNotFoundError('Join request not found');
+    }
+
+    if (joinRequest.event.hostId !== input.hostId) {
+      throw new JoinRequestUnauthorizedError('You are not allowed to update this join request');
+    }
+
+    if (nextStatus === JoinRequestStatus.ACCEPTED) {
+      if (joinRequest.event.status !== EventStatus.ACTIVE) {
+        throw new JoinRequestInactiveEventError('Event is not active');
+      }
+
+      if (joinRequest.status !== JoinRequestStatus.ACCEPTED) {
+        const acceptedCount = await tx.joinRequest.count({
+          where: {
+            eventId: joinRequest.eventId,
+            status: JoinRequestStatus.ACCEPTED,
+          },
+        });
+
+        if (!hasAvailableSlots(joinRequest.event.maxParticipants, acceptedCount)) {
+          throw new JoinRequestEventFullError('Event is already full');
+        }
+      }
+    }
+
+    const record = await tx.joinRequest.update({
+      where: { id: joinRequest.id },
+      data: { status: nextStatus },
     });
 
     return serializeJoinRequest(record);
