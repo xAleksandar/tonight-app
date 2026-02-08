@@ -33,14 +33,15 @@
 - Task 15.1: Create GET /api/chat/[joinRequestId]/messages (chat service with access control + message serialization, authenticated API route) — Commit `b8e692a`.
 - Task 15.2: Write property tests for chat access control (Property 27 + 28 to ensure accepted hosts/participants pass and other statuses fail) — Commit `190e7fd`.
 - Task 15.3: Create POST /api/chat/[joinRequestId]/messages (content validation, persistence, socket broadcast) — Commit `9932290`.
+- Task 15.4: Write Property 29/30 to verify chat message storage/serialization and resilient real-time delivery — Commit `aaea64e`.
+- Task 15.5: Create chat page (Socket.IO-powered conversation view with history fetching, real-time updates, and composer) — Commit `b4e4456`.
 - Task 18.1-18.4: Implement welcome/login experience, AuthProvider wrapping, and protected routing (login page, session checks, redirects) — Commit `17e347d`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 15.4 — Property tests for chat message storage and delivery guarantees.
+- **Next priority:** Task 15.6 — MessageList component with scrollable bubbles + timestamps.
 
 ## Next Up
-1. Task 15.4: Write property tests for message storage and delivery.
-2. Task 15.5: Create chat page (app/chat/[joinRequestId]/page.tsx) powered by the new Socket.IO hook and POST/GET APIs.
-3. Task 15.6: Create MessageList component with scrollable bubbles + timestamps.
-4. Task 16.1: Create POST /api/users/block.
+1. Task 15.6: Create MessageList component with scrollable bubbles + timestamps.
+2. Task 16.1: Create POST /api/users/block.
+3. Task 16.2: Write property tests for blocking.
