@@ -3,6 +3,8 @@
 import { FormEvent, useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLocationPicker';
+import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 const TITLE_LIMITS = { min: 3, max: 120 } as const;
 const DESCRIPTION_LIMITS = { min: 1, max: 2000 } as const;
@@ -57,6 +59,24 @@ const formatReadableDatetime = (value: string) => {
 };
 
 export default function CreateEventPage() {
+  const { status: authStatus } = useRequireAuth();
+
+  if (authStatus === 'loading') {
+    return <AuthStatusMessage label="Checking your session…" />;
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return <AuthStatusMessage label="Redirecting you to the welcome screen…" />;
+  }
+
+  if (authStatus === 'error') {
+    return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
+  }
+
+  return <AuthenticatedCreateEventPage />;
+}
+
+function AuthenticatedCreateEventPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

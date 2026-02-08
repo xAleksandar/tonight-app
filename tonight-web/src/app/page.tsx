@@ -5,6 +5,8 @@ import Link from 'next/link';
 
 import EventMapView, { type MapPoint } from '@/components/EventMapView';
 import EventListView from '@/components/EventListView';
+import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 const MAP_HEIGHT = 460;
 
@@ -38,6 +40,24 @@ type LocationStatus = 'idle' | 'locating' | 'ready' | 'denied' | 'unsupported' |
 type EventsStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export default function HomePage() {
+  const { status: authStatus } = useRequireAuth();
+
+  if (authStatus === 'loading') {
+    return <AuthStatusMessage label="Checking your session…" />;
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return <AuthStatusMessage label="Redirecting you to the welcome screen…" />;
+  }
+
+  if (authStatus === 'error') {
+    return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
+  }
+
+  return <AuthenticatedHomePage />;
+}
+
+function AuthenticatedHomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
   const [locationError, setLocationError] = useState<string | null>(null);

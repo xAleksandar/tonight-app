@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import UserAvatar from '@/components/UserAvatar';
+import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 type ProfileResponse = {
   user: Profile | null;
@@ -43,6 +45,24 @@ const fileToDataUrl = (file: File) =>
 const sanitize = (value: string) => value.trim();
 
 export default function ProfilePage() {
+  const { status: authStatus } = useRequireAuth();
+
+  if (authStatus === 'loading') {
+    return <AuthStatusMessage label="Checking your session…" />;
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return <AuthStatusMessage label="Redirecting you to the welcome screen…" />;
+  }
+
+  if (authStatus === 'error') {
+    return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
+  }
+
+  return <AuthenticatedProfilePage />;
+}
+
+function AuthenticatedProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayNameInput, setDisplayNameInput] = useState('');
