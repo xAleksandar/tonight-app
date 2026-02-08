@@ -55,12 +55,19 @@ beforeEach(() => {
   prisma.blockedUser.findFirst.mockResolvedValue(null);
 });
 
+const createdAtArb = fc
+  .integer({
+    min: Date.parse('2030-01-01T00:00:00.000Z'),
+    max: Date.parse('2035-12-31T23:59:59.000Z'),
+  })
+  .map((ms) => new Date(ms));
+
 const messagesArbitrary = fc.array(
   fc.record({
     id: fc.uuid(),
     senderId: fc.uuid(),
     content: fc.string({ minLength: 1, maxLength: 256 }),
-    createdAt: fc.date({ min: new Date('2030-01-01T00:00:00.000Z'), max: new Date('2035-12-31T23:59:59.000Z') }),
+    createdAt: createdAtArb,
   }),
   { maxLength: 5 }
 );
