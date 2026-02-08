@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { User } from '@/generated/prisma/client';
+import { serializeUser } from '@/lib/user-serialization';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/middleware/auth';
-
-const serializeUser = (user: User) => ({
-  id: user.id,
-  email: user.email,
-  displayName: user.displayName,
-  photoUrl: user.photoUrl,
-  createdAt: user.createdAt,
-});
 
 export async function GET(request: NextRequest) {
   try {
