@@ -17,7 +17,8 @@
 - Task 10.5: Create EventListView component (summary header, clickable cards, distance/time formatting) — Commit `0db17ba`.
 - Task 10.6: Write Property 22 (list view required fields) tests — Commit `49aa908`.
 - Task 11.1: Create event creation page (Mapbox-integrated creation form, validation, geolocation helper, POST /api/events wiring) — Commit `2241eec`.
+- Task 11.2: Create home/discovery page (App Router entry with location detection, map/list toggles, radius summary, and CTA wiring) — Commit `4185c8c`.
 
 ## Next Up
-1. Task 11.2: Create home/discovery page (app/page.tsx).
-2. Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx).
+1. Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx).
+2. Task 12.1: Create POST /api/join-requests.
