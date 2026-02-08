@@ -13,7 +13,8 @@
 - Task 10.1: Mapbox configuration scaffolding (env vars, mapbox-gl deps, shared config helper + property suite rerun) — Commit `59be6b8`.
 - Task 10.2: Create MapboxLocationPicker component (client-side map setup, marker interactions, disabled/error states) — Commit `0c649cf`.
 - Task 10.3: Write Property 38 (map click coordinate capture) tests (jsdom-friendly harness, mock Mapbox loader, property assertions) — Commit `f4eebaf`.
+- Task 10.4: Create EventMapView component (map initialization, event/user markers, popups, selection syncing) — Commit `0389003`.
 
 ## Next Up
-1. Task 10.4: Create EventMapView component.
-2. Task 10.5: Create EventListView component.
+1. Task 10.5: Create EventListView component.
+2. Task 10.6: Write Property 22 (list view required fields) tests.
