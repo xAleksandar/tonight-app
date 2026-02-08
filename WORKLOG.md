@@ -23,7 +23,8 @@
 - Task 12.2: Write property tests for join request creation (pending status, duplicate prevention, capacity enforcement) — Commit `30018a13`.
 - Task 12.3: Create PATCH /api/join-requests/[id] (host validation, status updates, capacity guard) — Commit `f4b03cc`.
 - Task 12.4: Write property test for join request status transitions (hosts can accept/reject pending requests and persist new status) — Commit `e9ad105`.
+- Task 12.5: Create GET /api/join-requests/for-event/[eventId] (host-only join request listing API + property tests) — Commit `8378dc5`.
 
 ## Next Up
-1. Task 12.5: Create GET /api/join-requests/for-event/[eventId].
-2. Task 12.6: Add join request handling to EventDetailModal.
+1. Task 12.6: Add join request handling to EventDetailModal.
+2. Task 12.7: Create join requests management page (app/events/[id]/requests/page.tsx).
