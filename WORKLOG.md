@@ -47,12 +47,14 @@
 - Task 17.1: Create POST /api/reports (validation + service layer + authenticated route, npm test) — Commit `b34a35d`.
 - Task 17.2: Write property test for report creation (Property 35 for report round trip coverage, enforced status/normalization) — Commit `a15aa7e`.
 - Task 17.3: Create ReportModal component (design-aligned modal, optimistic submission UX, RTL coverage) — Commit `06c0dd5`.
+- Task 17.4: Add report actions to event detail modal and user profile safety settings (ReportModal wiring + success messaging + design-aligned CTAs) — Commit `74aab95`.
+- Task 19: Final checkpoint — reran full `npm test` property suite (62 tests / 40 properties) to ensure chat, safety, and reporting changes stayed green — Commit `cc41d55`.
 
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 17.4 — Add report functionality to event and user pages.
+- **Next priority:** Task 20.1 — Add comprehensive error handling to all API routes.
 
 ## Next Up
-1. Task 17.4: Add report functionality to event and user pages (surfaced buttons, modal wiring).
-2. Task 19: Final checkpoint — ensure all property and integration suites stay green after report feature work.
+1. Task 20.1: Add comprehensive error handling to all API routes (consistent response formatting and logging).
+2. Task 20.2: Add loading states to core pages (pending indicators for discovery, events, and chat views).
