@@ -37,6 +37,8 @@ export type MapboxLocationPickerProps = {
   disabled?: boolean;
   /** Optional loader override for tests */
   mapboxLoader?: () => Promise<typeof mapboxgl>;
+  /** Visual tone for helper text + borders */
+  tone?: 'light' | 'dark';
 };
 
 const formatCoordinate = (value: number) => value.toFixed(5);
@@ -56,6 +58,7 @@ export default function MapboxLocationPicker({
   markerColor = "#DB2777",
   disabled = false,
   mapboxLoader = defaultMapboxLoader,
+  tone = 'light',
 }: MapboxLocationPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -275,33 +278,45 @@ export default function MapboxLocationPicker({
       ? "No location selected"
       : "";
 
+  const isDark = tone === 'dark';
+  const headingTextClass = isDark ? "text-white" : "text-zinc-700";
+  const subheadingTextClass = isDark ? "text-white/70" : "text-zinc-500";
+  const summaryTextClass = isDark ? "text-white/60" : "text-zinc-500";
+  const mapShellClass = isDark
+    ? "w-full overflow-hidden rounded-xl border border-white/10 bg-black/30"
+    : "w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50";
+  const disabledOverlayClass = isDark
+    ? "pointer-events-none absolute inset-0 rounded-xl bg-black/60 backdrop-blur-[1px]"
+    : "pointer-events-none absolute inset-0 rounded-xl bg-white/60 backdrop-blur-[1px]";
+  const errorOverlayClass = isDark
+    ? "pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/80 p-4 text-center text-sm text-rose-200"
+    : "pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-white/90 p-4 text-center text-sm text-red-600";
+
   return (
     <div className={className}>
       <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-zinc-700">{label}</p>
-          <p className="text-xs text-zinc-500" aria-live="polite">
+          <p className={`text-sm font-medium ${headingTextClass}`}>{label}</p>
+          <p className={`text-xs ${subheadingTextClass}`} aria-live="polite">
             {instruction}
           </p>
         </div>
         {coordinateSummary && (
-          <p className="text-xs font-mono text-zinc-500">{coordinateSummary}</p>
+          <p className={`text-xs font-mono ${summaryTextClass}`}>{coordinateSummary}</p>
         )}
       </div>
 
       <div className="relative">
         <div
           ref={containerRef}
-          className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50"
+          className={mapShellClass}
           style={{ height }}
           aria-label="Mapbox location picker"
           role="img"
         />
-        {disabled && (
-          <div className="pointer-events-none absolute inset-0 rounded-xl bg-white/60 backdrop-blur-[1px]" />
-        )}
+        {disabled && <div className={disabledOverlayClass} />}
         {mapStatus === "error" && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-white/90 p-4 text-center text-sm text-red-600">
+          <div className={errorOverlayClass}>
             {mapError ?? "Map failed to load. Please try again later."}
           </div>
         )}
