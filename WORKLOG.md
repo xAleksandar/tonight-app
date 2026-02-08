@@ -10,7 +10,8 @@
 - Task 7: Implement event creation and management (POST/GET events API, event service, expiration routine, property suite 12-17 updates) — Commit `39e9968`.
 - Task 8: Implement event discovery API (GET /api/events/nearby handler, query validation, serialization helpers, integration tests, profile test fixture hardening) — Commit `0f1aabc`.
 - Task 9: Event checkpoint (reran full property suite to ensure event APIs/services stay green) — Commit `99aa235`.
+- Task 10.1: Mapbox configuration scaffolding (env vars, mapbox-gl deps, shared config helper + property suite rerun) — Commit `59be6b8`.
 
 ## Next Up
-1. Task 10: Implement Mapbox integration.
-2. Task 11: Implement event creation and discovery pages.
+1. Task 10.2: Create MapboxLocationPicker component.
+2. Task 10.3: Write Property 38 (map click coordinate capture) tests.
