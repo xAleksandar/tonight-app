@@ -21,7 +21,9 @@
 - Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx with host summary, capacity details, CTA wiring) — Commit `46870cc`.
 - Task 12.1: Create POST /api/join-requests (validation, service orchestration, API wiring) — Commit `30018a13`.
 - Task 12.2: Write property tests for join request creation (pending status, duplicate prevention, capacity enforcement) — Commit `30018a13`.
+- Task 12.3: Create PATCH /api/join-requests/[id] (host validation, status updates, capacity guard) — Commit `f4b03cc`.
+- Task 12.4: Write property test for join request status transitions (hosts can accept/reject pending requests and persist new status) — Commit `e9ad105`.
 
 ## Next Up
-1. Task 12.3: Create PATCH /api/join-requests/[id].
-2. Task 12.4: Write property test for join request status transitions.
+1. Task 12.5: Create GET /api/join-requests/for-event/[eventId].
+2. Task 12.6: Add join request handling to EventDetailModal.
