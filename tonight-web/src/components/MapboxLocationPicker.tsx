@@ -11,6 +11,8 @@ const DEFAULT_CENTER = { lat: 39.8283, lng: -98.5795 }; // Continental US centro
 const DEFAULT_ZOOM = 3;
 const FOCUSED_ZOOM = 12;
 
+const defaultMapboxLoader = async () => (await import("mapbox-gl")).default;
+
 export type MapCoordinates = {
   lat: number;
   lng: number;
@@ -33,6 +35,8 @@ export type MapboxLocationPickerProps = {
   markerColor?: string;
   /** When true the map becomes read-only */
   disabled?: boolean;
+  /** Optional loader override for tests */
+  mapboxLoader?: () => Promise<typeof mapboxgl>;
 };
 
 const formatCoordinate = (value: number) => value.toFixed(5);
@@ -51,11 +55,13 @@ export default function MapboxLocationPicker({
   mapStyle = "mapbox://styles/mapbox/streets-v12",
   markerColor = "#DB2777",
   disabled = false,
+  mapboxLoader = defaultMapboxLoader,
 }: MapboxLocationPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const mapboxRef = useRef<typeof mapboxgl | null>(null);
+  const mapboxLoaderRef = useRef(mapboxLoader);
   const disabledRef = useRef(disabled);
   const onChangeRef = useRef(onChange);
   const [selected, setSelected] = useState<MapCoordinates | null>(initialValue);
@@ -63,6 +69,7 @@ export default function MapboxLocationPicker({
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
+  mapboxLoaderRef.current = mapboxLoader;
   disabledRef.current = disabled;
   onChangeRef.current = onChange;
 
@@ -142,7 +149,7 @@ export default function MapboxLocationPicker({
       setMapError(null);
 
       try {
-        const mapboxgl = (await import("mapbox-gl")).default;
+        const mapboxgl = await mapboxLoaderRef.current();
         mapboxRef.current = mapboxgl;
         mapboxgl.accessToken = getMapboxConfig().accessToken;
 

@@ -28,13 +28,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^28.0.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "@types/mapbox-gl": "^3.4.1"
+    "typescript": "^5"
   }
 }
