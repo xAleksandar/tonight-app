@@ -28,8 +28,9 @@
 - Task 12.7: Create join requests management page (host dashboard with pending/accepted/rejected filters, inline accept/reject actions, refresh controls) — Commit `db3be8b`.
 - Task 13: Join request checkpoint (ran full `npm test` suite to ensure join request properties stay green) — Commit `445d6e3`.
 - Task 14.1: Create Socket.IO service (lib/socket.ts) — Commit `b0b729f`.
+- Task 14.2: Set up Socket.IO server in Next.js (Node runtime API route that boots socketService and exposes readiness endpoint) — Commit `2c9ffc0`.
 
 ## Next Up
-1. Task 14.2: Set up Socket.IO server in Next.js.
-2. Task 14.3: Create Socket.IO client hook (hooks/useSocket.ts).
-3. Task 15.1: Create GET /api/chat/[joinRequestId]/messages.
+1. Task 14.3: Create Socket.IO client hook (hooks/useSocket.ts).
+2. Task 15.1: Create GET /api/chat/[joinRequestId]/messages.
+3. Task 15.2: Write property tests for chat access control.
