@@ -64,6 +64,7 @@
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
 - **Immediate priority:** Await updated specs for the next milestone now that Task 21 is complete.
 - 2026-02-09: Tonight build runner check-in — repo already matches the latest home/discovery designs; awaiting new tasks before proceeding.
+- 2026-02-09 01:55 EET: Re-checked tonight-web against tonight-meetup-app-designs; no new direction yet, so still blocked pending Task 22 details.
 
 ## Next Up
 1. Pending product direction for post-Task 21 scope (Task 22 TBD).
