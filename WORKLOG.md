@@ -32,10 +32,11 @@
 - Task 14.3: Create Socket.IO client hook (hooks/useSocket.ts with authenticated connect/join/send helpers plus unit tests) — Commit `317f4f1`.
 - Task 15.1: Create GET /api/chat/[joinRequestId]/messages (chat service with access control + message serialization, authenticated API route) — Commit `b8e692a`.
 - Task 15.2: Write property tests for chat access control (Property 27 + 28 to ensure accepted hosts/participants pass and other statuses fail) — Commit `190e7fd`.
+- Task 18.1-18.4: Implement welcome/login experience, AuthProvider wrapping, and protected routing (login page, session checks, redirects) — Commit `17e347d`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **New priority:** Implement the welcome/login flow from the design package so the app boots into that screen before discovery.
+- **Next priority:** Continue Task 15 chat work starting with POST /api/chat/[joinRequestId]/messages.
 
 ## Next Up
 1. Task 15.3: Create POST /api/chat/[joinRequestId]/messages.
