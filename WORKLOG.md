@@ -11,7 +11,9 @@
 - Task 8: Implement event discovery API (GET /api/events/nearby handler, query validation, serialization helpers, integration tests, profile test fixture hardening) — Commit `0f1aabc`.
 - Task 9: Event checkpoint (reran full property suite to ensure event APIs/services stay green) — Commit `99aa235`.
 - Task 10.1: Mapbox configuration scaffolding (env vars, mapbox-gl deps, shared config helper + property suite rerun) — Commit `59be6b8`.
+- Task 10.2: Create MapboxLocationPicker component (client-side map setup, marker interactions, disabled/error states) — Commit `0c649cf`.
+- Task 10.3: Write Property 38 (map click coordinate capture) tests (jsdom-friendly harness, mock Mapbox loader, property assertions) — Commit `f4eebaf`.
 
 ## Next Up
-1. Task 10.2: Create MapboxLocationPicker component.
-2. Task 10.3: Write Property 38 (map click coordinate capture) tests.
+1. Task 10.4: Create EventMapView component.
+2. Task 10.5: Create EventListView component.
