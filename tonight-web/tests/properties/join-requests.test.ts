@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import {
   createJoinRequest,
+  updateJoinRequestStatus,
   JoinRequestDuplicateError,
   JoinRequestEventFullError,
 } from '@/lib/join-requests';
@@ -15,6 +16,7 @@ type MockPrisma = {
     findUnique: ReturnType<typeof vi.fn>;
     count: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
   };
   $transaction: ReturnType<typeof vi.fn>;
 };
@@ -30,6 +32,7 @@ function createMockPrisma(): MockPrisma {
     findUnique: vi.fn(),
     count: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
   } as MockPrisma['joinRequest'];
 
   const prisma: MockPrisma = {
@@ -63,6 +66,7 @@ beforeEach(() => {
   prisma.joinRequest.findUnique.mockReset();
   prisma.joinRequest.count.mockReset();
   prisma.joinRequest.create.mockReset();
+  prisma.joinRequest.update.mockReset();
   prisma.$transaction.mockReset();
   prisma.$transaction.mockImplementation(async (callback: (transactionClient: { event: typeof prisma.event; joinRequest: typeof prisma.joinRequest }) => Promise<unknown>) =>
     callback({ event: prisma.event, joinRequest: prisma.joinRequest })
@@ -143,6 +147,86 @@ describe('Property 24: Duplicate Join Request Prevention', () => {
         await expect(createJoinRequest({ eventId, userId })).rejects.toBeInstanceOf(JoinRequestDuplicateError);
         expect(prisma.joinRequest.create).not.toHaveBeenCalled();
       })
+    );
+  });
+});
+
+describe('Property 25: Join Request Status Transitions', () => {
+  it('allows hosts to update pending join requests to accepted or rejected', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        fc.uuid(),
+        fc.constantFrom(JoinRequestStatus.ACCEPTED, JoinRequestStatus.REJECTED),
+        fc.integer({ min: 2, max: 12 }),
+        async (joinRequestId, eventId, hostId, userId, nextStatus, maxParticipants) => {
+          const prisma = getMockPrisma();
+          prisma.joinRequest.findUnique.mockReset();
+          prisma.joinRequest.count.mockReset();
+          prisma.joinRequest.update.mockReset();
+
+          const timestamp = new Date('2030-01-01T00:00:00.000Z');
+
+          prisma.joinRequest.findUnique.mockResolvedValue({
+            id: joinRequestId,
+            eventId,
+            userId,
+            status: JoinRequestStatus.PENDING,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            event: {
+              id: eventId,
+              hostId,
+              status: EventStatus.ACTIVE,
+              maxParticipants,
+            },
+          });
+
+          prisma.joinRequest.count.mockResolvedValue(0);
+          prisma.joinRequest.update.mockResolvedValue({
+            id: joinRequestId,
+            eventId,
+            userId,
+            status: nextStatus,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          });
+
+          const priorCountCalls = prisma.joinRequest.count.mock.calls.length;
+
+          const result = await updateJoinRequestStatus({
+            joinRequestId,
+            hostId,
+            status: nextStatus,
+          });
+
+          if (nextStatus === JoinRequestStatus.ACCEPTED) {
+            expect(prisma.joinRequest.count).toHaveBeenCalledWith({
+              where: {
+                eventId,
+                status: JoinRequestStatus.ACCEPTED,
+              },
+            });
+          } else {
+            expect(prisma.joinRequest.count.mock.calls.length).toBe(priorCountCalls);
+          }
+
+          expect(prisma.joinRequest.update).toHaveBeenCalledWith({
+            where: { id: joinRequestId },
+            data: { status: nextStatus },
+          });
+          expect(result).toEqual({
+            id: joinRequestId,
+            eventId,
+            userId,
+            status: nextStatus,
+            createdAt: timestamp.toISOString(),
+            updatedAt: timestamp.toISOString(),
+          });
+        }
+      )
     );
   });
 });
