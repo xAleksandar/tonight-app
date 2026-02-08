@@ -49,10 +49,12 @@ const photoUrlArb = fc.webUrl({
   validSchemes: ['http', 'https'],
 });
 
-const creationDateArb = fc.date({
-  min: new Date('2000-01-01T00:00:00.000Z'),
-  max: new Date('2100-01-01T00:00:00.000Z'),
-});
+const creationDateArb = fc
+  .date({
+    min: new Date('2000-01-01T00:00:00.000Z'),
+    max: new Date('2100-01-01T00:00:00.000Z'),
+  })
+  .filter((date) => Number.isFinite(date.getTime()));
 
 afterEach(() => {
   const prisma = getMockPrisma();
