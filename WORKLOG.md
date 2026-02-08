@@ -53,6 +53,7 @@
 - Task 20.2: Add loading states to core pages (discovery landing, event creation, and chat views now show branded skeletons and pending indicators) — Commit `3fc95d9`.
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
 - Task 20.5: Add mobile-responsive styling across discovery, profile, and chat surfaces (sticky mobile hero/action bar, redesigned profile editor, chat conversation/message theming) — Commit `1a26c6c`.
+- Task 20.5 follow-up: Matched the home/discovery screen to the tonight-meetup-app-designs system (desktop sidebar/header parity, refreshed discovery cards, mobile hero/action bar + toolbar, map/list toggle updates) — Commit `341c605`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
