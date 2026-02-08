@@ -8,7 +8,9 @@
 - Task 5: Implement user profile functionality (PATCH /api/users/me, profile page/components, related property tests) — Commit `HEAD`.
 - Task 6: Implement geospatial service (PostGIS-powered query + Properties 18-21) — Commit `292e320`.
 - Task 7: Implement event creation and management (POST/GET events API, event service, expiration routine, property suite 12-17 updates) — Commit `39e9968`.
+- Task 8: Implement event discovery API (GET /api/events/nearby handler, query validation, serialization helpers, integration tests, profile test fixture hardening) — Commit `0f1aabc`.
+- Task 9: Event checkpoint (reran full property suite to ensure event APIs/services stay green) — Commit `99aa235`.
 
 ## Next Up
-1. Task 8: Implement event discovery API.
-2. Task 9: Checkpoint - Ensure event tests pass.
+1. Task 10: Implement Mapbox integration.
+2. Task 11: Implement event creation and discovery pages.
