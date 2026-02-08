@@ -10,6 +10,7 @@ import {
   JoinRequestNotFoundError,
   JoinRequestUnauthorizedError,
 } from '@/lib/join-requests';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 type RouteContext = {
   params: {
@@ -46,6 +47,8 @@ const normalizeStatus = (value: unknown) => {
   return { error: 'Status must be "accepted" or "rejected"' } as const;
 };
 
+const ROUTE_CONTEXT = 'PATCH /api/join-requests/[id]';
+
 export const patchJoinRequestHandler: AuthenticatedRouteHandler<NextResponse> = async (
   request,
   context,
@@ -53,17 +56,29 @@ export const patchJoinRequestHandler: AuthenticatedRouteHandler<NextResponse> = 
 ) => {
   const joinRequestId = (context as RouteContext).params?.id;
   if (!joinRequestId) {
-    return NextResponse.json({ error: 'Join request id is required' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Join request id is required',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const body = await parseRequestBody(request);
   if (!body) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid JSON body',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const statusField = normalizeStatus(body.status);
   if ('error' in statusField) {
-    return NextResponse.json({ error: statusField.error }, { status: 400 });
+    return createErrorResponse({
+      message: statusField.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   try {
@@ -76,27 +91,46 @@ export const patchJoinRequestHandler: AuthenticatedRouteHandler<NextResponse> = 
     return NextResponse.json({ joinRequest }, { status: 200 });
   } catch (error) {
     if (error instanceof JoinRequestNotFoundError) {
-      return NextResponse.json({ error: 'Join request not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'Join request not found',
+        status: 404,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof JoinRequestUnauthorizedError) {
-      return NextResponse.json({ error: 'You are not allowed to modify this join request' }, { status: 403 });
+      return createErrorResponse({
+        message: 'You are not allowed to modify this join request',
+        status: 403,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof JoinRequestInvalidStatusError) {
-      return NextResponse.json({ error: 'Status must be "accepted" or "rejected"' }, { status: 400 });
+      return createErrorResponse({
+        message: 'Status must be "accepted" or "rejected"',
+        status: 400,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof JoinRequestInactiveEventError) {
-      return NextResponse.json({ error: 'This event is not active' }, { status: 409 });
+      return createErrorResponse({
+        message: 'This event is not active',
+        status: 409,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof JoinRequestEventFullError) {
-      return NextResponse.json({ error: 'This event is already full' }, { status: 409 });
+      return createErrorResponse({
+        message: 'This event is already full',
+        status: 409,
+        context: ROUTE_CONTEXT,
+      });
     }
 
-    console.error('Failed to update join request status', error);
-    return NextResponse.json({ error: 'Unable to update join request' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to update join request');
   }
 };
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { AuthenticatedRouteHandler } from '@/middleware/auth';
 import { requireAuth } from '@/middleware/auth';
 import { findNearbyEvents, DEFAULT_RADIUS_METERS } from '@/lib/geospatial';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const LATITUDE_MIN = -90;
 const LATITUDE_MAX = 90;
@@ -78,6 +79,8 @@ const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>
   };
 };
 
+const ROUTE_CONTEXT = 'GET /api/events/nearby';
+
 export const getNearbyEventsHandler: AuthenticatedRouteHandler<NextResponse> = async (
   request,
   _context,
@@ -85,7 +88,11 @@ export const getNearbyEventsHandler: AuthenticatedRouteHandler<NextResponse> = a
 ) => {
   const parsedQuery = parseQuery(request);
   if ('error' in parsedQuery) {
-    return NextResponse.json({ error: parsedQuery.error }, { status: 400 });
+    return createErrorResponse({
+      message: parsedQuery.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   try {
@@ -105,8 +112,7 @@ export const getNearbyEventsHandler: AuthenticatedRouteHandler<NextResponse> = a
       },
     });
   } catch (error) {
-    console.error('Failed to fetch nearby events', error);
-    return NextResponse.json({ error: 'Unable to fetch nearby events' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to fetch nearby events');
   }
 };
 

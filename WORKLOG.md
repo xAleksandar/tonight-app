@@ -49,12 +49,13 @@
 - Task 17.3: Create ReportModal component (design-aligned modal, optimistic submission UX, RTL coverage) — Commit `06c0dd5`.
 - Task 17.4: Add report actions to event detail modal and user profile safety settings (ReportModal wiring + success messaging + design-aligned CTAs) — Commit `74aab95`.
 - Task 19: Final checkpoint — reran full `npm test` property suite (62 tests / 40 properties) to ensure chat, safety, and reporting changes stayed green — Commit `cc41d55`.
+- Task 20.1: Add comprehensive error handling to all API routes (centralized response helper, middleware updates, deterministic property suite) — Commit `HEAD`.
 
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 20.1 — Add comprehensive error handling to all API routes.
+- **Next priority:** Task 20.2 — Add loading states to core pages.
 
 ## Next Up
-1. Task 20.1: Add comprehensive error handling to all API routes (consistent response formatting and logging).
-2. Task 20.2: Add loading states to core pages (pending indicators for discovery, events, and chat views).
+1. Task 20.2: Add loading states to core pages (pending indicators for discovery, events, and chat views).
+2. Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component).

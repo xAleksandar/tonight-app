@@ -6,13 +6,16 @@ import {
   hashToken,
 } from '@/lib/auth';
 import { sendMagicLink } from '@/lib/email';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+const ROUTE_CONTEXT = 'POST /api/auth/request-magic-link';
+
 const invalidEmailResponse = () =>
-  NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+  createErrorResponse({ message: 'Invalid email address', status: 400, context: ROUTE_CONTEXT });
 
 const parseBody = async (request: Request): Promise<Record<string, unknown>> => {
   try {
@@ -65,7 +68,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('Failed to request magic link', error);
-    return NextResponse.json({ error: 'Unable to process request' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to process request');
   }
 }

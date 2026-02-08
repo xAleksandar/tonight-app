@@ -10,6 +10,7 @@ import {
   ChatMessageValidationError,
   ChatBlockedError,
 } from '@/lib/chat';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 interface RouteContext {
   params?: {
@@ -46,6 +47,9 @@ const normalizeMessageContentField = (value: unknown) => {
   return { value } as const;
 };
 
+const GET_CONTEXT = 'GET /api/chat/[joinRequestId]/messages';
+const POST_CONTEXT = 'POST /api/chat/[joinRequestId]/messages';
+
 export const getChatMessagesHandler: AuthenticatedRouteHandler<NextResponse> = async (
   _request,
   context,
@@ -54,7 +58,11 @@ export const getChatMessagesHandler: AuthenticatedRouteHandler<NextResponse> = a
   const joinRequestIdParam = (context as RouteContext)?.params?.joinRequestId;
   const normalizedJoinRequestId = normalizeJoinRequestId(joinRequestIdParam);
   if ('error' in normalizedJoinRequestId) {
-    return NextResponse.json({ error: normalizedJoinRequestId.error }, { status: 400 });
+    return createErrorResponse({
+      message: normalizedJoinRequestId.error,
+      status: 400,
+      context: GET_CONTEXT,
+    });
   }
 
   try {
@@ -66,23 +74,38 @@ export const getChatMessagesHandler: AuthenticatedRouteHandler<NextResponse> = a
     return NextResponse.json({ messages }, { status: 200 });
   } catch (error) {
     if (error instanceof ChatJoinRequestNotFoundError) {
-      return NextResponse.json({ error: 'Join request not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'Join request not found',
+        status: 404,
+        context: GET_CONTEXT,
+      });
     }
 
     if (error instanceof ChatUnauthorizedError) {
-      return NextResponse.json({ error: 'You are not allowed to access this chat' }, { status: 403 });
+      return createErrorResponse({
+        message: 'You are not allowed to access this chat',
+        status: 403,
+        context: GET_CONTEXT,
+      });
     }
 
     if (error instanceof ChatJoinRequestNotAcceptedError) {
-      return NextResponse.json({ error: 'Chat is only available for accepted join requests' }, { status: 403 });
+      return createErrorResponse({
+        message: 'Chat is only available for accepted join requests',
+        status: 403,
+        context: GET_CONTEXT,
+      });
     }
 
     if (error instanceof ChatBlockedError) {
-      return NextResponse.json({ error: 'Chat is not available between blocked users' }, { status: 403 });
+      return createErrorResponse({
+        message: 'Chat is not available between blocked users',
+        status: 403,
+        context: GET_CONTEXT,
+      });
     }
 
-    console.error('Failed to fetch chat messages', error);
-    return NextResponse.json({ error: 'Unable to fetch chat messages' }, { status: 500 });
+    return handleRouteError(error, GET_CONTEXT, 'Unable to fetch chat messages');
   }
 };
 
@@ -94,17 +117,29 @@ export const postChatMessageHandler: AuthenticatedRouteHandler<NextResponse> = a
   const joinRequestIdParam = (context as RouteContext)?.params?.joinRequestId;
   const normalizedJoinRequestId = normalizeJoinRequestId(joinRequestIdParam);
   if ('error' in normalizedJoinRequestId) {
-    return NextResponse.json({ error: normalizedJoinRequestId.error }, { status: 400 });
+    return createErrorResponse({
+      message: normalizedJoinRequestId.error,
+      status: 400,
+      context: POST_CONTEXT,
+    });
   }
 
   const body = await parseRequestBody(request);
   if (!body) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid JSON body',
+      status: 400,
+      context: POST_CONTEXT,
+    });
   }
 
   const contentField = normalizeMessageContentField(body.content);
   if ('error' in contentField) {
-    return NextResponse.json({ error: contentField.error }, { status: 400 });
+    return createErrorResponse({
+      message: contentField.error,
+      status: 400,
+      context: POST_CONTEXT,
+    });
   }
 
   try {
@@ -117,27 +152,46 @@ export const postChatMessageHandler: AuthenticatedRouteHandler<NextResponse> = a
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
     if (error instanceof ChatJoinRequestNotFoundError) {
-      return NextResponse.json({ error: 'Join request not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'Join request not found',
+        status: 404,
+        context: POST_CONTEXT,
+      });
     }
 
     if (error instanceof ChatUnauthorizedError) {
-      return NextResponse.json({ error: 'You are not allowed to access this chat' }, { status: 403 });
+      return createErrorResponse({
+        message: 'You are not allowed to access this chat',
+        status: 403,
+        context: POST_CONTEXT,
+      });
     }
 
     if (error instanceof ChatJoinRequestNotAcceptedError) {
-      return NextResponse.json({ error: 'Chat is only available for accepted join requests' }, { status: 403 });
+      return createErrorResponse({
+        message: 'Chat is only available for accepted join requests',
+        status: 403,
+        context: POST_CONTEXT,
+      });
     }
 
     if (error instanceof ChatMessageValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return createErrorResponse({
+        message: error.message,
+        status: 400,
+        context: POST_CONTEXT,
+      });
     }
 
     if (error instanceof ChatBlockedError) {
-      return NextResponse.json({ error: 'Chat is not available between blocked users' }, { status: 403 });
+      return createErrorResponse({
+        message: 'Chat is not available between blocked users',
+        status: 403,
+        context: POST_CONTEXT,
+      });
     }
 
-    console.error('Failed to create chat message', error);
-    return NextResponse.json({ error: 'Unable to create chat message' }, { status: 500 });
+    return handleRouteError(error, POST_CONTEXT, 'Unable to create chat message');
   }
 };
 

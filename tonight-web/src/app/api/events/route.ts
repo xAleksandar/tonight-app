@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { AuthenticatedRouteHandler } from '@/middleware/auth';
 import { requireAuth } from '@/middleware/auth';
 import { createEvent } from '@/lib/events';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 120;
@@ -61,6 +62,8 @@ type NormalizedPayload = {
 type ValidationResult =
   | { ok: true; data: NormalizedPayload }
   | { ok: false; errors: Record<string, string> };
+
+const ROUTE_CONTEXT = 'POST /api/events';
 
 const normalizeLocation = (value: unknown) => {
   if (!value || typeof value !== 'object') {
@@ -170,12 +173,21 @@ export const validateEventPayload = (body: Record<string, unknown>): ValidationR
 export const createEventHandler: AuthenticatedRouteHandler<NextResponse> = async (request, _context, auth) => {
   const body = await parseJson(request);
   if (!body) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid JSON body',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const validation = validateEventPayload(body);
   if (!validation.ok) {
-    return NextResponse.json({ error: 'Invalid event data', errors: validation.errors }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid event data',
+      status: 400,
+      context: ROUTE_CONTEXT,
+      errors: validation.errors,
+    });
   }
 
   try {
@@ -186,8 +198,7 @@ export const createEventHandler: AuthenticatedRouteHandler<NextResponse> = async
 
     return NextResponse.json({ event }, { status: 201 });
   } catch (error) {
-    console.error('Failed to create event', error);
-    return NextResponse.json({ error: 'Unable to create event' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to create event');
   }
 };
 

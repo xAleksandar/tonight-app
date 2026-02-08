@@ -6,6 +6,7 @@ import {
   JoinRequestEventNotFoundError,
   JoinRequestUnauthorizedError,
 } from '@/lib/join-requests';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 interface RouteContext {
   params?: {
@@ -26,6 +27,8 @@ const normalizeEventId = (value: unknown) => {
   return { value: trimmed } as const;
 };
 
+const ROUTE_CONTEXT = 'GET /api/join-requests/for-event/[eventId]';
+
 export const getJoinRequestsForEventHandler: AuthenticatedRouteHandler<NextResponse> = async (
   _request,
   context,
@@ -34,7 +37,11 @@ export const getJoinRequestsForEventHandler: AuthenticatedRouteHandler<NextRespo
   const eventIdParam = (context as RouteContext)?.params?.eventId;
   const normalizedEventId = normalizeEventId(eventIdParam);
   if ('error' in normalizedEventId) {
-    return NextResponse.json({ error: normalizedEventId.error }, { status: 400 });
+    return createErrorResponse({
+      message: normalizedEventId.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   try {
@@ -46,15 +53,22 @@ export const getJoinRequestsForEventHandler: AuthenticatedRouteHandler<NextRespo
     return NextResponse.json({ joinRequests }, { status: 200 });
   } catch (error) {
     if (error instanceof JoinRequestEventNotFoundError) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'Event not found',
+        status: 404,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof JoinRequestUnauthorizedError) {
-      return NextResponse.json({ error: 'You are not allowed to view join requests for this event' }, { status: 403 });
+      return createErrorResponse({
+        message: 'You are not allowed to view join requests for this event',
+        status: 403,
+        context: ROUTE_CONTEXT,
+      });
     }
 
-    console.error('Failed to fetch join requests for event', error);
-    return NextResponse.json({ error: 'Unable to fetch join requests' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to fetch join requests');
   }
 };
 

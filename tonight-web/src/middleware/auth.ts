@@ -1,13 +1,19 @@
 import { cookies } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getAuthCookieName, verifyJWT } from '@/lib/auth';
+import { createErrorResponse } from '@/lib/http/errors';
 
 export interface AuthenticatedUser {
   userId: string;
   token: string;
 }
 
-const unauthorizedResponse = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+const unauthorizedResponse = () =>
+  createErrorResponse({
+    message: 'Unauthorized',
+    status: 401,
+    context: 'middleware/auth',
+  });
 
 const readTokenFromCookies = (request?: NextRequest): string | null => {
   const cookieStore = request?.cookies ?? safeCookies();

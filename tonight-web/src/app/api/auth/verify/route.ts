@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateJWT, getAuthCookieName, hashToken } from '@/lib/auth';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
+
+const ROUTE_CONTEXT = 'GET /api/auth/verify';
 
 const unauthorized = (message: string, status = 400) =>
-  NextResponse.json({ error: message }, { status });
+  createErrorResponse({ message, status, context: ROUTE_CONTEXT });
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,7 +57,6 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Failed to verify magic link', error);
-    return NextResponse.json({ error: 'Unexpected error' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unexpected error');
   }
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import type { AuthenticatedRouteHandler } from '@/middleware/auth';
 import { requireAuth } from '@/middleware/auth';
 import { serializeUser } from '@/lib/user-serialization';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const DISPLAY_NAME_MIN = 2;
 const DISPLAY_NAME_MAX = 64;
@@ -92,6 +93,8 @@ const parseRequestBody = async (request: NextRequest) => {
   }
 };
 
+const ROUTE_CONTEXT = 'PATCH /api/users/me';
+
 export const patchProfileHandler: AuthenticatedRouteHandler<NextResponse> = async (
   request,
   _context,
@@ -99,7 +102,11 @@ export const patchProfileHandler: AuthenticatedRouteHandler<NextResponse> = asyn
 ) => {
   const body = await parseRequestBody(request);
   if (!body) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid JSON body',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const displayNameField = normalizeDisplayName(body.displayName);
@@ -114,7 +121,12 @@ export const patchProfileHandler: AuthenticatedRouteHandler<NextResponse> = asyn
   }
 
   if (Object.keys(errors).length > 0) {
-    return NextResponse.json({ error: 'Invalid profile data', errors }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid profile data',
+      status: 400,
+      context: ROUTE_CONTEXT,
+      errors,
+    });
   }
 
   const data: { displayName?: string | null; photoUrl?: string | null } = {};
@@ -126,7 +138,11 @@ export const patchProfileHandler: AuthenticatedRouteHandler<NextResponse> = asyn
   }
 
   if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: 'No changes provided' }, { status: 400 });
+    return createErrorResponse({
+      message: 'No changes provided',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   try {
@@ -138,11 +154,14 @@ export const patchProfileHandler: AuthenticatedRouteHandler<NextResponse> = asyn
     return NextResponse.json({ user: serializeUser(updatedUser) });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'User not found',
+        status: 404,
+        context: ROUTE_CONTEXT,
+      });
     }
 
-    console.error('Failed to update user profile', error);
-    return NextResponse.json({ error: 'Unable to update profile' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to update profile');
   }
 };
 

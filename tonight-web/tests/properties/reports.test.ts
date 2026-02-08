@@ -68,7 +68,9 @@ const reportTargetArb = fc.oneof(
   })
 );
 
-const creationDateArb = fc.date({ min: new Date('2020-01-01T00:00:00.000Z'), max: new Date('2035-12-31T23:59:59.999Z') });
+const creationDateMin = new Date('2020-01-01T00:00:00.000Z').getTime();
+const creationDateMax = new Date('2035-12-31T23:59:59.999Z').getTime();
+const creationDateArb = fc.integer({ min: creationDateMin, max: creationDateMax }).map((timestamp) => new Date(timestamp));
 
 beforeEach(() => {
   const prisma = getMockPrisma();

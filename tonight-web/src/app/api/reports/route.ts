@@ -7,6 +7,7 @@ import {
   ReportValidationError,
   ReportedUserNotFoundError,
 } from '@/lib/reports';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const parseRequestBody = async (request: NextRequest) => {
   try {
@@ -58,6 +59,8 @@ const normalizeOptionalId = (label: string, value: unknown) => {
   return { value: trimmed } as const;
 };
 
+const ROUTE_CONTEXT = 'POST /api/reports';
+
 export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = async (
   request,
   _context,
@@ -65,35 +68,63 @@ export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = asyn
 ) => {
   const body = await parseRequestBody(request);
   if (!body) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid JSON body',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const reasonField = normalizeReason(body.reason);
   if ('error' in reasonField) {
-    return NextResponse.json({ error: reasonField.error }, { status: 400 });
+    return createErrorResponse({
+      message: reasonField.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const descriptionField = normalizeDescription(body.description);
   if ('error' in descriptionField) {
-    return NextResponse.json({ error: descriptionField.error }, { status: 400 });
+    return createErrorResponse({
+      message: descriptionField.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const eventField = normalizeOptionalId('eventId', body.eventId);
   if ('error' in eventField) {
-    return NextResponse.json({ error: eventField.error }, { status: 400 });
+    return createErrorResponse({
+      message: eventField.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const reportedUserField = normalizeOptionalId('reportedUserId', body.reportedUserId);
   if ('error' in reportedUserField) {
-    return NextResponse.json({ error: reportedUserField.error }, { status: 400 });
+    return createErrorResponse({
+      message: reportedUserField.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   if (!eventField.value && !reportedUserField.value) {
-    return NextResponse.json({ error: 'Provide eventId or reportedUserId' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Provide eventId or reportedUserId',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   if (eventField.value && reportedUserField.value) {
-    return NextResponse.json({ error: 'Choose a single target to report' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Choose a single target to report',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   try {
@@ -108,19 +139,30 @@ export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = asyn
     return NextResponse.json({ report }, { status: 201 });
   } catch (error) {
     if (error instanceof ReportValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return createErrorResponse({
+        message: error.message,
+        status: 400,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof ReportEventNotFoundError) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'Event not found',
+        status: 404,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof ReportedUserNotFoundError) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'User not found',
+        status: 404,
+        context: ROUTE_CONTEXT,
+      });
     }
 
-    console.error('Failed to create report', error);
-    return NextResponse.json({ error: 'Unable to create report' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to create report');
   }
 };
 

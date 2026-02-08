@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { serializeUser } from '@/lib/user-serialization';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/middleware/auth';
+import { handleRouteError } from '@/lib/http/errors';
+
+const ROUTE_CONTEXT = 'GET /api/auth/me';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +20,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ user: serializeUser(user) });
   } catch (error) {
-    console.error('Failed to load user profile', error);
-    return NextResponse.json({ user: null }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to load session data');
   }
 }

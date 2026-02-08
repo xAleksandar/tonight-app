@@ -8,6 +8,7 @@ import {
   BlockUserTargetNotFoundError,
   BlockUserValidationError,
 } from '@/lib/blocking';
+import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const parseRequestBody = async (request: NextRequest) => {
   try {
@@ -30,6 +31,8 @@ const normalizeTargetUserId = (value: unknown) => {
   return { value: trimmed } as const;
 };
 
+const ROUTE_CONTEXT = 'POST /api/users/block';
+
 export const blockUserHandler: AuthenticatedRouteHandler<NextResponse> = async (
   request,
   _context,
@@ -37,12 +40,20 @@ export const blockUserHandler: AuthenticatedRouteHandler<NextResponse> = async (
 ) => {
   const body = await parseRequestBody(request);
   if (!body) {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return createErrorResponse({
+      message: 'Invalid JSON body',
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   const userField = normalizeTargetUserId(body.userId);
   if ('error' in userField) {
-    return NextResponse.json({ error: userField.error }, { status: 400 });
+    return createErrorResponse({
+      message: userField.error,
+      status: 400,
+      context: ROUTE_CONTEXT,
+    });
   }
 
   try {
@@ -54,23 +65,38 @@ export const blockUserHandler: AuthenticatedRouteHandler<NextResponse> = async (
     return NextResponse.json({ block }, { status: 201 });
   } catch (error) {
     if (error instanceof BlockUserSelfBlockError) {
-      return NextResponse.json({ error: 'You cannot block yourself' }, { status: 400 });
+      return createErrorResponse({
+        message: 'You cannot block yourself',
+        status: 400,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof BlockUserTargetNotFoundError) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return createErrorResponse({
+        message: 'User not found',
+        status: 404,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof BlockUserDuplicateError) {
-      return NextResponse.json({ error: 'User already blocked' }, { status: 409 });
+      return createErrorResponse({
+        message: 'User already blocked',
+        status: 409,
+        context: ROUTE_CONTEXT,
+      });
     }
 
     if (error instanceof BlockUserValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return createErrorResponse({
+        message: error.message,
+        status: 400,
+        context: ROUTE_CONTEXT,
+      });
     }
 
-    console.error('Failed to create block record', error);
-    return NextResponse.json({ error: 'Unable to block user' }, { status: 500 });
+    return handleRouteError(error, ROUTE_CONTEXT, 'Unable to block user');
   }
 };
 
