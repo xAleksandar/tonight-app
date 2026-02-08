@@ -37,12 +37,13 @@
 - Task 15.5: Create chat page (Socket.IO-powered conversation view with history fetching, real-time updates, and composer) — Commit `b4e4456`.
 - Task 15.6: Create MessageList component (scrollable conversation view, shared loading/empty/error states, timestamped bubbles) — Commit `b4d7ce6`.
 - Task 18.1-18.4: Implement welcome/login experience, AuthProvider wrapping, and protected routing (login page, session checks, redirects) — Commit `17e347d`.
+- Task 16.1: Create POST /api/users/block (validation, duplicate prevention, target existence checks) — Commit `446d2a7`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
-- **Next priority:** Task 16.1 — Create POST /api/users/block.
+- **Next priority:** Task 16.2 — Write property tests for blocking.
 
 ## Next Up
-1. Task 16.1: Create POST /api/users/block.
-2. Task 16.2: Write property tests for blocking.
-3. Task 16.3: Update geospatial service to filter blocked users.
+1. Task 16.2: Write property tests for blocking.
+2. Task 16.3: Update geospatial service to filter blocked users.
+3. Task 16.4: Update chat endpoints to check blocking.
