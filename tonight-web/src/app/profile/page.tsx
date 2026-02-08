@@ -7,6 +7,7 @@ import ReportModal from '@/components/ReportModal';
 import UserAvatar from '@/components/UserAvatar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 type ProfileResponse = {
   user: Profile | null;
@@ -132,21 +133,27 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
       const dataUrl = await fileToDataUrl(file);
       setPhotoInput(dataUrl);
       setStatus({ type: 'success', message: 'Photo ready to upload' });
+      showSuccessToast('Photo ready', 'Remember to save your changes.');
     } catch (error) {
       console.error(error);
       setStatus({ type: 'error', message: 'Could not read that file' });
+      showErrorToast('Unable to read file', 'Pick a different image to continue.');
     }
   }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!profile) {
-      setStatus({ type: 'error', message: 'You need to sign in to update your profile.' });
+      const message = 'You need to sign in to update your profile.';
+      setStatus({ type: 'error', message });
+      showErrorToast('Sign in required', message);
       return;
     }
 
     if (!hasChanges) {
-      setStatus({ type: 'error', message: 'No changes to save.' });
+      const message = 'No changes to save.';
+      setStatus({ type: 'error', message });
+      showErrorToast('Nothing to update', 'Make an edit before saving.');
       return;
     }
 
@@ -173,10 +180,12 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
 
       const data = await response.json();
       if (!response.ok) {
+        const message = data?.error ?? 'Unable to save your profile.';
         setStatus({
           type: 'error',
-          message: data?.error ?? 'Unable to save your profile.',
+          message,
         });
+        showErrorToast('Profile update failed', message);
         return;
       }
 
@@ -184,9 +193,12 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
       setDisplayNameInput(data.user.displayName ?? '');
       setPhotoInput(data.user.photoUrl ?? '');
       setStatus({ type: 'success', message: 'Profile updated successfully.' });
+      showSuccessToast('Profile updated', 'Your changes are live.');
     } catch (error) {
       console.error('Failed to update profile', error);
-      setStatus({ type: 'error', message: 'Unexpected error while saving changes.' });
+      const message = 'Unexpected error while saving changes.';
+      setStatus({ type: 'error', message });
+      showErrorToast('Unexpected error', message);
     } finally {
       setSaving(false);
     }

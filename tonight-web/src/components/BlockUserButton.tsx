@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShieldAlert } from 'lucide-react';
 
 import type { SerializedBlockRecord } from '@/lib/blocking';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 const combineClasses = (...values: Array<string | false | null | undefined>) =>
   values.filter(Boolean).join(' ');
@@ -168,10 +169,12 @@ export default function BlockUserButton({
       setConfirmOpen(false);
       setDialogError(null);
       setHasBlocked(true);
+      const successMessage = targetDisplayName ? `${targetDisplayName} has been blocked.` : 'User blocked.';
       setInlineNotice({
         type: 'success',
-        message: targetDisplayName ? `${targetDisplayName} has been blocked.` : 'User blocked.',
+        message: successMessage,
       });
+      showSuccessToast('User blocked', successMessage);
       onBlocked?.(payload.block);
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
@@ -180,6 +183,7 @@ export default function BlockUserButton({
       const message = (error as Error).message ?? 'Unable to block this user.';
       setSubmissionState('error');
       setDialogError(message);
+      showErrorToast('Unable to block user', message);
     } finally {
       requestRef.current = null;
     }

@@ -6,6 +6,7 @@ import { Flag } from "lucide-react";
 
 import ReportModal from "@/components/ReportModal";
 import UserAvatar from "./UserAvatar";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export type EventDetail = {
   id: string;
@@ -195,15 +196,16 @@ export default function EventDetailModal({
       }
 
       setJoinStatus("success", "Request sent! The host will follow up soon.");
+      showSuccessToast("Request sent", "We let the host know you're interested.");
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
       }
       console.error("Join request failed", error);
-      setJoinStatus(
-        "error",
-        (error as Error).message || "Unable to send join request. Please try again."
-      );
+      const fallback = "Unable to send join request. Please try again.";
+      const message = (error as Error).message || fallback;
+      setJoinStatus("error", message);
+      showErrorToast("Unable to send request", message);
     }
   }, [event.id, inferErrorMessage, setJoinStatus]);
 

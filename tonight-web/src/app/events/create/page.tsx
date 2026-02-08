@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLocationPicker';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 const TITLE_LIMITS = { min: 3, max: 120 } as const;
 const DESCRIPTION_LIMITS = { min: 1, max: 2000 } as const;
@@ -96,6 +97,7 @@ function AuthenticatedCreateEventPage() {
     if (!navigator.geolocation) {
       setStatusIntent('error');
       setStatusMessage('Your browser does not support geolocation.');
+      showErrorToast('Turn on location services', 'Your browser does not support geolocation.');
       return;
     }
 
@@ -111,6 +113,7 @@ function AuthenticatedCreateEventPage() {
         console.error('Geolocation failed', error);
         setStatusIntent('error');
         setStatusMessage('Unable to detect your location. Try selecting it on the map.');
+        showErrorToast('Unable to detect location', 'Try selecting it manually on the map.');
         setGeolocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000 }
@@ -166,6 +169,7 @@ function AuthenticatedCreateEventPage() {
 
     const errors = validateBeforeSubmit();
     if (Object.keys(errors).length > 0) {
+      showErrorToast('Fix the highlighted fields', 'Update the form before publishing.');
       return;
     }
 
@@ -195,18 +199,23 @@ function AuthenticatedCreateEventPage() {
       if (!response.ok) {
         setFieldErrors((prev) => ({ ...prev, ...(payload.errors ?? {}) }));
         setStatusIntent('error');
-        setStatusMessage(payload.error ?? 'Could not create the event.');
+        const message = payload.error ?? 'Could not create the event.';
+        setStatusMessage(message);
+        showErrorToast('Unable to publish event', message);
         return;
       }
 
       setStatusIntent('success');
       setStatusMessage('Event created! Redirecting…');
+      showSuccessToast('Event published', 'Your meetup is now live in the feed.');
       router.push('/');
       router.refresh();
     } catch (error) {
       console.error('Failed to create event', error);
       setStatusIntent('error');
-      setStatusMessage('Unexpected error while creating the event. Please try again.');
+      const message = 'Unexpected error while creating the event. Please try again.';
+      setStatusMessage(message);
+      showErrorToast('Unexpected error', message);
     } finally {
       setSubmitting(false);
     }

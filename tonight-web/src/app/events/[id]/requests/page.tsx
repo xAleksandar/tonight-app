@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import UserAvatar from '@/components/UserAvatar';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 type JoinRequestStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 
@@ -259,22 +260,27 @@ export default function JoinRequestsManagementPage() {
               : request
           )
         );
+        const successMessage = nextStatus === 'accepted' ? 'Request accepted.' : 'Request rejected.';
         setActionNotices((prev) => ({
           ...prev,
           [joinRequestId]: {
             intent: 'success',
-            message: nextStatus === 'accepted' ? 'Request accepted.' : 'Request rejected.',
+            message: successMessage,
           },
         }));
+        showSuccessToast(successMessage);
       } catch (error) {
         console.error('Failed to update join request', error);
+        const fallback = 'Unable to update this request right now.';
+        const message = (error as Error).message ?? fallback;
         setActionNotices((prev) => ({
           ...prev,
           [joinRequestId]: {
             intent: 'error',
-            message: (error as Error).message ?? 'Unable to update this request right now.',
+            message,
           },
         }));
+        showErrorToast('Join request update failed', message);
       } finally {
         setActionState((prev) => {
           const next = { ...prev };

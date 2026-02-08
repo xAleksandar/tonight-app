@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 
 import type { SerializedReport } from "@/lib/reports";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 const reasonOptions = [
   {
@@ -202,13 +203,16 @@ export default function ReportModal({
 
       setSubmissionState("success");
       setStatusMessage("Thanks for letting us know. Our team will review ASAP.");
+      showSuccessToast("Report submitted", "Our safety team will review ASAP.");
       onSubmitted?.(data.report);
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
       }
+      const message = (error as Error).message || "Unable to submit the report.";
       setSubmissionState("error");
-      setStatusMessage((error as Error).message || "Unable to submit the report.");
+      setStatusMessage(message);
+      showErrorToast("Report failed", message);
     }
   }, [description, onSubmitted, reportedUserId, resolvedEventId, selectedReason, submissionState]);
 

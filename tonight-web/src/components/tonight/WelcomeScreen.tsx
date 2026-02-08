@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ArrowRight, Clock, MapPin, Sparkles, Users } from "lucide-react";
 
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -28,6 +30,7 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
     if (!normalized) {
       setMessage("Enter a valid email to continue.");
       setStatus("error");
+      showErrorToast("Enter a valid email", "We need your email to send a magic link.");
       return;
     }
 
@@ -51,10 +54,13 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
       setMagicLinkUrl(payload.magicLinkUrl ?? null);
       setStatus("success");
       setMessage(null);
+      showSuccessToast("Magic link sent", "Check your email to continue.");
     } catch (error) {
       console.error("Magic link request failed", error);
       setStatus("error");
-      setMessage((error as Error).message ?? "Something went wrong. Try again.");
+      const errorMessage = (error as Error).message ?? "Something went wrong. Try again.";
+      setMessage(errorMessage);
+      showErrorToast("Unable to send magic link", errorMessage);
     }
   };
 

@@ -9,6 +9,7 @@ import MessageList, { type MessageListStatus } from '@/components/chat/MessageLi
 import UserAvatar from '@/components/UserAvatar';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
+import { showErrorToast } from '@/lib/toast';
 
 export type ChatParticipantSummary = {
   id: string;
@@ -212,7 +213,9 @@ export default function ChatConversation({
         setComposerValue('');
       } catch (error) {
         console.error('Failed to send chat message', error);
-        setSendError((error as Error).message ?? 'Unable to send this message.');
+        const message = (error as Error).message ?? 'Unable to send this message.';
+        setSendError(message);
+        showErrorToast('Message not sent', message);
       } finally {
         setSendStatus('idle');
       }
