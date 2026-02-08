@@ -7,7 +7,8 @@
 - Task 4: Authentication checkpoint (added npm test alias and re-ran property suite) — Commit `c9e3246`.
 - Task 5: Implement user profile functionality (PATCH /api/users/me, profile page/components, related property tests) — Commit `HEAD`.
 - Task 6: Implement geospatial service (PostGIS-powered query + Properties 18-21) — Commit `292e320`.
+- Task 7: Implement event creation and management (POST/GET events API, event service, expiration routine, property suite 12-17 updates) — Commit `39e9968`.
 
 ## Next Up
-1. Task 7: Implement event creation and management.
-2. Task 8: Implement event discovery API.
+1. Task 8: Implement event discovery API.
+2. Task 9: Checkpoint - Ensure event tests pass.
