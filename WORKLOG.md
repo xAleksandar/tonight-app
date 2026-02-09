@@ -55,7 +55,7 @@
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
 - Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) — Commit `af6a3b6`.
 - Task 20.5a: Realign discovery/home screen with live V0 designs — Commit `c0dbe82`.
-- Task 20.5b: Extract shared discovery shell components (desktop header/sidebar, mobile action bar) and centralized category utilities so the home screen matches V0 across desktop/tablet/mobile; reran `npm test`. — Commit `78911c8`.
+- Task 20.5b: Extract shared discovery shell components (desktop header/sidebar, mobile action bar) and centralized category utilities so the home screen matches V0 across desktop/tablet/mobile; reran `npm test`. — Commit `9291482`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
