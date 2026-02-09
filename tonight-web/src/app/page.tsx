@@ -15,6 +15,7 @@ import {
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import { MiniMap } from "@/components/tonight/MiniMap";
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
 
@@ -434,6 +435,8 @@ function AuthenticatedHomePage() {
           <DesktopHeader
             title="Discover"
             subtitle="Events near you"
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
             onNavigateProfile={() => router.push("/profile")}
           />
 
@@ -868,31 +871,45 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
         const definition = event.categoryId ? CATEGORY_DEFINITIONS[event.categoryId] : null;
         const Icon = definition?.icon ?? Sparkles;
         const spotsLabel = formatSpotsLabel(event.spotsRemaining);
+        const hasCoordinates =
+          typeof event.location?.latitude === "number" && typeof event.location?.longitude === "number";
         return (
           <button
             key={event.id}
             type="button"
             onClick={() => onSelect(event.id)}
             className={classNames(
-              "group flex items-start gap-3 rounded-2xl border border-border/70 bg-card/60 p-4 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10",
+              "group flex w-full flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10",
               selectedEventId === event.id && "border-primary/60 shadow-primary/20"
             )}
           >
-            <div
-              className={classNames(
-                "flex h-12 w-12 items-center justify-center rounded-2xl border text-sm",
-                definition?.accent ?? "border-border/70 bg-background/60"
-              )}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="flex flex-1 flex-col gap-2">
+            {hasCoordinates ? (
+              <MiniMap
+                latitude={event.location.latitude}
+                longitude={event.location.longitude}
+                locationName={event.locationName}
+                className="w-full"
+              />
+            ) : (
+              <div className="h-40 w-full rounded-t-2xl bg-secondary/40" />
+            )}
+            <div className="flex flex-1 flex-col gap-2 border-t border-border/60 p-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{event.title}</p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {event.description ?? "Host will share details once you request to join."}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={classNames(
+                      "flex h-11 w-11 items-center justify-center rounded-2xl border text-sm",
+                      definition?.accent ?? "border-border/70 bg-background/60"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground leading-tight">{event.title}</p>
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                      {event.description ?? "Host will share details once you request to join."}
+                    </p>
+                  </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
               </div>
