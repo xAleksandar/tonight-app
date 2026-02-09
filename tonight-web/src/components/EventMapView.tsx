@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type mapboxgl from "mapbox-gl";
 
 import { getMapboxConfig } from "@/lib/mapbox";
+import { classNames } from "@/lib/classNames";
 
 const defaultMapboxLoader = async () => (await import("mapbox-gl")).default;
 const DEFAULT_CENTER: [number, number] = [-98.5795, 39.8283];
@@ -42,17 +43,35 @@ type EventMarkerEntry = {
   element: HTMLButtonElement;
   cleanup: () => void;
   event: EventMapItem;
+  isHovered: boolean;
 };
 
 type MapStatus = "idle" | "loading" | "ready" | "error";
 
-const getEventMarkerClass = (isSelected: boolean) =>
-  [
-    "pointer-events-auto grid h-8 w-8 place-items-center rounded-full border-2 text-xs font-semibold transition-colors",
+const getEventMarkerClass = ({
+  isSelected,
+  isHovered,
+}: {
+  isSelected: boolean;
+  isHovered: boolean;
+}) =>
+  classNames(
+    "pointer-events-auto grid h-8 w-8 place-items-center rounded-full border-2 text-xs font-semibold transition-transform transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300",
     isSelected
-      ? "border-white bg-pink-600 text-white shadow-lg"
-      : "border-white bg-zinc-900/90 text-white shadow",
-  ].join(" ");
+      ? "scale-110 border-pink-100 bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-2xl shadow-pink-500/40"
+      : isHovered
+        ? "scale-105 border-pink-200/80 bg-zinc-900 text-white shadow-xl shadow-pink-500/20"
+        : "border-white/80 bg-zinc-950/90 text-white/90 shadow-lg shadow-black/40"
+  );
+
+const applyMarkerAppearance = (entry: EventMarkerEntry, selectedEventId: string | null) => {
+  const isSelected = Boolean(selectedEventId && entry.event.id === selectedEventId);
+  entry.element.className = getEventMarkerClass({
+    isSelected,
+    isHovered: entry.isHovered,
+  });
+  entry.element.setAttribute("aria-pressed", isSelected ? "true" : "false");
+};
 
 const buildPopupContent = (event: EventMapItem) => {
   const wrapper = document.createElement("div");
@@ -136,9 +155,11 @@ export default function EventMapView({
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const lastSelectedRef = useRef<string | null>(null);
+  const selectedEventIdRef = useRef<string | null>(selectedEventId ?? null);
 
   onEventSelectRef.current = onEventSelect;
   mapboxLoaderRef.current = mapboxLoader;
+  selectedEventIdRef.current = selectedEventId ?? null;
 
   const summaryText = useMemo(() => {
     if (!events.length) {
@@ -269,8 +290,8 @@ export default function EventMapView({
 
       const button = document.createElement("button");
       button.type = "button";
-      button.className = getEventMarkerClass(event.id === selectedEventId);
       button.setAttribute("aria-label", `${event.title} marker`);
+      button.setAttribute("data-event-id", event.id);
 
       const marker = new mapbox.Marker({ element: button, anchor: "bottom" })
         .setLngLat(lngLat)
@@ -282,21 +303,62 @@ export default function EventMapView({
 
       marker.setPopup(popup);
 
+      const entry: EventMarkerEntry = {
+        marker,
+        popup,
+        element: button,
+        cleanup: () => {},
+        event,
+        isHovered: false,
+      };
+
+      const updateAppearance = () => {
+        applyMarkerAppearance(entry, selectedEventIdRef.current);
+      };
+
       const handleClick = (nativeEvent: MouseEvent) => {
         nativeEvent.stopPropagation();
         popup.addTo(map);
         onEventSelectRef.current?.(event.id);
       };
 
-      button.addEventListener("click", handleClick);
+      const handlePointerEnter = () => {
+        entry.isHovered = true;
+        updateAppearance();
+      };
 
-      markerMap.set(event.id, {
-        marker,
-        popup,
-        element: button,
-        cleanup: () => button.removeEventListener("click", handleClick),
-        event,
-      });
+      const handlePointerLeave = () => {
+        entry.isHovered = false;
+        updateAppearance();
+      };
+
+      const handleFocus = () => {
+        entry.isHovered = true;
+        updateAppearance();
+      };
+
+      const handleBlur = () => {
+        entry.isHovered = false;
+        updateAppearance();
+      };
+
+      button.addEventListener("click", handleClick);
+      button.addEventListener("mouseenter", handlePointerEnter);
+      button.addEventListener("mouseleave", handlePointerLeave);
+      button.addEventListener("focus", handleFocus);
+      button.addEventListener("blur", handleBlur);
+
+      entry.cleanup = () => {
+        button.removeEventListener("click", handleClick);
+        button.removeEventListener("mouseenter", handlePointerEnter);
+        button.removeEventListener("mouseleave", handlePointerLeave);
+        button.removeEventListener("focus", handleFocus);
+        button.removeEventListener("blur", handleBlur);
+      };
+
+      updateAppearance();
+
+      markerMap.set(event.id, entry);
     });
   }, [events, mapReady, selectedEventId]);
 
@@ -310,8 +372,8 @@ export default function EventMapView({
     if (!map) return;
 
     eventMarkersRef.current.forEach((entry, id) => {
+      applyMarkerAppearance(entry, selectedEventId ?? null);
       const isSelected = Boolean(selectedEventId && id === selectedEventId);
-      entry.element.className = getEventMarkerClass(isSelected);
       if (isSelected && selectedEventId !== lastSelectedRef.current) {
         entry.popup.addTo(map);
         map.easeTo({
