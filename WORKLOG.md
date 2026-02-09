@@ -61,10 +61,13 @@
 - Task 20.5e: Updated the discovery list cards with inline MiniMap previews plus the desktop header list/map toggle to match the refreshed V0 shell; `npm test` remains green. - Commit `a510921`.
 - Task 20.5f: Matched the discovery list card description typography to V0 (text-sm copy, relaxed leading, fixed two-line min height) so the new MiniMap tiles stay consistent on tablets; reran `npm test`. - Commit `81a8ff2`.
 - Task 20.5g: Removed the redundant discovery card view toggle in favor of the new sticky header/mobile hero controls and tightened the summary grid so tablets match the V0 spacing spec; reran `npm test`. - Commit `HEAD`.
+- Task 20.5h: Added gradient hover/selected states plus keyboard focus handling for discovery map pins so the Mapbox markers mirror the latest V0 shells; reran `npm test`. - Commit `865e1c9`.
+- Task 20.5i: Matched the mobile discovery range sheet to the latest V0 tray (blurred glass panel, Radix slider, close affordances) so the hero controls align across breakpoints; reran `npm test`. - Commit `09651e5`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
-- 2026-02-09 21:45 runner: Removed the duplicate discovery list/map toggle in favor of the new sticky header + mobile hero controls and adjusted the summary cards to snap into a three-up grid at the tablet breakpoint so gutters match the latest V0 handoff. Remaining discovery polish: hover/selected states for the map pins and final QA on the range sheet sizing.
+- 2026-02-09 22:30 runner: The mobile discovery range sheet now mirrors the V0 tray (glass panel sizing, Radix slider, close affordances). Remaining discovery polish: run a responsive regression on the sticky hero + summary grid and confirm the tray still cooperates with the map/list toggles before picking up the event creation deltas.
+- 2026-02-09 21:45 runner: Removed the duplicate discovery list/map toggle in favor of the new sticky header + mobile hero controls and adjusted the summary cards to snap into a three-up grid at the tablet breakpoint so gutters match the latest V0 handoff. Remaining discovery polish at that point: hover/selected states for the map pins and final QA on the range sheet sizing (both now addressed).
 - 2026-02-09 21:10 runner: Dialed in discovery list card copy spacing (text-sm, relaxed leading, enforced two-line height) to match the latest V0 tablet spec; remaining discovery deltas include summary panel spacing and responsive gutter polish.
 - 2026-02-09 17:24 runner: Blocked on Task 20.6+ design priorities; no new guidance beyond completed alignment tasks, so holding until updated brief arrives.
 - 2026-02-09 17:39 runner: Re-ran kickoff checklist (git pull + WORKLOG review). All priority alignment tasks already logged as complete; still waiting on updated Task 20.6+ direction before proceeding.
@@ -79,7 +82,7 @@
  
  
 ## Next Up
-1. Discovery/home delta follow-ups (map pin hover/selected states, range sheet sizing, and a quick regression pass now that the in-card toggle is gone).
+1. Discovery/home delta follow-ups (responsive regression on the sticky hero/summary grid and map/list transitions now that the pins + range sheet are aligned).
 2. Event creation delta pass (reordered sections, new details from V0).
 3. Profile screen delta pass.
 4. Broader sweep for any remaining deltas once these three areas are complete.
