@@ -460,16 +460,6 @@ function AuthenticatedHomePage() {
           <main className="flex-1 pb-28 pt-0 md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
               <section className="mt-4 flex flex-col gap-4">
-                <DiscoverySummary
-                  describeLocation={describeLocation}
-                  lastUpdatedLabel={lastUpdatedLabel}
-                  rangeSummary={buildRadiusSummary(radiusKm)}
-                  onUpdateLocation={attemptLocationDetection}
-                  onRefresh={handleRefresh}
-                  locationStatus={locationStatus}
-                  eventsStatus={eventsStatus}
-                />
-
                 {locationStatus === "denied" || locationStatus === "unsupported" ? (
                   <AlertPanel
                     title="Turn on location services"
@@ -496,46 +486,29 @@ function AuthenticatedHomePage() {
                   />
                 ) : null}
 
-                <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-xl shadow-black/20">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-                      <p className="font-serif text-2xl font-semibold text-foreground">Live nearby meetups</p>
-                      <p className="text-xs text-muted-foreground">
-                        Toggle between list and map to explore plans within your radius.
-                      </p>
-                    </div>
-                    <p className="max-w-xs text-xs text-muted-foreground md:text-right">
-                      Use the sticky controls above to switch views or adjust your radius anytime.
-                    </p>
+                {isLoading && <DiscoverySkeleton viewMode={activeViewMode} />}
+
+                {!isLoading && activeViewMode === "map" && (
+                  <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
+                    <EventMapView
+                      events={mapItems}
+                      userLocation={userLocation || undefined}
+                      selectedEventId={selectedEventId}
+                      onEventSelect={setSelectedEventId}
+                      height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
+                    />
                   </div>
+                )}
 
-                  <div className="mt-5">
-                    {isLoading && <DiscoverySkeleton viewMode={activeViewMode} />}
-
-                    {!isLoading && activeViewMode === "map" && (
-                      <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
-                        <EventMapView
-                          events={mapItems}
-                          userLocation={userLocation || undefined}
-                          selectedEventId={selectedEventId}
-                          onEventSelect={setSelectedEventId}
-                          height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
-                        />
-                      </div>
-                    )}
-
-                    {!isLoading && activeViewMode === "list" && (
-                      <DiscoveryList
-                        events={visibleEvents}
-                        selectedEventId={selectedEventId}
-                        onSelect={setSelectedEventId}
-                        locationReady={locationReady}
-                        radiusSummary={buildRadiusSummary(radiusKm)}
-                      />
-                    )}
-                  </div>
-                </div>
+                {!isLoading && activeViewMode === "list" && (
+                  <DiscoveryList
+                    events={visibleEvents}
+                    selectedEventId={selectedEventId}
+                    onSelect={setSelectedEventId}
+                    locationReady={locationReady}
+                    radiusSummary={buildRadiusSummary(radiusKm)}
+                  />
+                )}
               </section>
             </div>
           </main>
@@ -823,7 +796,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
             type="button"
             onClick={() => onSelect(event.id)}
             className={classNames(
-              "group flex w-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99]",
+              "group flex w-full max-w-[330px] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99]",
               selectedEventId === event.id && "border-primary/60 shadow-primary/20"
             )}
           >
