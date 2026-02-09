@@ -56,12 +56,12 @@ const getEventMarkerClass = ({
   isHovered: boolean;
 }) =>
   classNames(
-    "pointer-events-auto grid h-8 w-8 place-items-center rounded-full border-2 text-xs font-semibold transition-transform transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300",
+    "pointer-events-auto grid h-5 w-5 place-items-center rounded-full border-2 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300",
     isSelected
-      ? "scale-110 border-pink-100 bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-2xl shadow-pink-500/40"
+      ? "border-pink-100 bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/40"
       : isHovered
-        ? "scale-105 border-pink-200/80 bg-zinc-900 text-white shadow-xl shadow-pink-500/20"
-        : "border-white/80 bg-zinc-950/90 text-white/90 shadow-lg shadow-black/40"
+        ? "border-pink-200/80 bg-zinc-900 text-white shadow-md shadow-pink-500/20"
+        : "border-white/80 bg-zinc-950/90 text-white/90 shadow-md shadow-black/40"
   );
 
 const applyMarkerAppearance = (entry: EventMarkerEntry, selectedEventId: string | null) => {
