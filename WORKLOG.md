@@ -61,6 +61,7 @@
  
 ## In Progress / Priority Notes
 - **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
+- 2026-02-09 17:24 runner: Blocked on Task 20.6+ design priorities; no new guidance beyond completed alignment tasks, so holding until updated brief arrives.
  
 ## Next Up
 1. Resume the remaining backlog (Task 20.6 onward) once the next design priorities are confirmed.
