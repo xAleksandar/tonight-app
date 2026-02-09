@@ -496,7 +496,7 @@ function AuthenticatedHomePage() {
                 ) : null}
 
                 <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-xl shadow-black/20">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
                       <p className="font-serif text-2xl font-semibold text-foreground">Live nearby meetups</p>
@@ -504,7 +504,9 @@ function AuthenticatedHomePage() {
                         Toggle between list and map to explore plans within your radius.
                       </p>
                     </div>
-                    <ViewToggle current={viewMode} onChange={setViewMode} />
+                    <p className="max-w-xs text-xs text-muted-foreground md:text-right">
+                      Use the sticky controls above to switch views or adjust your radius anytime.
+                    </p>
                   </div>
 
                   <div className="mt-5">
@@ -683,7 +685,7 @@ function DiscoverySummary({
   eventsStatus,
 }: DiscoverySummaryProps) {
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-3 md:gap-4">
       <div className="rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm shadow-black/20">
         <div className="flex items-center justify-between text-sm">
           <div>
@@ -804,42 +806,6 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
           );
         })}
       </div>
-    </div>
-  );
-}
-
-type ViewToggleProps = {
-  current: ViewMode;
-  onChange: (mode: ViewMode) => void;
-};
-
-function ViewToggle({ current, onChange }: ViewToggleProps) {
-  const options: { value: ViewMode; label: string; icon: typeof ListIcon }[] = [
-    { value: "list", label: "List", icon: ListIcon },
-    { value: "map", label: "Map", icon: MapIcon },
-  ];
-
-  return (
-    <div className="inline-flex rounded-full border border-border/70 bg-card/60 p-1 text-sm text-muted-foreground">
-      {options.map((option) => {
-        const Icon = option.icon;
-        const isActive = option.value === current;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={classNames(
-              "flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold",
-              isActive ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
-            )}
-            aria-pressed={isActive}
-          >
-            <Icon className="h-4 w-4" />
-            {option.label}
-          </button>
-        );
-      })}
     </div>
   );
 }
