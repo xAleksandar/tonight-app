@@ -54,7 +54,7 @@
 
 body {
   min-height: 100vh;
-  background: linear-gradient(155deg, hsl(250 26% 26%) 0%, hsl(235 22% 23%) 50%, hsl(220 24% 22%) 100%);
+  background: #30324b;
   color: hsl(var(--foreground));
   font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;

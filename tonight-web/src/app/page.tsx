@@ -428,7 +428,7 @@ function AuthenticatedHomePage() {
     locationStatus === "locating" || (eventsStatus === "loading" && visibleEvents.length === 0);
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] text-foreground">
+    <div className="min-h-dvh text-foreground">
       <div className="flex min-h-dvh flex-col md:flex-row">
         <DesktopSidebar
           selectedCategory={selectedCategory}
@@ -445,20 +445,20 @@ function AuthenticatedHomePage() {
             onNavigateProfile={() => router.push("/profile")}
           />
 
+          <MobileHero
+            viewMode={mobileViewMode}
+            onViewModeChange={setMobileViewMode}
+            radiusKm={radiusKm}
+            onOpenRange={() => {
+              setPendingRadiusKm(radiusKm);
+              setRangeSheetOpen(true);
+            }}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+
           <main className="flex-1 pb-28 pt-0 md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
-              <MobileHero
-                viewMode={mobileViewMode}
-                onViewModeChange={setMobileViewMode}
-                radiusKm={radiusKm}
-                onOpenRange={() => {
-                  setPendingRadiusKm(radiusKm);
-                  setRangeSheetOpen(true);
-                }}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-              />
-
               <section className="mt-4 flex flex-col gap-4">
                 <DiscoverySummary
                   describeLocation={describeLocation}
@@ -580,10 +580,9 @@ function MobileHero({
   onCategoryChange,
 }: MobileHeroProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+16px)] text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/95 pb-3 pt-[calc(env(safe-area-inset-top)+16px)] text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden">
+      <div className="mb-3 flex items-center justify-between gap-2 px-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
           <h1 className="text-2xl font-serif font-semibold leading-tight">Discover</h1>
           <p className="text-xs text-muted-foreground">Events near you</p>
         </div>
@@ -629,15 +628,13 @@ function MobileHero({
         </div>
       </div>
 
-      <div className="-mx-4 overflow-hidden">
-        <div className="px-4">
-          <CategoryRow
-            selectedCategory={selectedCategory}
-            onCategoryChange={onCategoryChange}
-            compact
-            showLabel={false}
-          />
-        </div>
+      <div className="overflow-hidden px-4">
+        <CategoryRow
+          selectedCategory={selectedCategory}
+          onCategoryChange={onCategoryChange}
+          compact
+          showLabel={false}
+        />
       </div>
     </header>
   );
