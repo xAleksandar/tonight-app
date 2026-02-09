@@ -16,7 +16,7 @@
 - Task 10.4: Create EventMapView component (map initialization, event/user markers, popups, selection syncing) - Commit `0389003`.
 - Task 10.5: Create EventListView component (summary header, clickable cards, distance/time formatting) - Commit `0db17ba`.
 - Task 10.6: Write Property 22 (list view required fields) tests - Commit `49aa908`.
-- Task 11.1: Create event creation page (Mapbox-integrated creation form, validation, geolocation helper, POST /api/events wiring) - Commit `2241eec`.
+- Task 11.1: Create event creation page (Mapbox-integrated creation form, validation, geolocation helper, POST /api events wiring) - Commit `2241eec`.
 - Task 11.2a: Initial home/discovery page implementation (App Router entry with location detection, map/list toggles, radius summary, and CTA wiring) - Commit `4185c8c`.
 - Task 11.2b: Home/discovery redesign pass (host metadata, glass panels, V0-aligned layout) - Commit `5b07fc7`.
 - Task 11.2c: Home/discovery alignment with live V0 site (desktop + mobile parity) - Commit `c0dbe82`.
@@ -33,58 +33,16 @@
 - Task 14.2: Set up Socket.IO server in Next.js (Node runtime API route that boots socketService and exposes readiness endpoint) - Commit `2c9ffc0`.
 - Task 14.3: Create Socket.IO client hook (hooks/useSocket.ts with authenticated connect/join/send helpers plus unit tests) - Commit `317f4f1`.
 - Task 15.1: Create GET /api/chat/[joinRequestId]/messages (chat service with access control + message serialization, authenticated API route) - Commit `b8e692a`.
-- Task 15.2: Write property tests for chat access control (Property 27 + 28 to ensure accepted hosts/participants pass and other statuses fail) - Commit `190e7fd`.
-- Task 15.3: Create POST /api/chat/[joinRequestId]/messages (content validation, persistence, socket broadcast) - Commit `9932290`.
-- Task 15.4: Write Property 29/30 to verify chat message storage/serialization and resilient real-time delivery - Commit `aaea64e`.
-- Task 15.5: Create chat page (Socket.IO-powered conversation view with history fetching, real-time updates, and composer) - Commit `b4e4456`.
-- Task 15.6: Create MessageList component (scrollable conversation view, shared loading/empty/error states, timestamped bubbles) - Commit `b4d7ce6`.
-- Task 18.1-18.4: Implement welcome/login experience, AuthProvider wrapping, and protected routing (login page, session checks, redirects) - Commit `17e347d`.
-- Task 16.1: Create POST /api/users/block (validation, duplicate prevention, target existence checks) - Commit `446d2a7`.
-- Task 16.2: Write property tests for blocking (blocking service coverage, discovery filter assertion, chat guard enforcement) - Commit `0e3a7bf`.
-- Task 16.3: Harden geospatial block filtering (added bidirectional block parameter assertions in property suite) - Commit `c2aa6a6`.
-- Task 16.4: Update chat endpoints to check blocking. - Commit `dbc0bfc`.
-- Task 16.5: Create BlockUserButton component (confirmation popover, API orchestration, RTL coverage) - Commit `31c2443`.
-- Task 16.6: Add BlockUserButton to user profile and chat pages (profile safety card, chat action rail, composer blocking state) - Commit `8b7c9e0`.
-- Task 17.1: Create POST /api/reports (validation + service layer + authenticated route, npm test) - Commit `b34a35d`.
-- Task 17.2: Write property test for report creation (Property 35 for report round trip coverage, enforced status/normalization) - Commit `a15aa7e`.
-- Task 17.3: Create ReportModal component (design-aligned modal, optimistic submission UX, RTL coverage) - Commit `06c0dd5`.
-- Task 17.4: Add report actions to event detail modal and user profile safety settings (ReportModal wiring + success messaging + design-aligned CTAs) - Commit `74aab95`.
-- Task 19: Final checkpoint - reran full `npm test` property suite (62 tests / 40 properties) to ensure chat, safety, and reporting changes stayed green - Commit `cc41d55`.
-- Task 20.1: Add comprehensive error handling to all API routes (centralized response helper, middleware updates, deterministic property suite) - Commit `90a31dd`.
-- Task 20.2: Add loading states to core pages (discovery landing, event creation, and chat views now show branded skeletons and pending indicators) - Commit `3fc95d9`.
-- Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) - Commit `0701f95`.
-- Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) - Commit `af6a3b6`.
-- Task 20.5a: Realign discovery/home screen with live V0 designs - Commit `c0dbe82`.
-- Task 20.5b: Extract shared discovery shell components (desktop header/sidebar, mobile action bar) and centralized category utilities so the home screen matches V0 across desktop/tablet/mobile; reran `npm test`. - Commit `9291482`.
-- Task 20.5c: Realign the event creation page with the live V0 designs (Tonight shell, category chips, refreshed map picker, and mobile-first layout); reran `npm test`. - Commit `8012ae1`.
-- Task 20.5d: Realign the profile screen with the live V0 designs (Tonight shell layout, stats row, "My Active Events" panel, overview API, refreshed safety actions) and reran `npm test`. - Commit `a7d82d8`.
-- Task 20.5e: Updated the discovery list cards with inline MiniMap previews plus the desktop header list/map toggle to match the refreshed V0 shell; `npm test` remains green. - Commit `a510921`.
-- Task 20.5f: Matched the discovery list card description typography to V0 (text-sm copy, relaxed leading, fixed two-line min height) so the new MiniMap tiles stay consistent on tablets; reran `npm test`. - Commit `81a8ff2`.
-- Task 20.5g: Removed the redundant discovery card view toggle in favor of the new sticky header/mobile hero controls and tightened the summary grid so tablets match the V0 spacing spec; reran `npm test`. - Commit `d17301e`.
-- Task 20.5h: Added gradient hover/selected states plus keyboard focus handling for discovery map pins so the Mapbox markers mirror the latest V0 shells; reran `npm test`. - Commit `865e1c9`.
-- Task 20.5i: Matched the mobile discovery range sheet to the latest V0 tray (blurred glass panel, Radix slider, close affordances) so the hero controls align across breakpoints; reran `npm test`. - Commit `09651e5`.
-- Task 20.5j: Rebuilt the discovery mobile header, bottom nav, and MiniMap cards to match the updated V0 handoff (sticky hero, segmented view toggle wiring, refreshed card preview chrome) and reran `npm test`. - Commit `19de6d2`.
-- Task 20.5k: Reordered the event creation form to match the refreshed V0 layout (title/description block, schedule/capacity pairing, glassy location tray copy) and reran `npm test`. - Commit `6831ee2`.
-
+- Tasks 15.2–15.6: Chat property tests, POST endpoint, conversation UI, MessageList component — Commit `aaea64e`, `9932290`, `b4e4456`, `b4d7ce6`.
+- Tasks 16.1–16.6: Blocking service/APIs/UI — Commit `446d2a7`, `0e3a7bf`, `c2aa6a6`, `dbc0bfc`, `31c2443`, `8b7c9e0`.
+- Tasks 17.1–17.4: Reporting service, modal, UI wiring — Commit `b34a35d`, `a15aa7e`, `06c0dd5`, `74aab95`.
+- Task 18.1-18.4: Welcome/login experience + auth provider — Commit `17e347d`.
+- Task 19: Full-suite checkpoint — Commit `cc41d55`.
+- Task 20.1–20.5k: Design alignment waves (discovery/event creation/profile/mobile tweaks) — Commits `90a31dd`, `3fc95d9`, `0701f95`, `af6a3b6`, `c0dbe82`, `9291482`, `8012ae1`, `a7d82d8`, `a510921`, `81a8ff2`, `d17301e`, `865e1c9`, `09651e5`, `19de6d2`, `6831ee2`.
 ## In Progress / Priority Notes
-- 2026-02-09 23:31 runner: Reflowed the event creation experience to mirror the latest V0 drop (mobile-first stack, paired date/time + capacity controls, and the updated map/location copy). Verified against tonight-meetup-app-designs/components/tonight/create-event-screen.tsx, reran `npm test`, and pushed `6831ee2`. Next up: profile screen deltas from the same V0 release, then sweep any refreshed components before hopping back to the backlog.
-- **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
-- 2026-02-09 23:15 runner: Matched the discovery mobile header, segmented list/map toggle, MiniMap cards, and glassy bottom nav to the current V0 drop (confirmed against tonight-meetup-app-designs/components/tonight/discover-screen.tsx and the live V0 deployment). Verified sticky behavior + toggle state on mobile, refreshed the safe-area padding, and reran `npm test`. Next up per Aleks' 22:31 brief: event creation deltas followed by the profile refresh.
-- 2026-02-09 22:30 runner: The mobile discovery range sheet now mirrors the V0 tray (glass panel sizing, Radix slider, close affordances). Remaining discovery polish: run a responsive regression on the sticky hero + summary grid and confirm the tray still cooperates with the map/list toggles before picking up the event creation deltas.
-- 2026-02-09 21:45 runner: Removed the duplicate discovery list/map toggle in favor of the new sticky header + mobile hero controls and adjusted the summary cards to snap into a three-up grid at the tablet breakpoint so gutters match the latest V0 handoff. Remaining discovery polish at that point: hover/selected states for the map pins and final QA on the range sheet sizing (both now addressed).
-- 2026-02-09 21:10 runner: Dialed in discovery list card copy spacing (text-sm, relaxed leading, enforced two-line height) to match the latest V0 tablet spec; remaining discovery deltas include summary panel spacing and responsive gutter polish.
-- 2026-02-09 17:24 runner: Blocked on Task 20.6+ design priorities; no new guidance beyond completed alignment tasks, so holding until updated brief arrives.
-- 2026-02-09 17:39 runner: Re-ran kickoff checklist (git pull + WORKLOG review). All priority alignment tasks already logged as complete; still waiting on updated Task 20.6+ direction before proceeding.
-- 2026-02-09 17:54 runner: Completed kickoff checklist again; still blocked on missing Task 20.6+ design direction, so no code changes this run. (Commit `8494239`)
-- 2026-02-09 18:09 runner: Kickoff checklist complete (git pull + WORKLOG review + design parity check). All alignment priorities already shipped and no updated Task 20.6+ guidance available, so holding without code changes. (Commit `0091d19`)
-- 2026-02-09 18:24 runner: Kickoff checklist complete (git pull --rebase + WORKLOG review + V0 parity spot-check). Still waiting on Task 20.6+ design brief, so pausing without code changes this run.
-- 2026-02-09 18:39 runner: Kickoff checklist complete (git pull --rebase + WORKLOG review + V0 parity spot-check). All home/event creation/profile alignment priorities remain done, and there is still no Task 20.6+ design guidance, so holding without code changes this run.
-- 2026-02-09 19:24 runner: Kickoff checklist complete (git pull --rebase + WORKLOG review + V0 parity spot-check). All alignment priorities (home/event creation/profile) are still shipped, and there is no new Task 20.6+ brief, so pausing without code changes this run.
-- 2026-02-09 19:54 runner: Kickoff checklist complete (git pull --rebase + WORKLOG review + V0 parity spot-check). All home/event creation/profile alignment priorities remain done, and there is still no Task 20.6+ design guidance, so holding without code changes this run.
-- 2026-02-09 20:09 runner: Kickoff checklist complete (git pull --rebase + WORKLOG review + V0 parity spot-check). Priority alignment tasks remain shipped and there's still no Task 20.6+ design brief, so pausing without code changes this run.
-- 2026-02-09 20:24 runner: Kickoff checklist complete (git pull --rebase + WORKLOG review + V0 parity spot-check). All home/event creation/profile alignment priorities remain finished, and there is still no Task 20.6+ design guidance, so holding without code changes this run. (Commit `98d8386`)
- 
- 
+- 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
+
 ## Next Up
-1. Profile screen delta pass (remove the deprecated sections, add the new stats/safety blocks from the latest V0 release).
-2. Sweep the refreshed shared components called out in WORKLOG, then resume the standard backlog.
+1. Make the bottom nav highlight the active section across discovery/profile/map screens and ensure the map toggle actually swaps the primary content panes on mobile.
+2. Enable the desktop sidebar nav (“Discover”, “People nearby”) to navigate between shell sections so Profile isn’t a dead end.
+3. After the navigation fixes, continue the profile + design delta sweep from Aleks’ latest brief.

@@ -24,6 +24,7 @@ import { classNames } from "@/lib/classNames";
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { MessagesModal } from "@/components/chat/MessagesModal";
 
 const DEFAULT_RADIUS_KM = 10;
 const MIN_RADIUS_KM = 1;
@@ -198,8 +199,7 @@ export default function HomePage() {
 function AuthenticatedHomePage() {
   const router = useRouter();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const [desktopViewMode, setDesktopViewMode] = useState<ViewMode>("list");
-  const [mobileViewMode, setMobileViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<MapPoint | null>(null);
@@ -214,8 +214,10 @@ function AuthenticatedHomePage() {
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
 
-  const activeViewMode = isDesktop ? desktopViewMode : mobileViewMode;
+  const openMessages = useCallback(() => setMessagesOpen(true), []);
+  const closeMessages = useCallback(() => setMessagesOpen(false), []);
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -440,14 +442,15 @@ function AuthenticatedHomePage() {
           <DesktopHeader
             title="Discover"
             subtitle="Events near you"
-            viewMode={desktopViewMode}
-            onViewModeChange={setDesktopViewMode}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
             onNavigateProfile={() => router.push("/profile")}
+            onNavigateMessages={openMessages}
           />
 
           <MobileHero
-            viewMode={mobileViewMode}
-            onViewModeChange={setMobileViewMode}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
             radiusKm={radiusKm}
             onOpenRange={() => {
               setPendingRadiusKm(radiusKm);
@@ -486,9 +489,21 @@ function AuthenticatedHomePage() {
                   />
                 ) : null}
 
-                {isLoading && <DiscoverySkeleton viewMode={activeViewMode} />}
+                <div className="hidden md:block">
+                  <DiscoverySummary
+                    describeLocation={describeLocation}
+                    lastUpdatedLabel={lastUpdatedLabel}
+                    rangeSummary={buildRadiusSummary(radiusKm)}
+                    onUpdateLocation={attemptLocationDetection}
+                    onRefresh={handleRefresh}
+                    locationStatus={locationStatus}
+                    eventsStatus={eventsStatus}
+                  />
+                </div>
 
-                {!isLoading && activeViewMode === "map" && (
+                {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
+
+                {!isLoading && viewMode === "map" && (
                   <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
                     <EventMapView
                       events={mapItems}
@@ -500,7 +515,7 @@ function AuthenticatedHomePage() {
                   </div>
                 )}
 
-                {!isLoading && activeViewMode === "list" && (
+                {!isLoading && viewMode === "list" && (
                   <DiscoveryList
                     events={visibleEvents}
                     selectedEventId={selectedEventId}
@@ -518,6 +533,7 @@ function AuthenticatedHomePage() {
       <MobileActionBar
         active="discover"
         onNavigateDiscover={() => router.push("/")}
+        onNavigateMessages={openMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
       />
@@ -530,6 +546,8 @@ function AuthenticatedHomePage() {
           onApply={applyRadiusChange}
         />
       )}
+
+      <MessagesModal isOpen={messagesOpen} onClose={closeMessages} />
     </div>
   );
 
@@ -601,13 +619,15 @@ function MobileHero({
         </div>
       </div>
 
-      <div className="overflow-hidden px-4">
-        <CategoryRow
-          selectedCategory={selectedCategory}
-          onCategoryChange={onCategoryChange}
-          compact
-          showLabel={false}
-        />
+      <div className="-mx-4 overflow-hidden">
+        <div className="px-4 pb-1">
+          <CategoryRow
+            selectedCategory={selectedCategory}
+            onCategoryChange={onCategoryChange}
+            compact
+            showLabel={false}
+          />
+        </div>
       </div>
     </header>
   );
@@ -783,8 +803,16 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {events.map((event) => {
+    <div className="space-y-4">
+      <div className="flex flex-col gap-0.5 text-left">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground">
+          Live nearby meetups
+        </p>
+        <p className="text-xs text-muted-foreground/80">{radiusSummary}</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {events.map((event) => {
         const definition = event.categoryId ? CATEGORY_DEFINITIONS[event.categoryId] : null;
         const Icon = definition?.icon ?? Sparkles;
         const spotsLabel = formatSpotsLabel(event.spotsRemaining);
@@ -861,7 +889,8 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
             </div>
           </button>
         );
-      })}
+        })}
+      </div>
     </div>
   );
 }
