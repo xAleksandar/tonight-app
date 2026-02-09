@@ -67,24 +67,34 @@ export function MobileActionBar({
               type="button"
               onClick={disabled ? undefined : item.onPress}
               className={classNames(
-                "relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                "relative flex flex-col items-center gap-0.5 rounded-2xl px-3 py-1.5 text-[11px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                 disabled
                   ? "text-muted-foreground/50"
                   : isActive
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
               )}
+              data-active={isActive ? 'true' : undefined}
               aria-current={isActive ? "page" : undefined}
               aria-disabled={disabled || undefined}
               disabled={disabled}
             >
+              <span
+                className={classNames(
+                  "pointer-events-none absolute inset-0 rounded-2xl transition-opacity",
+                  isActive && !disabled
+                    ? "opacity-100 bg-primary/10 shadow-[0_10px_30px_rgba(236,72,153,0.15)]"
+                    : "opacity-0"
+                )}
+                aria-hidden
+              />
               <span className="relative flex h-5 w-5 items-center justify-center">
                 <Icon className="h-5 w-5" />
                 {item.id === "messages" && isActive && (
                   <span className="absolute -right-1.5 -top-1.5 h-2 w-2 rounded-full bg-primary" />
                 )}
               </span>
-              <span>{item.label}</span>
+              <span className="relative">{item.label}</span>
             </button>
           );
         })}

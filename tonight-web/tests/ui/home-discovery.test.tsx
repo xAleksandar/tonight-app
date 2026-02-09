@@ -38,10 +38,14 @@ const ensureDomGlobals = () => {
 };
 
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
+let currentSearchParams = new URLSearchParams();
 const useRequireAuthMock = vi.fn(() => ({ status: 'authenticated' as const }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  usePathname: () => '/',
+  useSearchParams: () => currentSearchParams,
 }));
 
 vi.mock('@/hooks/useRequireAuth', () => ({
@@ -236,6 +240,7 @@ afterAll(() => {
 beforeEach(() => {
   document.body.innerHTML = '';
   useRequireAuthMock.mockReturnValue({ status: 'authenticated' });
+  currentSearchParams = new URLSearchParams();
   global.fetch = mockFetchSuccess() as unknown as typeof fetch;
   installMatchMedia();
   installGeolocation();

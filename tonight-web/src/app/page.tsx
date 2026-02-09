@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   Clock,
@@ -198,8 +198,11 @@ export default function HomePage() {
 
 function AuthenticatedHomePage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const initialView: ViewMode = searchParams?.get("view") === "map" ? "map" : "list";
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<MapPoint | null>(null);
@@ -218,6 +221,40 @@ function AuthenticatedHomePage() {
 
   const openMessages = useCallback(() => setMessagesOpen(true), []);
   const closeMessages = useCallback(() => setMessagesOpen(false), []);
+
+  useEffect(() => {
+    const param = searchParams?.get("view");
+    const nextMode: ViewMode = param === "map" ? "map" : "list";
+    setViewMode((current) => (current === nextMode ? current : nextMode));
+  }, [searchParams]);
+
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode);
+
+      if (!pathname) {
+        return;
+      }
+
+      const currentParam = searchParams?.get("view");
+      const normalizedCurrent: ViewMode = currentParam === "map" ? "map" : "list";
+      if (normalizedCurrent === mode) {
+        return;
+      }
+
+      const nextParams = new URLSearchParams(searchParams?.toString() ?? "");
+      if (mode === "list") {
+        nextParams.delete("view");
+      } else {
+        nextParams.set("view", mode);
+      }
+
+      const queryString = nextParams.toString();
+      const nextUrl = queryString ? `${pathname}?${queryString}` : pathname;
+      router.replace(nextUrl, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -443,14 +480,14 @@ function AuthenticatedHomePage() {
             title="Discover"
             subtitle="Events near you"
             viewMode={viewMode}
-            onViewModeChange={setViewMode}
+            onViewModeChange={handleViewModeChange}
             onNavigateProfile={() => router.push("/profile")}
             onNavigateMessages={openMessages}
           />
 
           <MobileHero
             viewMode={viewMode}
-            onViewModeChange={setViewMode}
+            onViewModeChange={handleViewModeChange}
             radiusKm={radiusKm}
             onOpenRange={() => {
               setPendingRadiusKm(radiusKm);
@@ -531,7 +568,7 @@ function AuthenticatedHomePage() {
       </div>
 
       <MobileActionBar
-        active="discover"
+        active={messagesOpen ? "messages" : "discover"}
         onNavigateDiscover={() => router.push("/")}
         onNavigateMessages={openMessages}
         onCreate={handleCreate}
