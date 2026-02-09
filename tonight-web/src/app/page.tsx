@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   Clock,
   List as ListIcon,
@@ -10,6 +11,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   ChevronRight,
+  X,
 } from "lucide-react";
 
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
@@ -972,28 +974,49 @@ function RangeSheet({ value, onChange, onApply, onClose }: RangeSheetProps) {
     <div className="fixed inset-0 z-50 flex items-end justify-center md:hidden">
       <button
         type="button"
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         aria-label="Close range selector"
         onClick={onClose}
       />
-      <div className="relative w-full rounded-t-3xl border border-white/10 bg-[#111428] p-6 text-white shadow-2xl">
-        <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/20" />
-        <h2 className="text-lg font-semibold">Discovery range</h2>
-        <p className="text-sm text-white/70">Slide to adjust how far we search for events.</p>
+      <div className="relative w-full max-w-md rounded-t-[32px] border border-white/10 bg-[#0a0f21]/95 px-5 pb-8 pt-6 text-white shadow-[0_-32px_120px_rgba(2,6,23,0.75)]">
+        <div className="mx-auto mb-4 h-1 w-16 rounded-full bg-white/15" />
+        <button
+          type="button"
+          aria-label="Close range selector"
+          onClick={onClose}
+          className="absolute right-5 top-5 rounded-full border border-white/10 p-1.5 text-white/60 transition hover:text-white"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div className="space-y-1 text-left">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/60">Discovery</p>
+          <h2 className="text-2xl font-serif font-semibold text-white">Discovery range</h2>
+          <p className="text-sm text-white/70">Fine-tune how far out we should look for nearby plans.</p>
+        </div>
         <div className="mt-6 space-y-6">
           <div>
             <div className="flex items-center justify-between text-sm text-white/80">
               <span>Distance</span>
               <span className="font-semibold text-white">{Math.round(value)} km</span>
             </div>
-            <input
-              type="range"
-              min={MIN_RADIUS_KM}
+            <SliderPrimitive.Root
+              className="relative mt-5 flex h-8 w-full touch-none select-none items-center"
               max={MAX_RADIUS_KM}
-              value={value}
-              onChange={(event) => onChange(Number(event.target.value))}
-              className="mt-4 h-1.5 w-full accent-emerald-400"
-            />
+              min={MIN_RADIUS_KM}
+              step={1}
+              value={[value]}
+              aria-label="Discovery range"
+              onValueChange={([next]) => {
+                if (typeof next === "number") {
+                  onChange(next);
+                }
+              }}
+            >
+              <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-white/12">
+                <SliderPrimitive.Range className="absolute h-full rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.45)]" />
+              </SliderPrimitive.Track>
+              <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-[3px] border-[#050713] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.45)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" />
+            </SliderPrimitive.Root>
             <div className="mt-2 flex items-center justify-between text-xs text-white/50">
               <span>{MIN_RADIUS_KM} km</span>
               <span>{MAX_RADIUS_KM} km</span>
@@ -1002,7 +1025,7 @@ function RangeSheet({ value, onChange, onApply, onClose }: RangeSheetProps) {
           <button
             type="button"
             onClick={onApply}
-            className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-semibold text-slate-900"
+            className="w-full rounded-2xl bg-emerald-400/90 py-3 text-sm font-semibold text-[#051217] shadow-lg shadow-emerald-500/30 transition hover:bg-emerald-300"
           >
             Apply radius
           </button>
