@@ -64,8 +64,10 @@
 - Task 20.5h: Added gradient hover/selected states plus keyboard focus handling for discovery map pins so the Mapbox markers mirror the latest V0 shells; reran `npm test`. - Commit `865e1c9`.
 - Task 20.5i: Matched the mobile discovery range sheet to the latest V0 tray (blurred glass panel, Radix slider, close affordances) so the hero controls align across breakpoints; reran `npm test`. - Commit `09651e5`.
 - Task 20.5j: Rebuilt the discovery mobile header, bottom nav, and MiniMap cards to match the updated V0 handoff (sticky hero, segmented view toggle wiring, refreshed card preview chrome) and reran `npm test`. - Commit `19de6d2`.
+- Task 20.5k: Reordered the event creation form to match the refreshed V0 layout (title/description block, schedule/capacity pairing, glassy location tray copy) and reran `npm test`. - Commit `6831ee2`.
 
 ## In Progress / Priority Notes
+- 2026-02-09 23:31 runner: Reflowed the event creation experience to mirror the latest V0 drop (mobile-first stack, paired date/time + capacity controls, and the updated map/location copy). Verified against tonight-meetup-app-designs/components/tonight/create-event-screen.tsx, reran `npm test`, and pushed `6831ee2`. Next up: profile screen deltas from the same V0 release, then sweep any refreshed components before hopping back to the backlog.
 - **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
 - 2026-02-09 23:15 runner: Matched the discovery mobile header, segmented list/map toggle, MiniMap cards, and glassy bottom nav to the current V0 drop (confirmed against tonight-meetup-app-designs/components/tonight/discover-screen.tsx and the live V0 deployment). Verified sticky behavior + toggle state on mobile, refreshed the safe-area padding, and reran `npm test`. Next up per Aleks' 22:31 brief: event creation deltas followed by the profile refresh.
 - 2026-02-09 22:30 runner: The mobile discovery range sheet now mirrors the V0 tray (glass panel sizing, Radix slider, close affordances). Remaining discovery polish: run a responsive regression on the sticky hero + summary grid and confirm the tray still cooperates with the map/list toggles before picking up the event creation deltas.
@@ -84,6 +86,5 @@
  
  
 ## Next Up
-1. Event creation delta pass (apply the reordered sections, map copy tweaks, and updated chips from the latest V0 build).
-2. Profile screen delta pass (removed sections + new additions called out in the V0 release).
-3. Sweep the refreshed components called out in WORKLOG, then resume the standard backlog.
+1. Profile screen delta pass (remove the deprecated sections, add the new stats/safety blocks from the latest V0 release).
+2. Sweep the refreshed shared components called out in WORKLOG, then resume the standard backlog.
