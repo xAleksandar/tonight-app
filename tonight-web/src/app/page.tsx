@@ -905,8 +905,8 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-foreground leading-tight">{event.title}</p>
-                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                    <p className="text-sm font-semibold leading-tight text-foreground">{event.title}</p>
+                    <p className="line-clamp-2 min-h-[2.8rem] text-sm leading-relaxed text-muted-foreground">
                       {event.description ?? "Host will share details once you request to join."}
                     </p>
                   </div>
