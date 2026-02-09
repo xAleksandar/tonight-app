@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { MapPin } from "lucide-react";
 
+import { classNames } from "@/lib/classNames";
+
 export type MiniMapProps = {
   latitude: number;
   longitude: number;
@@ -40,40 +42,39 @@ export function MiniMap({
 
   return (
     <div
-      className={className}
+      className={classNames("relative w-full overflow-hidden", className)}
       style={{
         height,
       }}
     >
-      <div className="relative h-full w-full overflow-hidden rounded-t-2xl bg-secondary/40">
-        {tileUrl && (
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url(${tileUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              filter: "saturate(0.45) brightness(0.4)",
-            }}
-          />
-        )}
+      <div className="absolute inset-0 bg-secondary/50" />
+      {tileUrl && (
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${tileUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "saturate(0.35) brightness(0.45)",
+          }}
+        />
+      )}
 
-        <div className="absolute inset-0 bg-background/15" />
+      <div className="absolute inset-0 bg-background/20" />
 
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full">
-          <div className="flex flex-col items-center">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/40">
-              <MapPin className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <div className="h-2 w-0.5 bg-primary/60" />
-            <div className="h-1.5 w-3 rounded-full bg-primary/30 blur-[1px]" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full">
+        <div className="flex flex-col items-center">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/40">
+            <MapPin className="h-4 w-4 text-primary-foreground" />
           </div>
+          <div className="h-2 w-0.5 bg-primary/60" />
+          <div className="h-1.5 w-3 rounded-full bg-primary/30 blur-[1px]" />
         </div>
+      </div>
 
-        <div className="absolute bottom-2 left-2 right-2">
-          <div className="rounded-lg bg-card/80 px-2 py-1 text-[10px] font-medium text-foreground backdrop-blur">
-            <p className="truncate">{locationName}</p>
-          </div>
+      <div className="absolute bottom-2 left-2 right-2">
+        <div className="rounded-lg bg-card/80 px-2 py-1 text-[10px] font-medium text-foreground backdrop-blur-sm">
+          <p className="truncate">{locationName}</p>
         </div>
       </div>
     </div>

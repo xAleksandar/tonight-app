@@ -198,7 +198,8 @@ export default function HomePage() {
 function AuthenticatedHomePage() {
   const router = useRouter();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [desktopViewMode, setDesktopViewMode] = useState<ViewMode>("list");
+  const [mobileViewMode, setMobileViewMode] = useState<ViewMode>("list");
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<MapPoint | null>(null);
@@ -213,6 +214,8 @@ function AuthenticatedHomePage() {
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+
+  const activeViewMode = isDesktop ? desktopViewMode : mobileViewMode;
 
   const fetchAbortRef = useRef<AbortController | null>(null);
 
@@ -437,25 +440,21 @@ function AuthenticatedHomePage() {
           <DesktopHeader
             title="Discover"
             subtitle="Events near you"
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
+            viewMode={desktopViewMode}
+            onViewModeChange={setDesktopViewMode}
             onNavigateProfile={() => router.push("/profile")}
           />
 
-          <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
-            <div className="mx-auto w-full max-w-5xl">
+          <main className="flex-1 pb-28 pt-0 md:px-10 md:pb-12 md:pt-8">
+            <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
               <MobileHero
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                describeLocation={describeLocation}
-                rangeSummary={buildRadiusSummary(radiusKm)}
+                viewMode={mobileViewMode}
+                onViewModeChange={setMobileViewMode}
                 radiusKm={radiusKm}
                 onOpenRange={() => {
                   setPendingRadiusKm(radiusKm);
                   setRangeSheetOpen(true);
                 }}
-                onRefresh={handleRefresh}
-                lastUpdatedLabel={lastUpdatedLabel}
                 selectedCategory={selectedCategory}
                 onCategoryChange={setSelectedCategory}
               />
@@ -512,9 +511,9 @@ function AuthenticatedHomePage() {
                   </div>
 
                   <div className="mt-5">
-                    {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
+                    {isLoading && <DiscoverySkeleton viewMode={activeViewMode} />}
 
-                    {!isLoading && viewMode === "map" && (
+                    {!isLoading && activeViewMode === "map" && (
                       <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
                         <EventMapView
                           events={mapItems}
@@ -526,7 +525,7 @@ function AuthenticatedHomePage() {
                       </div>
                     )}
 
-                    {!isLoading && viewMode === "list" && (
+                    {!isLoading && activeViewMode === "list" && (
                       <DiscoveryList
                         events={visibleEvents}
                         selectedEventId={selectedEventId}
@@ -566,12 +565,8 @@ function AuthenticatedHomePage() {
 type MobileHeroProps = {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
-  describeLocation: string;
-  rangeSummary: string;
   radiusKm: number;
   onOpenRange: () => void;
-  onRefresh: () => void;
-  lastUpdatedLabel: string;
   selectedCategory: CategoryId | null;
   onCategoryChange: (category: CategoryId | null) => void;
 };
@@ -579,93 +574,74 @@ type MobileHeroProps = {
 function MobileHero({
   viewMode,
   onViewModeChange,
-  describeLocation,
-  rangeSummary,
   radiusKm,
   onOpenRange,
-  onRefresh,
-  lastUpdatedLabel,
   selectedCategory,
   onCategoryChange,
 }: MobileHeroProps) {
   return (
-    <section className="sticky top-0 z-40 border-b border-border/70 bg-background/90 text-foreground backdrop-blur-xl md:hidden">
-      <div className="px-4 pb-3 pt-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-            <h1 className="text-2xl font-serif font-semibold leading-tight">Discover</h1>
-            <p className="text-xs text-muted-foreground">Events near you</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-border bg-card/60 p-0.5">
-              <button
-                type="button"
-                aria-label="List view"
-                onClick={() => onViewModeChange('list')}
-                className={classNames(
-                  'rounded-md p-1.5 transition-colors',
-                  viewMode === 'list'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <ListIcon className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="Map view"
-                onClick={() => onViewModeChange('map')}
-                className={classNames(
-                  'rounded-md p-1.5 transition-colors',
-                  viewMode === 'map'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <MapIcon className="h-4 w-4" />
-              </button>
-            </div>
+    <header className="sticky top-0 z-40 border-b border-border bg-background/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+16px)] text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+          <h1 className="text-2xl font-serif font-semibold leading-tight">Discover</h1>
+          <p className="text-xs text-muted-foreground">Events near you</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-border bg-card/60 p-1">
             <button
               type="button"
-              onClick={() => {
-                onOpenRange();
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => onViewModeChange('list')}
+              className={classNames(
+                'rounded-md px-2 py-1.5 transition-colors',
+                viewMode === 'list'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              {Math.round(radiusKm)} km
+              <ListIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Map view"
+              aria-pressed={viewMode === 'map'}
+              onClick={() => onViewModeChange('map')}
+              className={classNames(
+                'rounded-md px-2 py-1.5 transition-colors',
+                viewMode === 'map'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <MapIcon className="h-4 w-4" />
             </button>
           </div>
-        </div>
-
-        <div className="space-y-1 text-[11px] text-muted-foreground">
-          <p>
-            <span className="text-foreground/70">Current location:</span> {describeLocation}
-          </p>
-          <p>
-            <span className="text-foreground/70">Range:</span> {rangeSummary}
-          </p>
-          <div className="flex items-center justify-between">
-            <span>Last updated {lastUpdatedLabel}</span>
-            <button type="button" onClick={onRefresh} className="font-semibold text-primary">
-              Refresh
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenRange}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            {Math.round(radiusKm)} km
+          </button>
         </div>
       </div>
 
-      <div className="-mx-4 border-t border-border/60 bg-background/85 px-4 pb-2 pt-2">
-        <CategoryRow
-          selectedCategory={selectedCategory}
-          onCategoryChange={onCategoryChange}
-          compact
-        />
+      <div className="-mx-4 overflow-hidden">
+        <div className="px-4">
+          <CategoryRow
+            selectedCategory={selectedCategory}
+            onCategoryChange={onCategoryChange}
+            compact
+            showLabel={false}
+          />
+        </div>
       </div>
-    </section>
+    </header>
   );
 }
-
 
 type DiscoverySummaryProps = {
   describeLocation: string;
@@ -737,23 +713,26 @@ type CategoryRowProps = {
   selectedCategory: CategoryId | null;
   onCategoryChange: (category: CategoryId | null) => void;
   compact?: boolean;
+  showLabel?: boolean;
 };
 
-function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: CategoryRowProps) {
+function CategoryRow({ selectedCategory, onCategoryChange, compact = false, showLabel = true }: CategoryRowProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Categories</span>
-        {selectedCategory && (
-          <button
-            type="button"
-            onClick={() => onCategoryChange(null)}
-            className="text-[11px] font-semibold text-primary"
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {showLabel && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Categories</span>
+          {selectedCategory && (
+            <button
+              type="button"
+              onClick={() => onCategoryChange(null)}
+              className="text-[11px] font-medium text-primary"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
       <div
         className={classNames(
           "flex gap-2",
@@ -777,7 +756,7 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
                 type="button"
                 onClick={() => onCategoryChange(null)}
                 className={classNames(
-                  "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold",
+                  "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium",
                   selectedCategory === null
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border/70 bg-card/60 text-muted-foreground"
@@ -796,7 +775,7 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
               type="button"
               onClick={() => onCategoryChange(definition.id)}
               className={classNames(
-                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold",
+                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
                 selectedCategory === definition.id
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border/70 bg-card/60 text-muted-foreground"
@@ -847,7 +826,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
             type="button"
             onClick={() => onSelect(event.id)}
             className={classNames(
-              "group flex w-full flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10",
+              "group flex w-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99]",
               selectedEventId === event.id && "border-primary/60 shadow-primary/20"
             )}
           >
@@ -859,14 +838,14 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                 className="w-full"
               />
             ) : (
-              <div className="h-40 w-full rounded-t-2xl bg-secondary/40" />
+              <div className="h-[156px] w-full border-b border-border/60 bg-secondary/40" />
             )}
-            <div className="flex flex-1 flex-col gap-2 border-t border-border/60 p-4">
+            <div className="flex flex-1 flex-col gap-3 border-t border-border/60 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div
                     className={classNames(
-                      "flex h-11 w-11 items-center justify-center rounded-2xl border text-sm",
+                      "flex h-10 w-10 items-center justify-center rounded-2xl border text-sm",
                       definition?.accent ?? "border-border/70 bg-background/60"
                     )}
                   >
@@ -874,7 +853,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                   </div>
                   <div>
                     <p className="text-sm font-semibold leading-tight text-foreground">{event.title}</p>
-                    <p className="line-clamp-2 min-h-[2.8rem] text-sm leading-relaxed text-muted-foreground">
+                    <p className="line-clamp-2 min-h-[2.8rem] text-sm leading-[1.4rem] text-muted-foreground">
                       {event.description ?? "Host will share details once you request to join."}
                     </p>
                   </div>
@@ -895,7 +874,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 pt-1">
+              <div className="mt-1 flex items-center gap-2 border-t border-border/50 pt-3">
                 <HostAvatar photoUrl={event.hostPhotoUrl} initials={event.hostInitials} label={event.hostLabel} />
                 <span className="text-xs text-muted-foreground">{event.hostLabel}</span>
                 {spotsLabel && (
