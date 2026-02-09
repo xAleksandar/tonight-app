@@ -89,6 +89,7 @@
 - 2026-02-09 07:40 EET: Tonight build runner rebase-pulled main (already current), spot-checked tonight-web against tonight-meetup-app-designs (unchanged), and noted Task 22 specs are still unavailable, so progress remains blocked pending new direction.
 - 2026-02-09 07:55 EET: Tonight build runner attempted the scheduled pull but WORKLOG diffs blocked the rebase; after logging this run, still no Task 22 specs or new design deltas, so work remains blocked pending product direction.
 - 2026-02-09 08:10 EET: Tonight build runner rebase-pulled main (already current), rechecked tonight-web against tonight-meetup-app-designs (no changes), and confirmed Task 22 specs still aren't available, so work stays blocked pending new direction.
+- 2026-02-09 08:25 EET: Tonight build runner rebase-pulled main (already current), verified discovery/home still mirrors tonight-meetup-app-designs, and noted Task 22 specs remain unavailable, leaving work blocked until new direction arrives.
 
 ## Next Up
 1. Pending product direction for post-Task 21 scope (Task 22 TBD).
