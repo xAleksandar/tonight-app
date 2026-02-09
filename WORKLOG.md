@@ -39,6 +39,7 @@
 - Task 18.1-18.4: Welcome/login experience + auth provider — Commit `17e347d`.
 - Task 19: Full-suite checkpoint — Commit `cc41d55`.
 - Task 20.1–20.5k: Design alignment waves (discovery/event creation/profile/mobile tweaks) — Commits `90a31dd`, `3fc95d9`, `0701f95`, `af6a3b6`, `c0dbe82`, `9291482`, `8012ae1`, `a7d82d8`, `a510921`, `81a8ff2`, `d17301e`, `865e1c9`, `09651e5`, `19de6d2`, `6831ee2`.
+- Task 20.6: Discovery navigation view-state sync (Messages tab, bottom nav highlighting, map/list query param handling, test updates) — Commit `f657d25`.
 ## In Progress / Priority Notes
 - 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
 - 2026-02-10 01:57 runner: Synced the mobile + desktop discovery toggles with the real view state: bottom nav now reflects the active section (including the Messages modal), map/list toggles stay in lockstep across breakpoints via URL search params, and the UI tests were updated to mock `usePathname`/`useSearchParams` so the new navigation plumbing stays covered.
