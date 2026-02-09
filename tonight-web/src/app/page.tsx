@@ -4,25 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Clock,
-  Coffee,
-  Compass,
-  Dumbbell,
   List as ListIcon,
   Map as MapIcon,
   MapPin,
-  Music,
-  Plus,
   SlidersHorizontal,
   Sparkles,
-  UtensilsCrossed,
-  Waves,
-  Clapperboard,
-  Users,
-  ChevronDown,
   ChevronRight,
-  MessageCircle,
-  User,
 } from "lucide-react";
+
+import { DesktopHeader } from "@/components/tonight/DesktopHeader";
+import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
+import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
+import { classNames } from "@/lib/classNames";
 
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
@@ -36,8 +30,6 @@ const MAP_HEIGHT_DESKTOP = 520;
 const MAP_HEIGHT_MOBILE = 360;
 
 type ViewMode = "list" | "map";
-type CategoryId = "cinema" | "food" | "outdoor" | "music" | "fitness" | "social";
-
 type NearbyEventPayload = {
   id: string;
   title: string;
@@ -79,15 +71,6 @@ type NearbyEventsResponse = {
 type LocationStatus = "idle" | "locating" | "ready" | "denied" | "unsupported" | "error";
 type EventsStatus = "idle" | "loading" | "success" | "error";
 
-type CategoryDefinition = {
-  id: CategoryId;
-  label: string;
-  keywords: string[];
-  icon: typeof Sparkles;
-  accent: string;
-  badge: string;
-};
-
 type DecoratedEvent = NearbyEventPayload & {
   datetimeLabel: string | null;
   distanceLabel: string | null;
@@ -97,71 +80,6 @@ type DecoratedEvent = NearbyEventPayload & {
   hostPhotoUrl: string | null;
   spotsRemaining: number | null;
 };
-
-const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
-  cinema: {
-    id: "cinema",
-    label: "Cinema",
-    keywords: ["movie", "film", "cinema", "theater"],
-    icon: Clapperboard,
-    accent: "bg-sky-500/15 text-sky-200 border-sky-400/30",
-    badge: "border border-sky-400/30 bg-sky-500/10 text-sky-100",
-  },
-  food: {
-    id: "food",
-    label: "Food",
-    keywords: ["dinner", "eat", "restaurant", "food", "sushi", "pizza", "brunch"],
-    icon: UtensilsCrossed,
-    accent: "bg-amber-500/15 text-amber-200 border-amber-400/30",
-    badge: "border border-amber-400/30 bg-amber-500/10 text-amber-100",
-  },
-  outdoor: {
-    id: "outdoor",
-    label: "Outdoor",
-    keywords: ["walk", "hike", "outdoor", "park", "beach"],
-    icon: Waves,
-    accent: "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
-    badge: "border border-emerald-400/30 bg-emerald-500/10 text-emerald-100",
-  },
-  music: {
-    id: "music",
-    label: "Music",
-    keywords: ["music", "concert", "band", "dj", "jazz"],
-    icon: Music,
-    accent: "bg-rose-500/15 text-rose-200 border-rose-400/30",
-    badge: "border border-rose-400/30 bg-rose-500/10 text-rose-100",
-  },
-  fitness: {
-    id: "fitness",
-    label: "Fitness",
-    keywords: ["gym", "workout", "run", "yoga", "fitness"],
-    icon: Dumbbell,
-    accent: "bg-lime-500/15 text-lime-200 border-lime-400/30",
-    badge: "border border-lime-400/30 bg-lime-500/10 text-lime-100",
-  },
-  social: {
-    id: "social",
-    label: "Social",
-    keywords: ["coffee", "board game", "hang", "meet", "social", "drink"],
-    icon: Coffee,
-    accent: "bg-orange-500/15 text-orange-200 border-orange-400/30",
-    badge: "border border-orange-400/30 bg-orange-500/10 text-orange-100",
-  },
-};
-
-const CATEGORY_ORDER: (CategoryId | "all")[] = [
-  "all",
-  "cinema",
-  "food",
-  "outdoor",
-  "music",
-  "fitness",
-  "social",
-];
-
-function classNames(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
 
 function formatEventTime(value?: string | null) {
   if (!value) return null;
@@ -619,6 +537,8 @@ function AuthenticatedHomePage() {
       </div>
 
       <MobileActionBar
+        active="discover"
+        onNavigateDiscover={() => router.push("/")}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
       />
@@ -634,175 +554,6 @@ function AuthenticatedHomePage() {
     </div>
   );
 
-}
-
-type DesktopSidebarProps = {
-  selectedCategory: CategoryId | null;
-  onCategoryChange: (category: CategoryId | null) => void;
-  onCreate: () => void;
-};
-
-function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: DesktopSidebarProps) {
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const activeCategory = selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory] : null;
-  const ActiveIcon = activeCategory?.icon ?? Sparkles;
-
-  return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-white/10 bg-card/30 px-5 py-6 text-foreground backdrop-blur-2xl md:flex md:flex-col">
-      <div className="flex items-center gap-3 px-1">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30">
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-lg font-serif font-semibold leading-tight">tonight</p>
-          <p className="text-xs text-muted-foreground">Meetups in real life</p>
-        </div>
-      </div>
-
-      <nav className="mt-8 space-y-1 text-sm" aria-label="Primary">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-xl bg-primary/10 px-3 py-2.5 font-medium text-primary transition-all"
-        >
-          <Compass className="h-4.5 w-4.5" />
-          Discover
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground/70"
-          disabled
-        >
-          <Users className="h-4.5 w-4.5" />
-          People nearby
-        </button>
-      </nav>
-
-      <div className="mt-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categories</p>
-        <button
-          type="button"
-          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-border/80 bg-background/40 px-3 py-2 text-left text-sm font-medium text-foreground transition-all"
-          onClick={() => setCategoriesOpen((value) => !value)}
-        >
-          <span className="rounded-lg bg-card/70 p-1.5 text-muted-foreground">
-            <ActiveIcon className="h-4 w-4" />
-          </span>
-          <span className="flex-1">
-            {selectedCategory ? activeCategory?.label : "All"}
-          </span>
-          <ChevronDown
-            className={classNames(
-              "h-4 w-4 text-muted-foreground transition-transform",
-              categoriesOpen && "rotate-180"
-            )}
-          />
-        </button>
-        {categoriesOpen && (
-          <div className="ml-1 mt-2 flex flex-col gap-0.5 border-l border-border/60 pl-3">
-            {CATEGORY_ORDER.map((entry) => {
-              if (entry === "all") {
-                return (
-                  <button
-                    key="all"
-                    type="button"
-                    onClick={() => {
-                      onCategoryChange(null);
-                      setCategoriesOpen(false);
-                    }}
-                    className={classNames(
-                      "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold",
-                      selectedCategory === null
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    All
-                  </button>
-                );
-              }
-              const definition = CATEGORY_DEFINITIONS[entry];
-              const Icon = definition.icon;
-              return (
-                <button
-                  key={definition.id}
-                  type="button"
-                  onClick={() => {
-                    onCategoryChange(definition.id);
-                    setCategoriesOpen(false);
-                  }}
-                  className={classNames(
-                    "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold",
-                    selectedCategory === definition.id
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {definition.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={onCreate}
-        className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90"
-      >
-        <Plus className="h-4 w-4" />
-        Post event
-      </button>
-    </aside>
-  );
-}
-
-type DesktopHeaderProps = {
-  title: string;
-  subtitle?: string;
-  onNavigateProfile: () => void;
-  onNavigateMessages?: () => void;
-};
-
-function DesktopHeader({ title, subtitle, onNavigateProfile, onNavigateMessages }: DesktopHeaderProps) {
-  const messagesDisabled = typeof onNavigateMessages !== "function";
-
-  return (
-    <header className="sticky top-0 z-30 hidden items-center justify-between border-b border-white/10 bg-background/80 px-10 py-5 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:flex">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-        <h1 className="font-serif text-3xl font-semibold leading-tight">{title}</h1>
-        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-      </div>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={messagesDisabled ? undefined : onNavigateMessages}
-          className={classNames(
-            "relative flex h-11 w-11 items-center justify-center rounded-full border",
-            messagesDisabled
-              ? "border-border/70 text-muted-foreground"
-              : "border-border/80 bg-card/60 text-muted-foreground hover:text-primary"
-          )}
-          aria-label="Messages"
-          aria-disabled={messagesDisabled}
-          disabled={messagesDisabled}
-        >
-          <MessageCircle className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={onNavigateProfile}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/60 text-sm font-semibold text-foreground"
-          aria-label="Profile"
-        >
-          <span>YN</span>
-        </button>
-      </div>
-    </header>
-  );
 }
 
 type MobileHeroProps = {
@@ -908,49 +659,6 @@ function MobileHero({
   );
 }
 
-
-type MobileActionBarProps = {
-  onCreate: () => void;
-  onOpenProfile: () => void;
-};
-
-function MobileActionBar({ onCreate, onOpenProfile }: MobileActionBarProps) {
-  return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-card/70 backdrop-blur-lg md:hidden"
-      role="navigation"
-      aria-label="Primary navigation"
-    >
-      <div className="flex items-center justify-around px-2 py-2 text-xs font-medium text-muted-foreground">
-        <button type="button" className="flex flex-col items-center gap-0.5 text-primary">
-          <Compass className="h-5 w-5" />
-          Discover
-        </button>
-        <button type="button" className="flex flex-col items-center gap-0.5 opacity-60" disabled>
-          <Users className="h-5 w-5" />
-          People
-        </button>
-        <button
-          type="button"
-          onClick={onCreate}
-          className="-mt-6 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30"
-          aria-label="Post event"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-        <button type="button" className="flex flex-col items-center gap-0.5 opacity-60" disabled>
-          <MessageCircle className="h-5 w-5" />
-          Messages
-        </button>
-        <button type="button" onClick={onOpenProfile} className="flex flex-col items-center gap-0.5">
-          <User className="h-5 w-5" />
-          Profile
-        </button>
-      </div>
-      <div className="h-[env(safe-area-inset-bottom)]" />
-    </nav>
-  );
-}
 
 type DiscoverySummaryProps = {
   describeLocation: string;

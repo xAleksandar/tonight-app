@@ -18,7 +18,8 @@
 - Task 10.6: Write Property 22 (list view required fields) tests — Commit `49aa908`.
 - Task 11.1: Create event creation page (Mapbox-integrated creation form, validation, geolocation helper, POST /api/events wiring) — Commit `2241eec`.
 - Task 11.2a: Initial home/discovery page implementation (App Router entry with location detection, map/list toggles, radius summary, and CTA wiring) — Commit `4185c8c`.
-- Task 11.2b: Home/discovery redesign pass (added host metadata, event cards, glass panels, etc.) — Commit `5b07fc7`.
+- Task 11.2b: Home/discovery redesign pass (host metadata, glass panels, V0-aligned layout) — Commit `5b07fc7`.
+- Task 11.2c: Home/discovery alignment with live V0 site (desktop + mobile parity) — Commit `c0dbe82`.
 - Task 11.3: Create EventDetailModal component (components/EventDetailModal.tsx with host summary, capacity details, CTA wiring) — Commit `46870cc`.
 - Task 12.1: Create POST /api/join-requests (validation, service orchestration, API wiring) — Commit `30018a13`.
 - Task 12.2: Write property tests for join request creation (pending status, duplicate prevention, capacity enforcement) — Commit `30018a13`.
@@ -53,12 +54,16 @@
 - Task 20.2: Add loading states to core pages (discovery landing, event creation, and chat views now show branded skeletons and pending indicators) — Commit `3fc95d9`.
 - Task 20.3: Add success/error toast notifications (react-hot-toast wiring, shared presenter component) — Commit `0701f95`.
 - Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) — Commit `af6a3b6`.
-- Task 20.5a: Realigned the home/discovery experience with tonight-meetup-app-designs/V0 (sticky desktop shell, refreshed mobile hero + category rail, glass discovery cards, updated tests) — Commit `c0dbe82`.
+- Task 20.5a: Realign discovery/home screen with live V0 designs — Commit `c0dbe82`.
+- Task 20.5b: Extract shared discovery shell components (desktop header/sidebar, mobile action bar) and centralized category utilities so the home screen matches V0 across desktop/tablet/mobile; reran `npm test`. — Commit `78911c8`.
 
 ## In Progress / Priority Notes
-- **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components or the live V0 site (<https://v0.app/chat/tonight-meetup-app-designs-nU0PwkD1pJ5>) as the visual baseline. Reuse those components whenever possible; if new files are required, match their layout/styling exactly across mobile, tablet, and desktop breakpoints.
-- **Immediate priority:** Align the event creation flow with the tonight-meetup-app-designs/V0 reference now that the discovery screen matches it across breakpoints.
+- **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
+- **Immediate priorities:**
+  1. Complete the event creation page realignment so it matches the V0 site.
+  2. After the event creation flow is done, focus on the profile screen (top-left entry) to ensure it matches V0 as well.
 
 ## Next Up
-1. Align the event creation page with <https://v0.app/chat/tonight-meetup-app-designs-nU0PwkD1pJ5> (mobile/tablet/desktop).
-2. Resume remaining tasks (Task 20.5 onwards) once design alignment is confirmed.
+1. Event creation page alignment with <https://v0-tonight-meetup-app-designs.vercel.app/>.
+2. Profile page alignment (desktop + mobile) using the same source.
+3. Resume the remaining backlog (Task 20.5c onward) once these alignments are complete.
