@@ -58,6 +58,7 @@
 - Task 20.5b: Extract shared discovery shell components (desktop header/sidebar, mobile action bar) and centralized category utilities so the home screen matches V0 across desktop/tablet/mobile; reran `npm test`. - Commit `9291482`.
 - Task 20.5c: Realign the event creation page with the live V0 designs (Tonight shell, category chips, refreshed map picker, and mobile-first layout); reran `npm test`. - Commit `HEAD`.
 - Task 20.5d: Realign the profile screen with the live V0 designs (Tonight shell layout, stats row, "My Active Events" panel, overview API, refreshed safety actions) and reran `npm test`. - Commit `a7d82d8`.
+- Task 20.5e: Updated the discovery list cards with inline MiniMap previews plus the desktop header list/map toggle to match the refreshed V0 shell; `npm test` remains green. - Commit `a510921`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
@@ -74,4 +75,7 @@
  
  
 ## Next Up
-1. Resume the remaining backlog (Task 20.6 onward) once the next design priorities are confirmed.
+1. Discovery/home delta follow-ups (tablet spacing, responsive polish, and regression checks for the new MiniMap cards + desktop list/map toggle).
+2. Event creation delta pass (reordered sections, new details from V0).
+3. Profile screen delta pass.
+4. Broader sweep for any remaining deltas once these three areas are complete.
