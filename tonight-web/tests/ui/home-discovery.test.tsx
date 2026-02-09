@@ -266,9 +266,8 @@ describe('Authenticated home/discovery experience', () => {
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
 
-    expect(
-      await screen.findByText(/discover what's happening near you/i)
-    ).toBeInTheDocument();
+    const heroCopies = await screen.findAllByText(/events near you/i);
+    expect(heroCopies.length).toBeGreaterThan(0);
     expect(screen.getByText('Live nearby meetups')).toBeInTheDocument();
     expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
     expect(screen.getByText('Downtown Coffee Crawl')).toBeInTheDocument();

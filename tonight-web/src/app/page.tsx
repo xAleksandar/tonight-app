@@ -504,8 +504,8 @@ function AuthenticatedHomePage() {
     locationStatus === "locating" || (eventsStatus === "loading" && visibleEvents.length === 0);
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] px-4 pb-24 pt-4 text-foreground sm:px-6 md:pb-12 md:pt-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 md:flex-row md:gap-10">
+    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#0a0d1c] text-foreground">
+      <div className="flex min-h-dvh flex-col md:flex-row">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -514,102 +514,106 @@ function AuthenticatedHomePage() {
 
         <div className="flex flex-1 flex-col">
           <DesktopHeader
+            title="Discover"
+            subtitle="Events near you"
             onNavigateProfile={() => router.push("/profile")}
           />
 
-          <main className="flex-1 px-4 pb-6 pt-4 md:px-8 md:pb-10">
-            <MobileHero
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              describeLocation={describeLocation}
-              rangeSummary={buildRadiusSummary(radiusKm)}
-              radiusKm={radiusKm}
-              onOpenRange={() => {
-                setPendingRadiusKm(radiusKm);
-                setRangeSheetOpen(true);
-              }}
-              onRefresh={handleRefresh}
-              lastUpdatedLabel={lastUpdatedLabel}
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-            />
-
-            <section className="mt-4 flex flex-col gap-4">
-              <DiscoverySummary
+          <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
+            <div className="mx-auto w-full max-w-5xl">
+              <MobileHero
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
                 describeLocation={describeLocation}
-                lastUpdatedLabel={lastUpdatedLabel}
                 rangeSummary={buildRadiusSummary(radiusKm)}
-                onUpdateLocation={attemptLocationDetection}
+                radiusKm={radiusKm}
+                onOpenRange={() => {
+                  setPendingRadiusKm(radiusKm);
+                  setRangeSheetOpen(true);
+                }}
                 onRefresh={handleRefresh}
-                locationStatus={locationStatus}
-                eventsStatus={eventsStatus}
+                lastUpdatedLabel={lastUpdatedLabel}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
               />
 
-              {locationStatus === "denied" || locationStatus === "unsupported" ? (
-                <AlertPanel
-                  title="Turn on location services"
-                  description={
-                    locationError ??
-                    "We need access to your approximate location to find pop-up events around you."
-                  }
-                  actionLabel="Retry"
-                  onAction={attemptLocationDetection}
+              <section className="mt-4 flex flex-col gap-4">
+                <DiscoverySummary
+                  describeLocation={describeLocation}
+                  lastUpdatedLabel={lastUpdatedLabel}
+                  rangeSummary={buildRadiusSummary(radiusKm)}
+                  onUpdateLocation={attemptLocationDetection}
+                  onRefresh={handleRefresh}
+                  locationStatus={locationStatus}
+                  eventsStatus={eventsStatus}
                 />
-              ) : locationStatus === "error" ? (
-                <AlertPanel
-                  title="Location unavailable"
-                  description={locationError ?? "Unable to determine your location right now."}
-                  actionLabel="Try again"
-                  onAction={attemptLocationDetection}
-                />
-              ) : eventsStatus === "error" ? (
-                <AlertPanel
-                  title="Couldn't load nearby events"
-                  description={eventsError ?? "Please try again in a moment."}
-                  actionLabel="Refresh"
-                  onAction={handleRefresh}
-                />
-              ) : null}
 
-              <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-xl shadow-black/20">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-                    <p className="text-lg font-semibold text-foreground">Live nearby meetups</p>
-                    <p className="text-xs text-muted-foreground">
-                      Toggle between list and map to explore plans within your radius.
-                    </p>
-                  </div>
-                  <ViewToggle current={viewMode} onChange={setViewMode} />
-                </div>
+                {locationStatus === "denied" || locationStatus === "unsupported" ? (
+                  <AlertPanel
+                    title="Turn on location services"
+                    description={
+                      locationError ??
+                      "We need access to your approximate location to find pop-up events around you."
+                    }
+                    actionLabel="Retry"
+                    onAction={attemptLocationDetection}
+                  />
+                ) : locationStatus === "error" ? (
+                  <AlertPanel
+                    title="Location unavailable"
+                    description={locationError ?? "Unable to determine your location right now."}
+                    actionLabel="Try again"
+                    onAction={attemptLocationDetection}
+                  />
+                ) : eventsStatus === "error" ? (
+                  <AlertPanel
+                    title="Couldn't load nearby events"
+                    description={eventsError ?? "Please try again in a moment."}
+                    actionLabel="Refresh"
+                    onAction={handleRefresh}
+                  />
+                ) : null}
 
-                <div className="mt-5">
-                  {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
-
-                  {!isLoading && viewMode === "map" && (
-                    <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
-                      <EventMapView
-                        events={mapItems}
-                        userLocation={userLocation || undefined}
-                        selectedEventId={selectedEventId}
-                        onEventSelect={setSelectedEventId}
-                        height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
-                      />
+                <div className="rounded-3xl border border-border/60 bg-card/60 p-5 shadow-xl shadow-black/20">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+                      <p className="font-serif text-2xl font-semibold text-foreground">Live nearby meetups</p>
+                      <p className="text-xs text-muted-foreground">
+                        Toggle between list and map to explore plans within your radius.
+                      </p>
                     </div>
-                  )}
+                    <ViewToggle current={viewMode} onChange={setViewMode} />
+                  </div>
 
-                  {!isLoading && viewMode === "list" && (
-                    <DiscoveryList
-                      events={visibleEvents}
-                      selectedEventId={selectedEventId}
-                      onSelect={setSelectedEventId}
-                      locationReady={locationReady}
-                      radiusSummary={buildRadiusSummary(radiusKm)}
-                    />
-                  )}
+                  <div className="mt-5">
+                    {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
+
+                    {!isLoading && viewMode === "map" && (
+                      <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
+                        <EventMapView
+                          events={mapItems}
+                          userLocation={userLocation || undefined}
+                          selectedEventId={selectedEventId}
+                          onEventSelect={setSelectedEventId}
+                          height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
+                        />
+                      </div>
+                    )}
+
+                    {!isLoading && viewMode === "list" && (
+                      <DiscoveryList
+                        events={visibleEvents}
+                        selectedEventId={selectedEventId}
+                        onSelect={setSelectedEventId}
+                        locationReady={locationReady}
+                        radiusSummary={buildRadiusSummary(radiusKm)}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            </div>
           </main>
         </div>
       </div>
@@ -629,6 +633,7 @@ function AuthenticatedHomePage() {
       )}
     </div>
   );
+
 }
 
 type DesktopSidebarProps = {
@@ -643,21 +648,21 @@ function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: Deskto
   const ActiveIcon = activeCategory?.icon ?? Sparkles;
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border/60 bg-card/40 px-4 py-6 text-foreground backdrop-blur-xl md:flex md:flex-col">
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-white/10 bg-card/30 px-5 py-6 text-foreground backdrop-blur-2xl md:flex md:flex-col">
       <div className="flex items-center gap-3 px-1">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/90 text-primary-foreground shadow-lg shadow-primary/30">
           <Sparkles className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-lg font-semibold leading-tight">Tonight</p>
-          <p className="text-xs text-muted-foreground">Discover real-life meetups</p>
+          <p className="text-lg font-serif font-semibold leading-tight">tonight</p>
+          <p className="text-xs text-muted-foreground">Meetups in real life</p>
         </div>
       </div>
 
-      <nav className="mt-8 space-y-1 text-sm">
+      <nav className="mt-8 space-y-1 text-sm" aria-label="Primary">
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-primary bg-primary/10"
+          className="flex w-full items-center gap-3 rounded-xl bg-primary/10 px-3 py-2.5 font-medium text-primary transition-all"
         >
           <Compass className="h-4.5 w-4.5" />
           Discover
@@ -676,7 +681,7 @@ function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: Deskto
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categories</p>
         <button
           type="button"
-          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-border/80 bg-background/40 px-3 py-2 text-left text-sm font-medium text-foreground"
+          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-border/80 bg-background/40 px-3 py-2 text-left text-sm font-medium text-foreground transition-all"
           onClick={() => setCategoriesOpen((value) => !value)}
         >
           <span className="rounded-lg bg-card/70 p-1.5 text-muted-foreground">
@@ -693,7 +698,7 @@ function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: Deskto
           />
         </button>
         {categoriesOpen && (
-          <div className="mt-3 space-y-1 rounded-xl border border-border/60 bg-background/40 p-2">
+          <div className="ml-1 mt-2 flex flex-col gap-0.5 border-l border-border/60 pl-3">
             {CATEGORY_ORDER.map((entry) => {
               if (entry === "all") {
                 return (
@@ -705,13 +710,13 @@ function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: Deskto
                       setCategoriesOpen(false);
                     }}
                     className={classNames(
-                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold",
                       selectedCategory === null
                         ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <Sparkles className="h-4 w-4" />
+                    <Sparkles className="h-3.5 w-3.5" />
                     All
                   </button>
                 );
@@ -727,13 +732,13 @@ function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: Deskto
                     setCategoriesOpen(false);
                   }}
                   className={classNames(
-                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold",
                     selectedCategory === definition.id
                       ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5" />
                   {definition.label}
                 </button>
               );
@@ -755,48 +760,46 @@ function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: Deskto
 }
 
 type DesktopHeaderProps = {
+  title: string;
+  subtitle?: string;
   onNavigateProfile: () => void;
   onNavigateMessages?: () => void;
 };
 
-function DesktopHeader({ onNavigateProfile, onNavigateMessages }: DesktopHeaderProps) {
+function DesktopHeader({ title, subtitle, onNavigateProfile, onNavigateMessages }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
 
   return (
-    <header className="hidden border-b border-border/60 bg-background/60 px-8 py-6 text-foreground shadow-lg shadow-black/20 backdrop-blur-xl md:block">
-      <div className="flex items-center justify-between gap-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-          <h1 className="text-3xl font-semibold leading-tight">Discover what's happening near you</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Browse intimate plans hosted by locals and request to join before spots fill up.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={messagesDisabled ? undefined : onNavigateMessages}
-            className={classNames(
-              "relative flex h-11 w-11 items-center justify-center rounded-full border",
-              messagesDisabled
-                ? "border-border/70 text-muted-foreground"
-                : "border-border/80 bg-card/60 text-muted-foreground hover:text-primary"
-            )}
-            aria-label="Messages"
-            aria-disabled={messagesDisabled}
-            disabled={messagesDisabled}
-          >
-            <MessageCircle className="h-4.5 w-4.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onNavigateProfile}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/60 text-sm font-semibold text-foreground"
-            aria-label="Profile"
-          >
-            <span>YN</span>
-          </button>
-        </div>
+    <header className="sticky top-0 z-30 hidden items-center justify-between border-b border-white/10 bg-background/80 px-10 py-5 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:flex">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+        <h1 className="font-serif text-3xl font-semibold leading-tight">{title}</h1>
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={messagesDisabled ? undefined : onNavigateMessages}
+          className={classNames(
+            "relative flex h-11 w-11 items-center justify-center rounded-full border",
+            messagesDisabled
+              ? "border-border/70 text-muted-foreground"
+              : "border-border/80 bg-card/60 text-muted-foreground hover:text-primary"
+          )}
+          aria-label="Messages"
+          aria-disabled={messagesDisabled}
+          disabled={messagesDisabled}
+        >
+          <MessageCircle className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={onNavigateProfile}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/60 text-sm font-semibold text-foreground"
+          aria-label="Profile"
+        >
+          <span>YN</span>
+        </button>
       </div>
     </header>
   );
@@ -828,73 +831,73 @@ function MobileHero({
   onCategoryChange,
 }: MobileHeroProps) {
   return (
-    <section className="sticky top-0 z-30 border-b border-border/80 bg-background/85 px-1 pb-4 pt-5 text-foreground backdrop-blur-md md:hidden">
-      <div className="flex items-center justify-between gap-3 px-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-          <h1 className="text-2xl font-semibold leading-tight">Discover</h1>
-          <p className="text-xs text-muted-foreground">Events near you</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-xl border border-border/70 bg-card/60 p-0.5">
+    <section className="sticky top-0 z-40 border-b border-border/70 bg-background/90 text-foreground backdrop-blur-xl md:hidden">
+      <div className="px-4 pb-3 pt-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+            <h1 className="text-2xl font-serif font-semibold leading-tight">Discover</h1>
+            <p className="text-xs text-muted-foreground">Events near you</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-border bg-card/60 p-0.5">
+              <button
+                type="button"
+                aria-label="List view"
+                onClick={() => onViewModeChange('list')}
+                className={classNames(
+                  'rounded-md p-1.5 transition-colors',
+                  viewMode === 'list'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <ListIcon className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Map view"
+                onClick={() => onViewModeChange('map')}
+                className={classNames(
+                  'rounded-md p-1.5 transition-colors',
+                  viewMode === 'map'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <MapIcon className="h-4 w-4" />
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => onViewModeChange('list')}
-              className={classNames(
-                'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold',
-                viewMode === 'list'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'
-              )}
+              onClick={() => {
+                onOpenRange();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <ListIcon className="h-4 w-4" />
-              List
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange('map')}
-              className={classNames(
-                'flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold',
-                viewMode === 'map'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground'
-              )}
-            >
-              <MapIcon className="h-4 w-4" />
-              Map
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              {Math.round(radiusKm)} km
             </button>
           </div>
-          <button
-            type="button"
-            onClick={onOpenRange}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-card/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            {Math.round(radiusKm)} km
-          </button>
+        </div>
+
+        <div className="space-y-1 text-[11px] text-muted-foreground">
+          <p>
+            <span className="text-foreground/70">Current location:</span> {describeLocation}
+          </p>
+          <p>
+            <span className="text-foreground/70">Range:</span> {rangeSummary}
+          </p>
+          <div className="flex items-center justify-between">
+            <span>Last updated {lastUpdatedLabel}</span>
+            <button type="button" onClick={onRefresh} className="font-semibold text-primary">
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 space-y-1 px-3 text-xs text-muted-foreground">
-        <p>
-          <span className="text-foreground/70">Current location:</span> {describeLocation}
-        </p>
-        <p>
-          <span className="text-foreground/70">Range:</span> {rangeSummary}
-        </p>
-        <div className="flex items-center justify-between">
-          <span>Last updated {lastUpdatedLabel}</span>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="text-[11px] font-semibold text-primary"
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-3 px-1">
+      <div className="-mx-4 border-t border-border/60 bg-background/85 px-4 pb-2 pt-2">
         <CategoryRow
           selectedCategory={selectedCategory}
           onCategoryChange={onCategoryChange}
@@ -905,6 +908,7 @@ function MobileHero({
   );
 }
 
+
 type MobileActionBarProps = {
   onCreate: () => void;
   onOpenProfile: () => void;
@@ -912,20 +916,17 @@ type MobileActionBarProps = {
 
 function MobileActionBar({ onCreate, onOpenProfile }: MobileActionBarProps) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/80 backdrop-blur-md md:hidden">
-      <div className="flex items-center justify-around px-2 py-2 text-xs font-semibold text-muted-foreground">
-        <button
-          type="button"
-          className="flex flex-col items-center gap-0.5 text-primary"
-        >
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-card/70 backdrop-blur-lg md:hidden"
+      role="navigation"
+      aria-label="Primary navigation"
+    >
+      <div className="flex items-center justify-around px-2 py-2 text-xs font-medium text-muted-foreground">
+        <button type="button" className="flex flex-col items-center gap-0.5 text-primary">
           <Compass className="h-5 w-5" />
           Discover
         </button>
-        <button
-          type="button"
-          className="flex flex-col items-center gap-0.5 opacity-60"
-          disabled
-        >
+        <button type="button" className="flex flex-col items-center gap-0.5 opacity-60" disabled>
           <Users className="h-5 w-5" />
           People
         </button>
@@ -937,19 +938,11 @@ function MobileActionBar({ onCreate, onOpenProfile }: MobileActionBarProps) {
         >
           <Plus className="h-5 w-5" />
         </button>
-        <button
-          type="button"
-          className="flex flex-col items-center gap-0.5 opacity-60"
-          disabled
-        >
+        <button type="button" className="flex flex-col items-center gap-0.5 opacity-60" disabled>
           <MessageCircle className="h-5 w-5" />
           Messages
         </button>
-        <button
-          type="button"
-          onClick={onOpenProfile}
-          className="flex flex-col items-center gap-0.5"
-        >
+        <button type="button" onClick={onOpenProfile} className="flex flex-col items-center gap-0.5">
           <User className="h-5 w-5" />
           Profile
         </button>
@@ -1049,9 +1042,17 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false }: Ca
       <div
         className={classNames(
           "flex gap-2",
-          compact ? "overflow-x-auto" : "flex-wrap"
+          compact ? "-mx-1 overflow-x-auto px-1 pb-1" : "flex-wrap"
         )}
-        style={compact ? { WebkitOverflowScrolling: "touch" } : undefined}
+        style={
+          compact
+            ? {
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+              }
+            : undefined
+        }
       >
         {CATEGORY_ORDER.map((entry) => {
           if (entry === "all") {
