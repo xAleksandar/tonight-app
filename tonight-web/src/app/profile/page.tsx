@@ -1,14 +1,42 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Flag } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  Calendar,
+  Camera,
+  ChevronRight,
+  Clapperboard,
+  Flag,
+  LogOut,
+  Mail,
+  MapPin,
+  Shield,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
 import ReportModal from '@/components/ReportModal';
 import UserAvatar from '@/components/UserAvatar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
+import { useAuthContext } from '@/components/auth/AuthProvider';
+import { DesktopHeader } from '@/components/tonight/DesktopHeader';
+import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
+import { MobileActionBar } from '@/components/tonight/MobileActionBar';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import type { CategoryId } from '@/lib/categories';
+import { classNames } from '@/lib/classNames';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
+
+const FORM_INPUT_CLASS =
+  'h-12 w-full rounded-2xl border border-border/70 bg-background/40 px-4 text-sm text-foreground placeholder:text-muted-foreground shadow-inner shadow-black/10 transition focus:border-primary focus:ring-2 focus:ring-primary/30 focus:outline-none';
+
+const CTA_BUTTON_CLASS =
+  'inline-flex items-center justify-center rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40';
+
+const SECONDARY_BUTTON_CLASS =
+  'rounded-2xl border border-border/60 px-6 py-2.5 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-40';
 
 type ProfileResponse = {
   user: Profile | null;
@@ -27,6 +55,27 @@ type StatusState = {
   message: string;
 };
 
+type ProfileOverviewResponse = {
+  stats: ProfileStats;
+  activeEvents: ActiveEventSummary[];
+};
+
+type ProfileStats = {
+  eventsHosted: number;
+  eventsJoined: number;
+  peopleMet: number;
+};
+
+type ActiveEventSummary = {
+  id: string;
+  title: string;
+  datetime: string;
+  locationName: string;
+  status: string;
+  pendingRequests: number;
+  acceptedRequests: number;
+};
+
 const formatDate = (isoDate: string) => {
   try {
     return new Intl.DateTimeFormat(undefined, {
@@ -36,6 +85,31 @@ const formatDate = (isoDate: string) => {
     }).format(new Date(isoDate));
   } catch {
     return 'Unknown';
+  }
+};
+
+const formatMonthYear = (isoDate: string) => {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date(isoDate));
+  } catch {
+    return 'Unknown';
+  }
+};
+
+const formatEventDatetime = (isoDate: string) => {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(isoDate));
+  } catch {
+    return 'Soon';
   }
 };
 
@@ -72,6 +146,9 @@ type AuthenticatedProfilePageProps = {
 };
 
 function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePageProps) {
+  const router = useRouter();
+  const { logout } = useAuthContext();
+  const [sidebarCategory, setSidebarCategory] = useState<CategoryId | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -80,7 +157,11 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
   const [saving, setSaving] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportNotice, setReportNotice] = useState<string | null>(null);
+  const [overview, setOverview] = useState<ProfileOverviewResponse | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const safetyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +192,31 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
       isMounted = false;
     };
   }, []);
+
+  const fetchOverview = useCallback(async () => {
+    setOverviewLoading(true);
+    try {
+      const response = await fetch('/api/profile/overview', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('Unable to load profile overview');
+      }
+      const payload = (await response.json()) as ProfileOverviewResponse;
+      setOverview(payload);
+      setOverviewError(null);
+    } catch (error) {
+      console.error('Failed to load profile overview', error);
+      setOverview(null);
+      setOverviewError('Unable to load your event activity right now. Try again shortly.');
+    } finally {
+      setOverviewLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOverview().catch((error) => {
+      console.error('Unexpected overview failure', error);
+    });
+  }, [fetchOverview]);
 
   useEffect(() => {
     setReportNotice(null);
@@ -195,6 +301,9 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
       setPhotoInput(data.user.photoUrl ?? '');
       setStatus({ type: 'success', message: 'Profile updated successfully.' });
       showSuccessToast('Profile updated', 'Your changes are live.');
+      fetchOverview().catch((error) => {
+        console.error('Failed to refresh overview', error);
+      });
     } catch (error) {
       console.error('Failed to update profile', error);
       const message = 'Unexpected error while saving changes.';
@@ -218,186 +327,251 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
     return status.type === 'success' ? 'text-emerald-300' : 'text-rose-300';
   }, [status]);
 
+  const stats = overview?.stats ?? { eventsHosted: 0, eventsJoined: 0, peopleMet: 0 };
+
   return (
-    <>
-      <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] px-4 py-6 text-white sm:px-6 md:py-10">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-          <div className="space-y-2 text-white/90">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">Account</p>
-            <h1 className="text-3xl font-semibold leading-tight">Profile</h1>
-            <p className="text-sm text-white/70">Update how you appear across Tonight and keep your safety settings close.</p>
-          </div>
+    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] text-foreground">
+      <div className="flex min-h-dvh flex-col md:flex-row">
+        <DesktopSidebar
+          selectedCategory={sidebarCategory}
+          onCategoryChange={setSidebarCategory}
+          onCreate={() => router.push('/events/create')}
+        />
 
-          {loading ? (
-            <ProfilePageSkeleton />
-          ) : !profile ? (
-            <div className="rounded-3xl border border-rose-200/30 bg-rose-500/10 p-6 text-sm text-rose-50 shadow-xl shadow-rose-900/20">
-              We couldn’t load your profile. Try signing in again.
+        <div className="flex flex-1 flex-col">
+          <DesktopHeader
+            title="Profile"
+            subtitle="Keep your Tonight identity current"
+            onNavigateProfile={() => router.push('/profile')}
+          />
+
+          <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
+            <div className="mx-auto w-full max-w-5xl space-y-6">
+              <ProfileMobileHero />
+
+              {loading ? (
+                <ProfilePageSkeleton />
+              ) : !profile ? (
+                <div className="rounded-3xl border border-rose-200/30 bg-rose-500/10 p-6 text-sm text-rose-50 shadow-xl shadow-rose-900/20">
+                  We couldn’t load your profile. Try signing in again.
+                </div>
+              ) : (
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
+                  <div className="space-y-6">
+                    <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
+                      <div className="flex flex-col items-center gap-3 text-center">
+                        <div className="relative">
+                          <UserAvatar
+                            displayName={profile.displayName}
+                            email={profile.email}
+                            photoUrl={currentPhotoPreview}
+                            size="xl"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-lg"
+                            aria-label="Change photo"
+                          >
+                            <Camera className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-foreground">{profile.displayName ?? 'Add your name'}</h2>
+                          <p className="text-xs text-muted-foreground">Edit how your name appears across Tonight</p>
+                        </div>
+                        <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm">
+                          <StatItem label="Events posted" value={stats.eventsHosted} />
+                          <div className="h-9 w-px bg-border/60" />
+                          <StatItem label="Events joined" value={stats.eventsJoined} />
+                          <div className="h-9 w-px bg-border/60" />
+                          <StatItem label="People met" value={stats.peopleMet} />
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="rounded-3xl border border-border/60 bg-card/60 divide-y divide-border/50">
+                      <InfoRow icon={Mail} label="Email" value={profile.email} />
+                      <InfoRow icon={Calendar} label="Joined" value={formatMonthYear(profile.createdAt)} />
+                      <InfoRow icon={MapPin} label="Location" value="Grant access from Discover" isAction />
+                    </section>
+
+                    <ActiveEventsPanel
+                      loading={overviewLoading}
+                      error={overviewError}
+                      events={overview?.activeEvents ?? []}
+                    />
+
+                    <section className="rounded-3xl border border-border/60 bg-card/60">
+                      <SettingsButton
+                        icon={Users}
+                        label="Account settings"
+                        onClick={() => showSuccessToast('Coming soon', 'Settings panel will live here soon.')}
+                      />
+                      <SettingsButton
+                        icon={Shield}
+                        label="Safety & privacy"
+                        onClick={() => safetyRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logout().catch((error) => console.error('Failed to log out', error))}
+                        className="flex w-full items-center gap-3 px-5 py-4 text-left text-rose-200 transition hover:bg-rose-500/5"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span className="text-sm font-medium">Sign out</span>
+                        <ChevronRight className="ml-auto h-4 w-4" />
+                      </button>
+                    </section>
+                  </div>
+
+                  <div className="space-y-6">
+                    <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Profile</p>
+                        <h3 className="font-serif text-2xl font-semibold">Personal details</h3>
+                        <p className="text-sm text-muted-foreground">Update your public name and avatar.</p>
+                      </div>
+                      <form className="mt-6 space-y-6" onSubmit={onSubmit}>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Display name</label>
+                          <input
+                            type="text"
+                            value={displayNameInput}
+                            onChange={(event) => setDisplayNameInput(event.target.value)}
+                            placeholder="Add a friendly name"
+                            className={FORM_INPUT_CLASS}
+                          />
+                          <p className="text-xs text-muted-foreground">Between 2 and 64 characters.</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photo</label>
+                          <input
+                            type="url"
+                            value={photoInput}
+                            onChange={(event) => setPhotoInput(event.target.value)}
+                            placeholder="https://example.com/photo.jpg"
+                            className={FORM_INPUT_CLASS}
+                          />
+                          <div className="flex flex-wrap gap-2 text-sm">
+                            <button
+                              type="button"
+                              className="rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:text-primary"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              Upload photo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={removePhoto}
+                              className="rounded-full border border-transparent px-4 py-2 font-semibold text-muted-foreground transition hover:border-border/50 hover:bg-background/40"
+                            >
+                              Remove
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetPhoto}
+                              className="rounded-full border border-transparent px-4 py-2 font-semibold text-muted-foreground transition hover:border-border/50 hover:bg-background/40"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Paste a public URL or upload a new image (stored as a data URL for preview).
+                          </p>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) {
+                                void handleFileSelection(file);
+                                event.target.value = '';
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {status ? <p className={classNames('text-sm font-semibold', statusStyles)}>{status.message}</p> : null}
+
+                        <div className="flex flex-wrap gap-3">
+                          <button type="submit" disabled={!hasChanges || saving} className={CTA_BUTTON_CLASS}>
+                            {saving ? 'Saving…' : 'Save changes'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!hasChanges || saving}
+                            className={SECONDARY_BUTTON_CLASS}
+                            onClick={() => {
+                              setDisplayNameInput(initialDisplayName);
+                              setPhotoInput(initialPhoto);
+                              setStatus(null);
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </section>
+
+                    <section
+                      ref={safetyRef}
+                      className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20"
+                    >
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Safety</p>
+                        <h3 className="font-serif text-2xl font-semibold">Block & report</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Block or report someone if they make you uncomfortable. Safety notes stay private with the Tonight team.
+                        </p>
+                      </div>
+                      <div className="mt-4 flex flex-col gap-3">
+                        <BlockUserButton
+                          targetUserId={profile.id}
+                          targetDisplayName={profile.displayName ?? profile.email}
+                          className="items-center rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground"
+                          confirmTitle={profile.displayName ? `Block ${profile.displayName}?` : 'Block this user?'}
+                          confirmMessage="They won’t be able to message you, join your events, or see your plans."
+                          disabled={viewingOwnProfile}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!canReportUser) return;
+                            setReportModalOpen(true);
+                          }}
+                          disabled={!canReportUser}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-rose-200/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Flag className="h-4 w-4" />
+                          Report user
+                        </button>
+                      </div>
+                      <p className={classNames('mt-3 text-xs', reportNotice ? 'text-emerald-300' : 'text-muted-foreground')}>
+                        {reportNotice
+                          ? reportNotice
+                          : viewingOwnProfile
+                            ? 'Viewing your own profile. Visit another person’s profile to manage safety settings.'
+                            : 'Reports alert Tonight’s safety team discreetly. Share details if something feels off.'}
+                      </p>
+                    </section>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <form className="space-y-6" onSubmit={onSubmit}>
-              <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <UserAvatar
-                    displayName={profile.displayName}
-                    email={profile.email}
-                    photoUrl={currentPhotoPreview}
-                    size="xl"
-                  />
-                  <div className="flex-1 space-y-1 text-sm">
-                    <p className="text-base font-semibold text-white">{profile.email}</p>
-                    <p className="text-white/70">Joined {formatDate(profile.createdAt)}</p>
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-3 text-xs text-white/60 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-wide text-white/50">Status</p>
-                    <p className="text-sm font-semibold text-white">{viewingOwnProfile ? 'Your profile' : 'Guest view'}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-wide text-white/50">Display name</p>
-                    <p className="text-sm font-semibold text-white">
-                      {profile.displayName ? profile.displayName : 'Not set'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-wide text-white/50">Photo</p>
-                    <p className="text-sm font-semibold text-white">{profile.photoUrl ? 'Custom' : 'Default'}</p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-white/60">Display name</label>
-                  <input
-                    type="text"
-                    value={displayNameInput}
-                    onChange={(event) => setDisplayNameInput(event.target.value)}
-                    placeholder="Add a friendly name"
-                    className="w-full rounded-2xl border border-white/15 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300/40"
-                  />
-                  <p className="text-xs text-white/60">Between 2 and 64 characters.</p>
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-white/60">Photo</label>
-                  <input
-                    type="url"
-                    value={photoInput}
-                    onChange={(event) => setPhotoInput(event.target.value)}
-                    placeholder="https://example.com/photo.jpg"
-                    className="w-full rounded-2xl border border-white/15 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300/40"
-                  />
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <button
-                      type="button"
-                      className="rounded-full border border-white/20 px-4 py-1.5 font-semibold text-white transition hover:border-emerald-300 hover:text-emerald-200"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Upload photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={removePhoto}
-                      className="rounded-full border border-transparent px-4 py-1.5 font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/5"
-                    >
-                      Remove
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetPhoto}
-                      className="rounded-full border border-transparent px-4 py-1.5 font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/5"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                  <p className="text-xs text-white/60">
-                    Paste a public URL or upload a new image (stored as a data URL for preview).
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) {
-                        void handleFileSelection(file);
-                        event.target.value = '';
-                      }
-                    }}
-                  />
-                </div>
-              </section>
-
-              <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/20">
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-white">Safety</p>
-                  <p className="text-xs text-white/70">
-                    Block or report someone if they make you uncomfortable. Safety notes stay private with the Tonight team.
-                  </p>
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                  <BlockUserButton
-                    targetUserId={profile.id}
-                    targetDisplayName={profile.displayName ?? profile.email}
-                    className="items-center rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white"
-                    confirmTitle={profile.displayName ? `Block ${profile.displayName}?` : 'Block this user?'}
-                    confirmMessage="They won’t be able to message you, join your events, or see your plans."
-                    disabled={viewingOwnProfile}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!canReportUser) return;
-                      setReportModalOpen(true);
-                    }}
-                    disabled={!canReportUser}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white transition hover:border-rose-200/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Flag className="h-4 w-4" />
-                    Report user
-                  </button>
-                </div>
-
-                <p className={`mt-3 text-xs ${reportNotice ? 'text-emerald-300' : 'text-white/60'}`}>
-                  {reportNotice
-                    ? reportNotice
-                    : viewingOwnProfile
-                      ? 'Viewing your own profile. Visit another person’s profile to manage safety settings.'
-                      : 'Reports alert Tonight’s safety team discreetly. Share details if something feels off.'}
-                </p>
-              </section>
-
-              {status ? <p className={`text-sm font-semibold ${statusStyles}`}>{status.message}</p> : null}
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={!hasChanges || saving}
-                  className="rounded-full bg-emerald-400 px-6 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/40 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60"
-                >
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasChanges || saving}
-                  className="rounded-full border border-white/10 px-6 py-2.5 text-sm font-semibold text-white transition hover:border-white/40 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
-                  onClick={() => {
-                    setDisplayNameInput(initialDisplayName);
-                    setPhotoInput(initialPhoto);
-                    setStatus(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
+          </main>
         </div>
       </div>
+
+      <MobileActionBar
+        active="profile"
+        onNavigateDiscover={() => router.push('/')}
+        onCreate={() => router.push('/events/create')}
+        onOpenProfile={() => router.push('/profile')}
+      />
 
       {profile ? (
         <ReportModal
@@ -416,19 +590,147 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
           titleOverride={profile.displayName ? `Report ${profile.displayName}` : undefined}
         />
       ) : null}
-    </>
+    </div>
+  );
+}
+
+type StatItemProps = {
+  label: string;
+  value: number;
+};
+
+function StatItem({ label, value }: StatItemProps) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-lg font-bold text-foreground">{value}</span>
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+type InfoRowProps = {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  isAction?: boolean;
+};
+
+function InfoRow({ icon: Icon, label, value, isAction = false }: InfoRowProps) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-4 text-sm">
+      <span className="text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className={classNames('ml-auto font-medium', isAction ? 'text-primary' : 'text-foreground')}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+type ActiveEventsPanelProps = {
+  loading: boolean;
+  error: string | null;
+  events: ActiveEventSummary[];
+};
+
+function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
+  return (
+    <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Hosts</p>
+          <h3 className="font-serif text-2xl font-semibold">My active events</h3>
+        </div>
+      </div>
+      <div className="mt-4 space-y-3">
+        {loading ? (
+          Array.from({ length: 2 }).map((_, index) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <div key={index} className="h-20 animate-pulse rounded-2xl border border-border/40 bg-background/30" />
+          ))
+        ) : error ? (
+          <div className="rounded-2xl border border-rose-200/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            {error}
+          </div>
+        ) : events.length === 0 ? (
+          <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-5 text-sm text-muted-foreground">
+            No active events yet. Tap “Post event” to start hosting.
+          </div>
+        ) : (
+          events.map((event) => (
+            <div
+              key={event.id}
+              className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/30 px-4 py-3"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                {event.pendingRequests > 0 ? <Clapperboard className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+              </div>
+              <div className="flex flex-1 flex-col">
+                <span className="text-sm font-semibold text-foreground">{event.title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {event.locationName} · {formatEventDatetime(event.datetime)}
+                </span>
+              </div>
+              <span
+                className={classNames(
+                  'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                  event.pendingRequests > 0
+                    ? 'border border-primary/40 bg-primary/10 text-primary'
+                    : 'border border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                )}
+              >
+                {event.pendingRequests > 0
+                  ? `${event.pendingRequests} request${event.pendingRequests === 1 ? '' : 's'}`
+                  : 'Active'}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+type SettingsButtonProps = {
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+};
+
+function SettingsButton({ icon: Icon, label, onClick }: SettingsButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 border-b border-border/50 px-5 py-4 text-left text-foreground last:border-b-0 transition hover:bg-background/40"
+    >
+      <span className="text-muted-foreground">
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex-1 text-sm font-medium">{label}</span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </button>
+  );
+}
+
+function ProfileMobileHero() {
+  return (
+    <div className="rounded-3xl border border-border/60 bg-card/60 px-5 py-4 text-foreground shadow-xl shadow-black/20 md:hidden">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+      <h1 className="mt-1 text-2xl font-serif font-semibold leading-tight">Profile</h1>
+      <p className="text-xs text-muted-foreground">Keep your Tonight identity up to date.</p>
+    </div>
   );
 }
 
 function ProfilePageSkeleton() {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div
-          // eslint-disable-next-line react/no-array-index-key
-          key={index}
-          className="h-40 animate-pulse rounded-3xl border border-white/10 bg-white/5"
-        />
+      {Array.from({ length: 4 }).map((_, index) => (
+        // eslint-disable-next-line react/no-array-index-key
+        <div key={index} className="h-32 animate-pulse rounded-3xl border border-border/40 bg-background/30" />
       ))}
     </div>
   );
