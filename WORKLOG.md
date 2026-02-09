@@ -59,6 +59,7 @@
 - Task 20.6.3: Matched the chat conversation/detail flow, shared MessageList component, and welcome/auth hero to the tonight-meetup-app-designs system across desktop and mobile — Commit `406aa6b`.
 - Task 21: Added Vitest/@testing-library coverage that locks in the refreshed discovery/home screen (auth gating states, discovery hero, category filtering, map toggle) — Commit `531ed9e`.
 - Ops check: Logged that the home/discovery experience already matches tonight-meetup-app-designs and we're awaiting Task 22 specs — Commit `7bc8e52`.
+- Task 11.2b: Refreshed the discovery/home screen to use design-system host badges, spot availability chips, and avatar styles backed by new host metadata from the events API; updated UI + API property tests to lock in the layout — Commit `5b07fc7`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** All new frontend work must reference `tonight-meetup-app-designs/` components as the visual baseline. Reuse those components when possible; if new files are required, match the design system exactly.
@@ -76,6 +77,8 @@
 - 2026-02-09 04:10 EET: Tonight build runner re-ran git pull (already up to date), cross-checked tonight-web against tonight-meetup-app-designs, and confirmed there are still no Task 22 specs; work remains blocked pending new direction.
 - 2026-02-09 04:25 EET: Tonight build runner pulled latest main (already up to date), re-verified tonight-web matches tonight-meetup-app-designs, and noted there are still no Task 22 specs; work remains blocked until new direction arrives.
 - 2026-02-09 04:55 EET: Tonight build runner re-ran git pull (already current), confirmed tonight-web still mirrors tonight-meetup-app-designs, and recorded that Task 22 specs remain unavailable, so work stays blocked pending product direction.
+- 2026-02-09 05:25 EET: Rebuilt the discovery/home surface with the tonight-meetup-app-designs components, added host metadata to the nearby events API, and re-validated the suite; now waiting on Task 22 specs before picking up the next milestone.
+- 2026-02-09 05:40 EET: Tonight build runner pulled latest main (already current), re-verified discovery/home against tonight-meetup-app-designs, and confirmed there are still no Task 22 specs; work remains blocked pending new direction.
 
 ## Next Up
 1. Pending product direction for post-Task 21 scope (Task 22 TBD).
