@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Screen } from "./bottom-nav"
+import { MiniMap } from "./mini-map"
 
 const MOCK_EVENTS = [
   {
@@ -44,6 +45,8 @@ const MOCK_EVENTS = [
     location: "Cinema City, Downtown",
     distance: "1.2 km",
     spotsLeft: 1,
+    lat: 41.9028,
+    lng: 12.4964,
   },
   {
     id: "2",
@@ -55,6 +58,8 @@ const MOCK_EVENTS = [
     location: "Sakura Restaurant",
     distance: "2.8 km",
     spotsLeft: 1,
+    lat: 41.9065,
+    lng: 12.4823,
   },
   {
     id: "3",
@@ -66,6 +71,8 @@ const MOCK_EVENTS = [
     location: "Marina Bay Beach",
     distance: "4.5 km",
     spotsLeft: 1,
+    lat: 41.8902,
+    lng: 12.5113,
   },
   {
     id: "4",
@@ -77,6 +84,8 @@ const MOCK_EVENTS = [
     location: "Blue Note Bar",
     distance: "3.1 km",
     spotsLeft: 1,
+    lat: 41.8986,
+    lng: 12.4769,
   },
   {
     id: "5",
@@ -88,6 +97,8 @@ const MOCK_EVENTS = [
     location: "FitZone Gym",
     distance: "0.8 km",
     spotsLeft: 1,
+    lat: 41.9009,
+    lng: 12.5014,
   },
   {
     id: "6",
@@ -99,6 +110,8 @@ const MOCK_EVENTS = [
     location: "The Bean Counter Cafe",
     distance: "1.9 km",
     spotsLeft: 1,
+    lat: 41.9102,
+    lng: 12.4895,
   },
 ]
 
@@ -124,10 +137,13 @@ interface DiscoverScreenProps {
   onNavigate: (screen: Screen) => void
   isDesktop?: boolean
   desktopCategory?: string | null
+  desktopViewMode?: "list" | "map"
 }
 
-export function DiscoverScreen({ onNavigate, isDesktop, desktopCategory }: DiscoverScreenProps) {
-  const [viewMode, setViewMode] = useState<"list" | "map">("list")
+export function DiscoverScreen({ onNavigate, isDesktop, desktopCategory, desktopViewMode }: DiscoverScreenProps) {
+  const [mobileViewMode, setMobileViewMode] = useState<"list" | "map">("list")
+  const viewMode = isDesktop ? (desktopViewMode ?? "list") : mobileViewMode
+  const setViewMode = isDesktop ? () => {} : setMobileViewMode
   const [range, setRange] = useState([10])
   const [mobileCategory, setMobileCategory] = useState<string | null>(null)
 
@@ -254,25 +270,28 @@ export function DiscoverScreen({ onNavigate, isDesktop, desktopCategory }: Disco
 
       {/* Content */}
       {viewMode === "list" ? (
-        <div className={cn("gap-3 p-4", isDesktop ? "grid grid-cols-2 xl:grid-cols-3" : "flex flex-col")}>
+        <div className={cn("p-4", isDesktop ? "mx-auto grid gap-4 grid-cols-2 xl:grid-cols-3" : "flex flex-col gap-3")} style={isDesktop ? { maxWidth: 1300 } : undefined}>
           {filteredEvents.map((event) => (
             <button
               key={event.id}
               onClick={() => onNavigate("event-detail")}
-              className="group flex items-start gap-3 rounded-2xl border border-border bg-card/60 p-4 text-left transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 active:scale-[0.98]"
+              className="group flex w-full flex-col overflow-hidden rounded-2xl border border-border bg-card/60 text-left transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 active:scale-[0.99]"
             >
-              {/* Category Icon */}
-              <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border", categoryColors[event.category])}>
-                {categoryIcons[event.category]}
-              </div>
+              {/* Mini Map */}
+              <MiniMap lat={event.lat} lng={event.lng} locationName={event.location} />
 
               {/* Content */}
-              <div className="flex flex-1 flex-col gap-1.5">
+              <div className="flex flex-col gap-2 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-foreground leading-snug">{event.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border", categoryColors[event.category])}>
+                      {categoryIcons[event.category]}
+                    </div>
+                    <h3 className="font-semibold text-foreground leading-snug">{event.title}</h3>
+                  </div>
                   <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </div>
-                <p className="line-clamp-1 text-xs text-muted-foreground">{event.description}</p>
+                <p className="line-clamp-2 text-sm text-muted-foreground" style={{ lineHeight: "1.4rem", minHeight: "2.8rem" }}>{event.description}</p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -283,8 +302,8 @@ export function DiscoverScreen({ onNavigate, isDesktop, desktopCategory }: Disco
                     {event.distance}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <Avatar className="h-5 w-5">
+                <div className="mt-1 flex items-center gap-2 border-t border-border/50 pt-3">
+                  <Avatar className="h-6 w-6">
                     <AvatarImage src={event.host.avatar || "/placeholder.svg"} alt={event.host.name} />
                     <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">{event.host.initials}</AvatarFallback>
                   </Avatar>

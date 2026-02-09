@@ -24,9 +24,10 @@ const screenTitles: Partial<Record<Screen, { title: string; subtitle?: string }>
 }
 
 export default function Page() {
-  const [screen, setScreen] = useState<Screen>("welcome")
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [screen, setScreen] = useState<Screen>("discover")
+  const [isLoggedIn, setIsLoggedIn] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<"list" | "map">("list")
 
   function handleLogin() {
     setIsLoggedIn(true)
@@ -81,6 +82,8 @@ export default function Page() {
               unreadCount={2}
               title={currentScreen.title}
               subtitle={currentScreen.subtitle}
+              viewMode={screen === "discover" ? viewMode : undefined}
+              onViewModeChange={screen === "discover" ? setViewMode : undefined}
             />
           )}
           <main
@@ -95,6 +98,7 @@ export default function Page() {
                 onNavigate={setScreen}
                 isDesktop
                 desktopCategory={selectedCategory}
+                desktopViewMode={viewMode}
               />
             )}
             {screen === "people" && <PeopleScreen onNavigate={setScreen} isDesktop />}

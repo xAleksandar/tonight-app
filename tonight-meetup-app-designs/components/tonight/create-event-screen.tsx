@@ -39,6 +39,7 @@ export function CreateEventScreen({ onNavigate, isDesktop }: CreateEventScreenPr
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+  const [maxParticipants, setMaxParticipants] = useState(2)
   const [submitted, setSubmitted] = useState(false)
 
   if (submitted) {
@@ -130,17 +131,54 @@ export function CreateEventScreen({ onNavigate, isDesktop }: CreateEventScreenPr
           />
         </div>
 
-        {/* Date & Time */}
-        <div className="flex flex-col gap-2">
-          <label htmlFor="event-datetime" className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            Date & Time
-          </label>
-          <Input
-            id="event-datetime"
-            type="datetime-local"
-            className="h-11 rounded-xl border-border bg-card/60 text-foreground"
-          />
+        {/* Date & Time + Max Participants */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-1 flex-col gap-2">
+            <label htmlFor="event-datetime" className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              Date & Time
+            </label>
+            <Input
+              id="event-datetime"
+              type="datetime-local"
+              className="h-11 rounded-xl border-border bg-card/60 text-foreground"
+            />
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              Max Participants
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center rounded-xl border border-border bg-card/60">
+                <button
+                  type="button"
+                  onClick={() => setMaxParticipants((p) => Math.max(2, p - 1))}
+                  disabled={maxParticipants <= 2}
+                  className="flex h-10 w-10 items-center justify-center text-lg font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Decrease participants"
+                >
+                  -
+                </button>
+                <span className="flex h-10 w-10 items-center justify-center border-x border-border text-sm font-semibold text-foreground">
+                  {maxParticipants}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMaxParticipants((p) => Math.min(20, p + 1))}
+                  disabled={maxParticipants >= 20}
+                  className="flex h-10 w-10 items-center justify-center text-lg font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Increase participants"
+                >
+                  +
+                </button>
+              </div>
+              <span className="hidden text-xs text-muted-foreground md:inline">
+                You + {maxParticipants - 1} {maxParticipants - 1 === 1 ? "other" : "others"}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Location */}
@@ -171,20 +209,6 @@ export function CreateEventScreen({ onNavigate, isDesktop }: CreateEventScreenPr
             className="h-11 rounded-xl border-border bg-card/60 text-foreground placeholder:text-muted-foreground"
             aria-label="Location name"
           />
-        </div>
-
-        {/* Max Participants */}
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            Max Participants
-          </label>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="border-primary/30 text-primary px-3 py-1.5 text-sm">
-              2 (You + 1)
-            </Badge>
-            <span className="text-xs text-muted-foreground">Default for 1-on-1 meetups</span>
-          </div>
         </div>
 
         {/* Submit */}
