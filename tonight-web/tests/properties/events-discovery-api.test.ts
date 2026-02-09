@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { NextRequest } from 'next/server';
-import { getNearbyEventsHandler } from '@/app/api/events/nearby/route';
+import { getNearbyEventsHandler, buildHostInitials } from '@/app/api/events/nearby/route';
 import { findNearbyEvents, DEFAULT_RADIUS_METERS, type NearbyEventRecord } from '@/lib/geospatial';
 import { EventStatus } from '@/generated/prisma/client';
 
@@ -39,11 +39,14 @@ const buildNearbyEventRecord = (overrides: Partial<NearbyEventRecord> = {}): Nea
     maxParticipants: overrides.maxParticipants ?? 5,
     status: overrides.status ?? EventStatus.ACTIVE,
     hostId: overrides.hostId ?? 'host-id',
+    hostDisplayName: overrides.hostDisplayName ?? 'Sample Host',
+    hostPhotoUrl: overrides.hostPhotoUrl ?? 'https://example.com/avatar.png',
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     distanceMeters: overrides.distanceMeters ?? 123,
     latitude: overrides.latitude ?? 37.7749,
     longitude: overrides.longitude ?? -122.4194,
+    acceptedCount: overrides.acceptedCount ?? 1,
   };
 };
 
@@ -80,6 +83,8 @@ describe('Event discovery API', () => {
         const request = buildRequest({ lat, lng, radius });
         const record = buildNearbyEventRecord({ distanceMeters: 456.78 });
         mockedFindNearbyEvents.mockResolvedValue([record]);
+        const hostInitials = buildHostInitials(record.hostDisplayName ?? null);
+        const spotsRemaining = record.maxParticipants - record.acceptedCount;
 
         const response = await getNearbyEventsHandler(request, {}, { userId, token: 'token' });
         expect(response.status).toBe(200);
@@ -94,9 +99,24 @@ describe('Event discovery API', () => {
           datetime: record.datetime.toISOString(),
           createdAt: record.createdAt.toISOString(),
           updatedAt: record.updatedAt.toISOString(),
+          hostDisplayName: record.hostDisplayName,
+          hostPhotoUrl: record.hostPhotoUrl,
+          hostInitials,
+          spotsRemaining,
           location: {
             latitude: record.latitude,
             longitude: record.longitude,
+          },
+          availability: {
+            maxParticipants: record.maxParticipants,
+            acceptedCount: record.acceptedCount,
+            spotsRemaining,
+          },
+          host: {
+            id: record.hostId,
+            displayName: record.hostDisplayName,
+            photoUrl: record.hostPhotoUrl,
+            initials: hostInitials,
           },
         });
       })

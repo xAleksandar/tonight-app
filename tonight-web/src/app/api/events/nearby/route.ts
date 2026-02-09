@@ -59,7 +59,29 @@ const parseQuery = (request: NextRequest): ParsedQuery | { error: string } => {
   };
 };
 
+export const buildHostInitials = (value: string | null | undefined) => {
+  if (!value) {
+    return 'YN';
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return 'YN';
+  }
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return 'YN';
+  }
+  const initials = parts
+    .slice(0, 2)
+    .map((segment) => segment.charAt(0).toUpperCase())
+    .join('');
+  return initials || 'YN';
+};
+
 const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>>[number]) => {
+  const hostInitials = buildHostInitials(event.hostDisplayName);
+  const spotsRemaining = Math.max(event.maxParticipants - event.acceptedCount, 0);
+
   return {
     id: event.id,
     title: event.title,
@@ -69,12 +91,27 @@ const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>
     maxParticipants: event.maxParticipants,
     status: event.status,
     hostId: event.hostId,
+    hostDisplayName: event.hostDisplayName,
+    hostPhotoUrl: event.hostPhotoUrl,
+    hostInitials,
+    spotsRemaining,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
     distanceMeters: event.distanceMeters,
     location: {
       latitude: event.latitude,
       longitude: event.longitude,
+    },
+    availability: {
+      maxParticipants: event.maxParticipants,
+      acceptedCount: event.acceptedCount,
+      spotsRemaining,
+    },
+    host: {
+      id: event.hostId,
+      displayName: event.hostDisplayName,
+      photoUrl: event.hostPhotoUrl,
+      initials: hostInitials,
     },
   };
 };

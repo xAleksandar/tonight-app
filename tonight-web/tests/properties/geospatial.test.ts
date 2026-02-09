@@ -55,9 +55,12 @@ const stubNearbyEvents = (distances: Array<number | string>): NearbyEventRecord[
     maxParticipants: 10,
     status: 'ACTIVE',
     hostId: `host-${index}`,
+    hostDisplayName: `Host ${index}`,
+    hostPhotoUrl: null,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
     distanceMeters: distance as number,
+    acceptedCount: 0,
   })) as NearbyEventRecord[];
 };
 

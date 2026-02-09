@@ -75,6 +75,17 @@ const sampleEvents = [
     maxParticipants: 20,
     distanceMeters: 1500,
     location: { ...locationCoords },
+    host: {
+      id: 'host-marco',
+      displayName: 'Marco R.',
+      photoUrl: null,
+      initials: 'MR',
+    },
+    availability: {
+      maxParticipants: 20,
+      acceptedCount: 19,
+      spotsRemaining: 1,
+    },
   },
   {
     id: 'evt-social',
@@ -85,6 +96,17 @@ const sampleEvents = [
     maxParticipants: 12,
     distanceMeters: 800,
     location: { ...locationCoords },
+    host: {
+      id: 'host-elena',
+      displayName: 'Elena K.',
+      photoUrl: null,
+      initials: 'EK',
+    },
+    availability: {
+      maxParticipants: 12,
+      acceptedCount: 10,
+      spotsRemaining: 2,
+    },
   },
   {
     id: 'evt-music',
@@ -95,6 +117,17 @@ const sampleEvents = [
     maxParticipants: 30,
     distanceMeters: 2300,
     location: { ...locationCoords },
+    host: {
+      id: 'host-sofia',
+      displayName: 'Sofia M.',
+      photoUrl: null,
+      initials: 'SM',
+    },
+    availability: {
+      maxParticipants: 30,
+      acceptedCount: 25,
+      spotsRemaining: 5,
+    },
   },
 ];
 
@@ -240,6 +273,9 @@ describe('Authenticated home/discovery experience', () => {
     expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
     expect(screen.getByText('Downtown Coffee Crawl')).toBeInTheDocument();
     expect(screen.getAllByText(/37\.7749, -122\.4194/)[0]).toBeInTheDocument();
+    expect(screen.getByText('Marco R.')).toBeInTheDocument();
+    expect(screen.getByText('Elena K.')).toBeInTheDocument();
+    expect(screen.getByText(/1 spot left/i)).toBeInTheDocument();
   });
 
   it('filters events by category selection so only matching cards remain', async () => {

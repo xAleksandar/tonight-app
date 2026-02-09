@@ -50,6 +50,21 @@ type NearbyEventPayload = {
     latitude: number;
     longitude: number;
   };
+  host?: {
+    id: string;
+    displayName: string | null;
+    photoUrl: string | null;
+    initials?: string | null;
+  };
+  availability?: {
+    maxParticipants: number;
+    acceptedCount: number;
+    spotsRemaining: number;
+  };
+  hostDisplayName?: string | null;
+  hostPhotoUrl?: string | null;
+  hostInitials?: string | null;
+  spotsRemaining?: number | null;
 };
 
 type NearbyEventsResponse = {
@@ -77,6 +92,10 @@ type DecoratedEvent = NearbyEventPayload & {
   datetimeLabel: string | null;
   distanceLabel: string | null;
   categoryId: CategoryId | null;
+  hostLabel: string;
+  hostInitials: string;
+  hostPhotoUrl: string | null;
+  spotsRemaining: number | null;
 };
 
 const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
@@ -86,7 +105,7 @@ const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     keywords: ["movie", "film", "cinema", "theater"],
     icon: Clapperboard,
     accent: "bg-sky-500/15 text-sky-200 border-sky-400/30",
-    badge: "text-sky-200",
+    badge: "border border-sky-400/30 bg-sky-500/10 text-sky-100",
   },
   food: {
     id: "food",
@@ -94,7 +113,7 @@ const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     keywords: ["dinner", "eat", "restaurant", "food", "sushi", "pizza", "brunch"],
     icon: UtensilsCrossed,
     accent: "bg-amber-500/15 text-amber-200 border-amber-400/30",
-    badge: "text-amber-200",
+    badge: "border border-amber-400/30 bg-amber-500/10 text-amber-100",
   },
   outdoor: {
     id: "outdoor",
@@ -102,7 +121,7 @@ const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     keywords: ["walk", "hike", "outdoor", "park", "beach"],
     icon: Waves,
     accent: "bg-emerald-500/15 text-emerald-200 border-emerald-400/30",
-    badge: "text-emerald-200",
+    badge: "border border-emerald-400/30 bg-emerald-500/10 text-emerald-100",
   },
   music: {
     id: "music",
@@ -110,7 +129,7 @@ const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     keywords: ["music", "concert", "band", "dj", "jazz"],
     icon: Music,
     accent: "bg-rose-500/15 text-rose-200 border-rose-400/30",
-    badge: "text-rose-200",
+    badge: "border border-rose-400/30 bg-rose-500/10 text-rose-100",
   },
   fitness: {
     id: "fitness",
@@ -118,7 +137,7 @@ const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     keywords: ["gym", "workout", "run", "yoga", "fitness"],
     icon: Dumbbell,
     accent: "bg-lime-500/15 text-lime-200 border-lime-400/30",
-    badge: "text-lime-200",
+    badge: "border border-lime-400/30 bg-lime-500/10 text-lime-100",
   },
   social: {
     id: "social",
@@ -126,7 +145,7 @@ const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     keywords: ["coffee", "board game", "hang", "meet", "social", "drink"],
     icon: Coffee,
     accent: "bg-orange-500/15 text-orange-200 border-orange-400/30",
-    badge: "text-orange-200",
+    badge: "border border-orange-400/30 bg-orange-500/10 text-orange-100",
   },
 };
 
@@ -180,6 +199,62 @@ function deriveEventCategory(event: NearbyEventPayload): CategoryId | null {
   }
   return null;
 }
+
+const HOST_FALLBACK_LABEL = "Your host";
+const HOST_FALLBACK_INITIALS = "YN";
+
+const buildInitialsFromLabel = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return HOST_FALLBACK_INITIALS;
+  }
+  const parts = trimmed.split(/\s+/).filter(Boolean).slice(0, 2);
+  const initials = parts.map((segment) => segment.charAt(0).toUpperCase()).join('');
+  return initials || HOST_FALLBACK_INITIALS;
+};
+
+const deriveHostLabel = (event: NearbyEventPayload) => {
+  return (event.host?.displayName ?? event.hostDisplayName ?? '').trim() || HOST_FALLBACK_LABEL;
+};
+
+const deriveHostInitials = (event: NearbyEventPayload, hostLabel: string) => {
+  const provided = event.host?.initials ?? event.hostInitials ?? null;
+  if (provided && provided.trim()) {
+    return provided.trim().slice(0, 2).toUpperCase();
+  }
+  if (!hostLabel) {
+    return HOST_FALLBACK_INITIALS;
+  }
+  return buildInitialsFromLabel(hostLabel);
+};
+
+const deriveHostPhotoUrl = (event: NearbyEventPayload) => {
+  return event.host?.photoUrl ?? event.hostPhotoUrl ?? null;
+};
+
+const deriveSpotsRemaining = (event: NearbyEventPayload) => {
+  if (typeof event.availability?.spotsRemaining === 'number') {
+    return Math.max(event.availability.spotsRemaining, 0);
+  }
+  if (typeof event.spotsRemaining === 'number') {
+    return Math.max(event.spotsRemaining, 0);
+  }
+  if (typeof event.maxParticipants === 'number') {
+    const accepted = event.availability?.acceptedCount ?? 0;
+    return Math.max(event.maxParticipants - accepted, 0);
+  }
+  return null;
+};
+
+const formatSpotsLabel = (value: number | null) => {
+  if (value === null || typeof value === 'undefined') {
+    return null;
+  }
+  if (value <= 0) {
+    return 'No spots left';
+  }
+  return value === 1 ? '1 spot left' : `${value} spots left`;
+};
 
 export default function HomePage() {
   const { status: authStatus } = useRequireAuth();
@@ -361,12 +436,19 @@ function AuthenticatedHomePage() {
   }, [searchMeta?.radiusMeters]);
 
   const decoratedEvents = useMemo<DecoratedEvent[]>(() => {
-    return events.map((event) => ({
-      ...event,
-      datetimeLabel: formatEventTime(event.datetime ?? null),
-      distanceLabel: formatDistance(event.distanceMeters ?? null),
-      categoryId: deriveEventCategory(event),
-    }));
+    return events.map((event) => {
+      const hostLabel = deriveHostLabel(event);
+      return {
+        ...event,
+        datetimeLabel: formatEventTime(event.datetime ?? null),
+        distanceLabel: formatDistance(event.distanceMeters ?? null),
+        categoryId: deriveEventCategory(event),
+        hostLabel,
+        hostInitials: deriveHostInitials(event, hostLabel),
+        hostPhotoUrl: deriveHostPhotoUrl(event),
+        spotsRemaining: deriveSpotsRemaining(event),
+      };
+    });
   }, [events]);
 
   const visibleEvents = useMemo(() => {
@@ -1076,57 +1158,63 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
       {events.map((event) => {
         const definition = event.categoryId ? CATEGORY_DEFINITIONS[event.categoryId] : null;
         const Icon = definition?.icon ?? Sparkles;
+        const spotsLabel = formatSpotsLabel(event.spotsRemaining);
         return (
           <button
             key={event.id}
             type="button"
             onClick={() => onSelect(event.id)}
             className={classNames(
-              "flex flex-col gap-3 rounded-3xl border border-border/70 bg-card/60 p-4 text-left transition",
-              selectedEventId === event.id
-                ? "border-primary/60 shadow-lg shadow-primary/20"
-                : "hover:border-primary/40"
+              "group flex items-start gap-3 rounded-2xl border border-border/70 bg-card/60 p-4 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10",
+              selectedEventId === event.id && "border-primary/60 shadow-primary/20"
             )}
           >
-            <div className="flex items-start gap-3">
-              <div
-                className={classNames(
-                  "flex h-12 w-12 items-center justify-center rounded-2xl border text-sm",
-                  definition?.accent ?? "border-border/70 bg-background/60"
+            <div
+              className={classNames(
+                "flex h-12 w-12 items-center justify-center rounded-2xl border text-sm",
+                definition?.accent ?? "border-border/70 bg-background/60"
+              )}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{event.title}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    {event.description ?? "Host will share details once you request to join."}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                {event.datetimeLabel && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {event.datetimeLabel}
+                  </span>
                 )}
-              >
-                <Icon className="h-5 w-5" />
+                {event.distanceLabel && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {event.distanceLabel}
+                  </span>
+                )}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">{event.title}</p>
-                <p className="text-xs text-muted-foreground">{event.locationName}</p>
+              <div className="flex items-center gap-2 pt-1">
+                <HostAvatar photoUrl={event.hostPhotoUrl} initials={event.hostInitials} label={event.hostLabel} />
+                <span className="text-xs text-muted-foreground">{event.hostLabel}</span>
+                {spotsLabel && (
+                  <span className="ml-auto rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    {spotsLabel}
+                  </span>
+                )}
+                {definition && (
+                  <span className={classNames("rounded-full px-2 py-0.5 text-[10px] font-semibold", definition.badge)}>
+                    {definition.label}
+                  </span>
+                )}
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="line-clamp-2 text-xs text-muted-foreground">{event.description}</p>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              {event.datetimeLabel && (
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  {event.datetimeLabel}
-                </span>
-              )}
-              {event.distanceLabel && (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {event.distanceLabel}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border/70 px-2 py-0.5">
-                Up to {event.maxParticipants} people
-              </span>
-              {definition && (
-                <span className={classNames("rounded-full px-2 py-0.5 text-[11px]", definition.badge)}>
-                  {definition.label}
-                </span>
-              )}
             </div>
           </button>
         );
@@ -1134,6 +1222,28 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
     </div>
   );
 }
+
+type HostAvatarProps = {
+  photoUrl: string | null;
+  initials: string;
+  label: string;
+};
+
+function HostAvatar({ photoUrl, initials, label }: HostAvatarProps) {
+  if (photoUrl) {
+    return (
+      <span className="inline-flex h-6 w-6 overflow-hidden rounded-full border border-border/70 bg-card/50">
+        <img src={photoUrl} alt={`${label} avatar`} className="h-full w-full object-cover" />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-card/50 text-[10px] font-semibold text-foreground">
+      {initials}
+    </span>
+  );
+}
+
 
 type AlertPanelProps = {
   title: string;

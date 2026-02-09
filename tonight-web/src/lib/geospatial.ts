@@ -14,11 +14,14 @@ export type NearbyEventRecord = {
   maxParticipants: number;
   status: EventStatus;
   hostId: string;
+  hostDisplayName: string | null;
+  hostPhotoUrl: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
   distanceMeters: number | string;
   latitude: number | string;
   longitude: number | string;
+  acceptedCount: number | string;
 };
 
 const assertFiniteCoordinate = (value: number, label: 'latitude' | 'longitude'): number => {
@@ -79,12 +82,22 @@ export const findNearbyEvents = async (
       e."maxParticipants",
       e."status",
       e."hostId",
+      u."displayName" AS "hostDisplayName",
+      u."photoUrl" AS "hostPhotoUrl",
       e."createdAt",
       e."updatedAt",
       ST_Y(e."location"::geometry) AS "latitude",
       ST_X(e."location"::geometry) AS "longitude",
-      ST_Distance(e."location", ${origin}) AS "distanceMeters"
+      ST_Distance(e."location", ${origin}) AS "distanceMeters",
+      COALESCE(accepted."acceptedCount", 0) AS "acceptedCount"
     FROM "Event" e
+    INNER JOIN "User" u ON u."id" = e."hostId"
+    LEFT JOIN (
+      SELECT "eventId", COUNT(*)::integer AS "acceptedCount"
+      FROM "JoinRequest"
+      WHERE "status" = 'ACCEPTED'
+      GROUP BY "eventId"
+    ) AS accepted ON accepted."eventId" = e."id"
     WHERE e."status" = 'ACTIVE'
       AND ST_DWithin(e."location", ${origin}, ${radius})
       AND NOT EXISTS (
@@ -107,6 +120,10 @@ export const findNearbyEvents = async (
           : Number(event.distanceMeters),
       latitude: typeof event.latitude === 'number' ? event.latitude : Number(event.latitude),
       longitude: typeof event.longitude === 'number' ? event.longitude : Number(event.longitude),
+      acceptedCount:
+        typeof event.acceptedCount === 'number'
+          ? event.acceptedCount
+          : Number(event.acceptedCount),
     }))
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 };
