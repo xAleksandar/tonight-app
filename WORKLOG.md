@@ -1,7 +1,7 @@
 # Tonight App Worklog
 
 ## Completed
-- Task 1: Project infrastructure & database (Next.js scaffold, Prisma schema/migration, DB property tests) — Commit `83eb81e`.
+- Task 1: Project infrastructure & database (Next.js scaffold, Prisma schema/migration, DB property tests) — Commit `HEAD`.
 - Task 2: Authentication services & middleware (magic-link token + JWT helpers, Resend-backed email sender with dev logging, auth middleware utilities, Properties 1/2/6/7/8/39/40 tests) — Commit `c232bf3`.
 - Task 3: Authentication API routes and tests (magic-link request/verify/me/logout endpoints plus Properties 3/4/5) — Commit `9f50672`.
 - Task 4: Authentication checkpoint (added npm test alias and re-ran property suite) — Commit `c9e3246`.
@@ -56,14 +56,13 @@
 - Task 20.4: Implement WebSocket reconnection logic (exponential backoff, connection status UI, queued chat messaging) — Commit `af6a3b6`.
 - Task 20.5a: Realign discovery/home screen with live V0 designs — Commit `c0dbe82`.
 - Task 20.5b: Extract shared discovery shell components (desktop header/sidebar, mobile action bar) and centralized category utilities so the home screen matches V0 across desktop/tablet/mobile; reran `npm test`. — Commit `9291482`.
+- Task 20.5c: Realign the event creation page with the live V0 designs (Tonight shell, category chips, refreshed map picker, and mobile-first layout); reran `npm test`. — Commit `HEAD`.
 
 ## In Progress / Priority Notes
 - **Design alignment:** Reference both the local design components (`tonight-meetup-app-designs/`) and the live V0 deployment at <https://v0-tonight-meetup-app-designs.vercel.app/> across all breakpoints.
 - **Immediate priorities:**
-  1. Complete the event creation page realignment so it matches the V0 site.
-  2. After the event creation flow is done, focus on the profile screen (top-left entry) to ensure it matches V0 as well.
+  1. Focus on the profile screen (top-left entry) so it matches the V0 site across desktop and mobile.
 
 ## Next Up
-1. Event creation page alignment with <https://v0-tonight-meetup-app-designs.vercel.app/>.
-2. Profile page alignment (desktop + mobile) using the same source.
-3. Resume the remaining backlog (Task 20.5c onward) once these alignments are complete.
+1. Profile page alignment (desktop + mobile) using <https://v0-tonight-meetup-app-designs.vercel.app/>.
+2. Resume the remaining backlog (Task 20.5d onward) once the profile polish is complete.

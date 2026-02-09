@@ -1,14 +1,19 @@
 
 'use client';
 
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlignLeft, CalendarDays, MapPin, Sparkles, Type, Users } from 'lucide-react';
+import { AlignLeft, CalendarDays, MapPin, Minus, Plus, Sparkles, Type, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLocationPicker';
+import { DesktopHeader } from '@/components/tonight/DesktopHeader';
+import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
+import { MobileActionBar } from '@/components/tonight/MobileActionBar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { CATEGORY_DEFINITIONS, type CategoryId } from '@/lib/categories';
+import { classNames } from '@/lib/classNames';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 const TITLE_LIMITS = { min: 3, max: 120 } as const;
@@ -18,29 +23,7 @@ const MAX_PARTICIPANTS_LIMITS = { min: 2, max: 50 } as const;
 const DEFAULT_MAX_PARTICIPANTS = 2;
 
 const INPUT_BASE_CLASS =
-  'w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/30 focus:outline-none transition';
-
-const HOSTING_TIPS = [
-  {
-    title: 'Set the vibe',
-    description: 'Describe the atmosphere, dress code, and anything guests should bring before they request to join.',
-  },
-  {
-    title: 'Keep it intimate',
-    description: 'Tonight meetups shine when they stay small. Pick a cap that matches the plan and update it later if needed.',
-  },
-  {
-    title: 'Pin it precisely',
-    description: 'Drop the marker exactly where guests should meet so navigation is effortless when they are en route.',
-  },
-] as const;
-
-type FieldErrors = Partial<Record<'title' | 'description' | 'datetime' | 'location' | 'locationName' | 'maxParticipants', string>>;
-
-type ApiErrorPayload = {
-  error?: string;
-  errors?: FieldErrors;
-};
+  'h-12 w-full rounded-2xl border border-border/70 bg-card/60 px-4 text-sm text-foreground placeholder:text-muted-foreground shadow-inner shadow-black/10 transition focus:border-primary focus:ring-2 focus:ring-primary/30 focus:outline-none';
 
 const pad = (value: number) => value.toString().padStart(2, '0');
 
@@ -81,6 +64,13 @@ const formatReadableDatetime = (value: string) => {
   }
 };
 
+type FieldErrors = Partial<Record<'title' | 'description' | 'datetime' | 'location' | 'locationName' | 'maxParticipants', string>>;
+
+type ApiErrorPayload = {
+  error?: string;
+  errors?: FieldErrors;
+};
+
 export default function CreateEventPage() {
   const { status: authStatus } = useRequireAuth();
 
@@ -101,6 +91,7 @@ export default function CreateEventPage() {
 
 function AuthenticatedCreateEventPage() {
   const router = useRouter();
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [datetimeInput, setDatetimeInput] = useState(getInitialDateValue);
@@ -141,6 +132,13 @@ function AuthenticatedCreateEventPage() {
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
+
+  const handleParticipantChange = (delta: number) => {
+    setMaxParticipants((prev) => {
+      const next = Math.max(MAX_PARTICIPANTS_LIMITS.min, Math.min(MAX_PARTICIPANTS_LIMITS.max, prev + delta));
+      return Number.isFinite(next) ? next : DEFAULT_MAX_PARTICIPANTS;
+    });
+  };
 
   const validateBeforeSubmit = () => {
     const errors: FieldErrors = {};
@@ -243,260 +241,344 @@ function AuthenticatedCreateEventPage() {
     }
   };
 
-  const errorBorderClass = 'border-rose-400/70 focus:border-rose-300 focus:ring-rose-400/30';
+  const errorBorderClass = 'border-rose-400/80 focus:border-rose-400 focus:ring-rose-400/30';
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] px-4 py-6 text-white sm:px-6 md:py-10">
-      <div className="mx-auto w-full max-w-5xl space-y-8">
-        <header className="rounded-3xl border border-white/10 bg-white/5 px-6 py-8 shadow-2xl shadow-black/30">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-                <Sparkles className="h-3.5 w-3.5" />
-                Host
-              </div>
-              <h1 className="mt-4 text-3xl font-semibold leading-tight">Create an event</h1>
-              <p className="mt-2 text-sm text-white/70">
-                Share what you're planning tonight. We'll surface it to people nearby once it's live.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <SummaryStat icon={MapPin} label="Meetup label" value={locationName.trim() || 'Add a location'} />
-              <SummaryStat icon={CalendarDays} label="Starts" value={friendlyDatetime} />
-              <SummaryStat icon={Users} label="Capacity" value={`Up to ${maxParticipants} people`} />
-            </div>
-          </div>
-        </header>
+    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] text-foreground">
+      <div className="flex min-h-dvh flex-col md:flex-row">
+        <DesktopSidebar
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          onCreate={() => router.push('/events/create')}
+        />
 
-        {statusMessage && (
-          <div
-            role="status"
-            className={`rounded-3xl border px-5 py-4 text-sm shadow-lg shadow-black/40 ${
-              statusIntent === 'success'
-                ? 'border-emerald-400/60 bg-emerald-500/10 text-emerald-50'
-                : 'border-rose-400/50 bg-rose-500/10 text-rose-100'
-            }`}
-          >
-            {statusMessage}
-          </div>
-        )}
+        <div className="flex flex-1 flex-col">
+          <DesktopHeader
+            title="Create"
+            subtitle="Share what you're planning tonight"
+            onNavigateProfile={() => router.push('/profile')}
+          />
 
-        <form onSubmit={onSubmit} className="space-y-8">
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/30">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="event-title" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-                  <Type className="h-3.5 w-3.5 text-white/40" />
-                  Title
-                </label>
-                <input
-                  id="event-title"
-                  type="text"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Late-night ramen crawl"
-                  className={`${INPUT_BASE_CLASS} ${fieldErrors.title ? errorBorderClass : ''}`}
-                  maxLength={TITLE_LIMITS.max}
-                  required
-                />
-                <p className="text-xs text-white/60">
-                  {title.trim().length}/{TITLE_LIMITS.max} characters
-                </p>
-                {fieldErrors.title && <p className="text-xs text-rose-300">{fieldErrors.title}</p>}
-              </div>
+          <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
+            <div className="mx-auto w-full max-w-4xl space-y-6">
+              <MobileCreateHero />
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-                  <Users className="h-3.5 w-3.5 text-white/40" />
-                  Maximum participants
-                </label>
-                <input
-                  type="number"
-                  min={MAX_PARTICIPANTS_LIMITS.min}
-                  max={MAX_PARTICIPANTS_LIMITS.max}
-                  value={maxParticipants}
-                  onChange={(event) => setMaxParticipants(Number(event.target.value) || DEFAULT_MAX_PARTICIPANTS)}
-                  className={`${INPUT_BASE_CLASS} ${fieldErrors.maxParticipants ? errorBorderClass : ''}`}
-                />
-                <p className="text-xs text-white/60">
-                  Keep it intimate ({MAX_PARTICIPANTS_LIMITS.min}-{MAX_PARTICIPANTS_LIMITS.max} people).
-                </p>
-                {fieldErrors.maxParticipants && <p className="text-xs text-rose-300">{fieldErrors.maxParticipants}</p>}
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
-              <label htmlFor="event-description" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-                <AlignLeft className="h-3.5 w-3.5 text-white/40" />
-                Description
-              </label>
-              <textarea
-                id="event-description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Walk us through the vibe, meetup point, and anything to bring."
-                className={`${INPUT_BASE_CLASS} min-h-[160px] ${fieldErrors.description ? errorBorderClass : ''}`}
-                maxLength={DESCRIPTION_LIMITS.max}
-              />
-              <div className="flex flex-wrap items-center justify-between text-xs text-white/60">
-                <span>
-                  {description.trim().length}/{DESCRIPTION_LIMITS.max} characters
-                </span>
-                {fieldErrors.description && <p className="text-rose-300">{fieldErrors.description}</p>}
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/30">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="event-datetime" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-                  <CalendarDays className="h-3.5 w-3.5 text-white/40" />
-                  Starts
-                </label>
-                <input
-                  id="event-datetime"
-                  type="datetime-local"
-                  value={datetimeInput}
-                  onChange={(event) => setDatetimeInput(event.target.value)}
-                  className={`${INPUT_BASE_CLASS} ${fieldErrors.datetime ? errorBorderClass : ''}`}
-                  min={getInitialDateValue()}
-                  required
-                />
-                <p className="text-xs text-white/60">{friendlyDatetime}</p>
-                {fieldErrors.datetime && <p className="text-xs text-rose-300">{fieldErrors.datetime}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="event-location-name" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-                  <MapPin className="h-3.5 w-3.5 text-white/40" />
-                  Location name
-                </label>
-                <input
-                  id="event-location-name"
-                  type="text"
-                  value={locationName}
-                  onChange={(event) => setLocationName(event.target.value)}
-                  placeholder="Mott & Bowery, outside the deli"
-                  className={`${INPUT_BASE_CLASS} ${fieldErrors.locationName ? errorBorderClass : ''}`}
-                  maxLength={LOCATION_NAME_LIMITS.max}
-                  required
-                />
-                <p className="text-xs text-white/60">
-                  Visible to attendees. {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
-                </p>
-                {fieldErrors.locationName && <p className="text-xs text-rose-300">{fieldErrors.locationName}</p>}
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-white/50">Location</p>
-                  <p className="text-sm text-white/80">Drop the marker where guests should meet.</p>
+              <div className="hidden rounded-3xl border border-border/70 bg-card/40 px-6 py-5 shadow-xl shadow-black/20 md:block">
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Host
                 </div>
-                <button
-                  type="button"
-                  onClick={handleGeolocate}
-                  className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:border-emerald-300 hover:text-emerald-200 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
-                  disabled={geolocating}
-                >
-                  {geolocating ? 'Locating…' : 'Use my location'}
-                </button>
+                <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h1 className="font-serif text-3xl font-semibold text-foreground leading-tight">Create an event</h1>
+                    <p className="text-sm text-muted-foreground">Tell people what's happening tonight and we'll surface it nearby.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGeolocate}
+                    className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary"
+                    disabled={geolocating}
+                  >
+                    {geolocating ? 'Locating…' : 'Use my location'}
+                  </button>
+                </div>
+                <dl className="mt-6 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+                  <SummaryItem label="Meetup label" value={locationName.trim() || 'Add a location'} />
+                  <SummaryItem label="Starts" value={friendlyDatetime} />
+                  <SummaryItem label="Capacity" value={`Up to ${maxParticipants} people`} />
+                </dl>
               </div>
 
-              <MapboxLocationPicker
-                label="Event location"
-                initialValue={location}
-                onChange={setLocation}
-                tone="dark"
-                className="rounded-3xl border border-white/5 bg-white/5 p-4"
-              />
-              {fieldErrors.location && <p className="text-xs text-rose-300">{fieldErrors.location}</p>}
+              {statusMessage && (
+                <StatusBanner intent={statusIntent} message={statusMessage} />
+              )}
+
+              <form onSubmit={onSubmit} className="space-y-6">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <header className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
+                      <p className="text-xs text-muted-foreground/80">Optional: highlight the vibe.</p>
+                    </div>
+                    {selectedCategory && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory(null)}
+                        className="text-[11px] font-semibold text-primary"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </header>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {Object.values(CATEGORY_DEFINITIONS).map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(category.id)}
+                        className={classNames(
+                          'flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 text-xs font-semibold transition',
+                          selectedCategory === category.id
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        <category.icon className="h-5 w-5" />
+                        {category.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <FormField label="Title" icon={Type}>
+                      <input
+                        id="event-title"
+                        type="text"
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        placeholder="Late-night ramen crawl"
+                        className={classNames(INPUT_BASE_CLASS, fieldErrors.title && errorBorderClass)}
+                        maxLength={TITLE_LIMITS.max}
+                        required
+                      />
+                      <FieldMeta>
+                        {title.trim().length}/{TITLE_LIMITS.max} characters
+                      </FieldMeta>
+                      {fieldErrors.title && <FieldError message={fieldErrors.title} />}
+                    </FormField>
+
+                    <FormField label="Maximum participants" icon={Users}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 rounded-2xl border border-border/70 bg-background/40 px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => handleParticipantChange(-1)}
+                            className="rounded-full border border-border/60 p-1 text-muted-foreground hover:text-primary"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <div className="min-w-[64px] text-center text-lg font-semibold text-foreground">{maxParticipants}</div>
+                          <button
+                            type="button"
+                            onClick={() => handleParticipantChange(1)}
+                            className="rounded-full border border-border/60 p-1 text-muted-foreground hover:text-primary"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Keep it intimate ({MAX_PARTICIPANTS_LIMITS.min}-{MAX_PARTICIPANTS_LIMITS.max} people).
+                        </div>
+                      </div>
+                      {fieldErrors.maxParticipants && <FieldError message={fieldErrors.maxParticipants} />}
+                    </FormField>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    <FormField label="Description" icon={AlignLeft}>
+                      <textarea
+                        id="event-description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        placeholder="Walk us through the vibe, meetup point, and anything to bring."
+                        className={classNames(INPUT_BASE_CLASS, 'min-h-[140px] resize-none py-3', fieldErrors.description && errorBorderClass)}
+                        maxLength={DESCRIPTION_LIMITS.max}
+                      />
+                      <FieldMeta>
+                        {description.trim().length}/{DESCRIPTION_LIMITS.max} characters
+                      </FieldMeta>
+                      {fieldErrors.description && <FieldError message={fieldErrors.description} />}
+                    </FormField>
+                  </div>
+                </section>
+
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <FormField label="Starts" icon={CalendarDays}>
+                      <input
+                        id="event-datetime"
+                        type="datetime-local"
+                        value={datetimeInput}
+                        onChange={(event) => setDatetimeInput(event.target.value)}
+                        className={classNames(INPUT_BASE_CLASS, fieldErrors.datetime && errorBorderClass)}
+                        min={getInitialDateValue()}
+                        required
+                      />
+                      <FieldMeta>{friendlyDatetime}</FieldMeta>
+                      {fieldErrors.datetime && <FieldError message={fieldErrors.datetime} />}
+                    </FormField>
+
+                    <FormField label="Location name" icon={MapPin}>
+                      <input
+                        id="event-location-name"
+                        type="text"
+                        value={locationName}
+                        onChange={(event) => setLocationName(event.target.value)}
+                        placeholder="Mott & Bowery, outside the deli"
+                        className={classNames(INPUT_BASE_CLASS, fieldErrors.locationName && errorBorderClass)}
+                        maxLength={LOCATION_NAME_LIMITS.max}
+                        required
+                      />
+                      <FieldMeta>
+                        Visible to attendees. {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
+                      </FieldMeta>
+                      {fieldErrors.locationName && <FieldError message={fieldErrors.locationName} />}
+                    </FormField>
+                  </div>
+
+                  <div className="mt-6 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Map location</p>
+                        <p className="text-sm text-muted-foreground/80">Drop the marker where guests should meet.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGeolocate}
+                        className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={geolocating}
+                      >
+                        {geolocating ? 'Locating…' : 'Use my location'}
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl border border-border/60 bg-background/30 p-3">
+                      <MapboxLocationPicker
+                        label="Event location"
+                        initialValue={location}
+                        onChange={setLocation}
+                        tone="dark"
+                        className="rounded-2xl border border-border/40 bg-card/30 p-3"
+                      />
+                    </div>
+                    {fieldErrors.location && <FieldError message={fieldErrors.location} />}
+                  </div>
+                </section>
+
+                <div className="flex flex-col gap-3 border-t border-white/5 pt-4 text-sm text-muted-foreground">
+                  <p>You can edit or cancel the event later from your profile.</p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        setTitle('');
+                        setDescription('');
+                        setDatetimeInput(getInitialDateValue());
+                        setLocationName('');
+                        setMaxParticipants(DEFAULT_MAX_PARTICIPANTS);
+                        setLocation(null);
+                        setFieldErrors({});
+                        setStatusMessage(null);
+                        setSelectedCategory(null);
+                      }}
+                      disabled={submitting}
+                    >
+                      Reset form
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="inline-flex items-center justify-center rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {submitting ? 'Publishing…' : 'Post event'}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
-          </section>
-
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/30">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Preview</p>
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-lg font-semibold text-white">{title || 'Untitled event'}</p>
-              <p className="text-sm text-white/70">{friendlyDatetime}</p>
-              <p className="mt-2 text-sm text-white/80">
-                {description || 'Share the vibe so people know what to expect.'}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/60">
-                <span>{locationName || 'Add a meetup label'}</span>
-                <span>•</span>
-                <span>
-                  {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'No coordinates yet'}
-                </span>
-                <span>•</span>
-                <span>Up to {maxParticipants} people</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-6 shadow-xl shadow-black/30">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/60">Hosting tips</p>
-            <p className="mt-2 text-sm text-white/75">Little reminders to keep Tonight meetups delightful.</p>
-            <ul className="mt-4 grid gap-4 md:grid-cols-3">
-              {HOSTING_TIPS.map((tip) => (
-                <li key={tip.title} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-                  <p className="text-sm font-semibold text-white">{tip.title}</p>
-                  <p className="mt-1 text-xs text-white/70">{tip.description}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-emerald-400 px-6 py-2.5 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/40 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60"
-            >
-              {submitting ? 'Publishing…' : 'Publish event'}
-            </button>
-            <button
-              type="button"
-              disabled={submitting}
-              className="rounded-full border border-white/15 px-6 py-2.5 text-sm font-semibold text-white transition hover:border-white/40 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-white/40"
-              onClick={() => {
-                setTitle('');
-                setDescription('');
-                setDatetimeInput(getInitialDateValue());
-                setLocationName('');
-                setMaxParticipants(DEFAULT_MAX_PARTICIPANTS);
-                setLocation(null);
-                setFieldErrors({});
-                setStatusMessage(null);
-              }}
-            >
-              Reset form
-            </button>
-          </div>
-        </form>
+          </main>
+        </div>
       </div>
+
+      <MobileActionBar
+        active="create"
+        onNavigateDiscover={() => router.push('/')}
+        onCreate={() => router.push('/events/create')}
+        onOpenProfile={() => router.push('/profile')}
+      />
     </div>
   );
 }
 
-type SummaryStatProps = {
-  icon: LucideIcon;
+function MobileCreateHero() {
+  return (
+    <div className="rounded-3xl border border-border/70 bg-card/50 px-5 py-4 text-foreground shadow-xl shadow-black/20 md:hidden">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+      <h1 className="mt-1 text-2xl font-serif font-semibold leading-tight">Create event</h1>
+      <p className="text-xs text-muted-foreground">Share what you're up to tonight</p>
+    </div>
+  );
+}
+
+type SummaryItemProps = {
   label: string;
   value: string;
 };
 
-function SummaryStat({ icon: Icon, label, value }: SummaryStatProps) {
+function SummaryItem({ label, value }: SummaryItemProps) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-      <span className="rounded-xl bg-white/10 p-2 text-emerald-200">
-        <Icon className="h-4 w-4" />
-      </span>
-      <div>
-        <p className="text-[11px] uppercase tracking-wide text-white/60">{label}</p>
-        <p className="text-sm font-semibold text-white">{value}</p>
-      </div>
+    <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold text-foreground">{value}</p>
     </div>
   );
+}
+
+type StatusBannerProps = {
+  intent: 'idle' | 'error' | 'success';
+  message: string;
+};
+
+function StatusBanner({ intent, message }: StatusBannerProps) {
+  const isSuccess = intent === 'success';
+  return (
+    <div
+      role="status"
+      className={classNames(
+        'rounded-3xl border px-5 py-4 text-sm shadow-lg shadow-black/30',
+        isSuccess
+          ? 'border-emerald-400/60 bg-emerald-500/10 text-emerald-50'
+          : 'border-rose-400/50 bg-rose-500/10 text-rose-100'
+      )}
+    >
+      {message}
+    </div>
+  );
+}
+
+type FormFieldProps = {
+  label: string;
+  icon: LucideIcon;
+  children: ReactNode;
+};
+
+function FormField({ label, icon: Icon, children }: FormFieldProps) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground/70" />
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+type FieldErrorProps = {
+  message: string;
+};
+
+function FieldError({ message }: FieldErrorProps) {
+  return <p className="text-xs text-rose-300">{message}</p>;
+}
+
+type FieldMetaProps = {
+  children: ReactNode;
+};
+
+function FieldMeta({ children }: FieldMetaProps) {
+  return <p className="text-xs text-muted-foreground">{children}</p>;
 }
