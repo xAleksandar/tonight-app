@@ -481,6 +481,11 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     setRangeSheetOpen(false);
   }, [fetchEventsForLocation, pendingRadiusKm, userLocation]);
 
+  const openRangeSheet = useCallback(() => {
+    setPendingRadiusKm(radiusKm);
+    setRangeSheetOpen(true);
+  }, [radiusKm]);
+
   const mapItems = useMemo(() => {
     return visibleEvents.map((event) => ({
       id: event.id,
@@ -539,10 +544,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             radiusKm={radiusKm}
-            onOpenRange={() => {
-              setPendingRadiusKm(radiusKm);
-              setRangeSheetOpen(true);
-            }}
+            onOpenRange={openRangeSheet}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
           />
@@ -585,6 +587,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     onRefresh={handleRefresh}
                     locationStatus={locationStatus}
                     eventsStatus={eventsStatus}
+                    onAdjustRange={openRangeSheet}
                   />
                 </div>
 
@@ -779,6 +782,7 @@ type DiscoverySummaryProps = {
   rangeSummary: string;
   onUpdateLocation: () => void;
   onRefresh: () => void;
+  onAdjustRange?: () => void;
   locationStatus: LocationStatus;
   eventsStatus: EventsStatus;
 };
@@ -789,6 +793,7 @@ function DiscoverySummary({
   rangeSummary,
   onUpdateLocation,
   onRefresh,
+  onAdjustRange,
   locationStatus,
   eventsStatus,
 }: DiscoverySummaryProps) {
@@ -817,15 +822,30 @@ function DiscoverySummary({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Range</p>
             <p className="text-sm font-semibold text-foreground">{rangeSummary}</p>
           </div>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="rounded-full border border-border/80 px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
-          >
-            {eventsStatus === "loading" ? "Refreshing…" : "Refresh"}
-          </button>
+          <div className="flex items-center gap-2">
+            {typeof onAdjustRange === "function" && (
+              <button
+                type="button"
+                onClick={onAdjustRange}
+                className="rounded-full border border-border/80 px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+              >
+                Adjust
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="rounded-full border border-border/80 px-3 py-1 text-xs font-semibold text-foreground transition hover:border-primary hover:text-primary"
+            >
+              {eventsStatus === "loading" ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Adjust the radius from the list/map controls.</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {onAdjustRange
+            ? "Change how far out we look or refresh results whenever things feel stale."
+            : "Adjust the radius from the list or map controls."}
+        </p>
       </div>
 
       <div className="rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm shadow-black/20">
