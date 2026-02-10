@@ -18,7 +18,7 @@ import { MessagesModal } from "@/components/chat/MessagesModal";
 import { PLACEHOLDER_CONVERSATIONS } from "@/components/chat/conversations";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
-import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import { MobileActionBar, type MobileNavTarget } from "@/components/tonight/MobileActionBar";
 import { MiniMap } from "@/components/tonight/MiniMap";
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
@@ -204,18 +204,39 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const [activePrimarySection, setActivePrimarySection] = useState<PrimarySection>("discover");
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
+  const derivedPrimarySection = useMemo<MobileNavTarget>(() => {
+    if (messagesModalOpen) {
+      return "messages";
+    }
+    if (!pathname) {
+      return "discover";
+    }
+    if (pathname.startsWith("/people")) {
+      return "people";
+    }
+    if (pathname.startsWith("/messages") || pathname.startsWith("/chat")) {
+      return "messages";
+    }
+    if (pathname.startsWith("/profile")) {
+      return "profile";
+    }
+    if (pathname.startsWith("/events/create")) {
+      return "create";
+    }
+    return "discover";
+  }, [messagesModalOpen, pathname]);
+  const desktopPrimarySection: PrimarySection =
+    derivedPrimarySection === "people"
+      ? "people"
+      : derivedPrimarySection === "messages"
+        ? "messages"
+        : "discover";
   const handleCloseMessages = useCallback(() => {
     setMessagesModalOpen(false);
-    setActivePrimarySection("discover");
   }, []);
   const handleToggleMessages = useCallback(() => {
-    setMessagesModalOpen((current) => {
-      const next = !current;
-      setActivePrimarySection(next ? "messages" : "discover");
-      return next;
-    });
+    setMessagesModalOpen((current) => !current);
   }, []);
   const handleNavigateDiscover = useCallback(() => {
     handleCloseMessages();
@@ -223,7 +244,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   }, [handleCloseMessages, router]);
   const handleNavigatePeople = useCallback(() => {
     setMessagesModalOpen(false);
-    setActivePrimarySection("people");
     router.push("/people");
   }, [router]);
   const handleSelectConversation = useCallback(
@@ -231,7 +251,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       if (conversationId.startsWith("demo-")) {
         return;
       }
-      setActivePrimarySection("discover");
       setMessagesModalOpen(false);
       router.push(`/chat/${conversationId}`);
     },
@@ -523,7 +542,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           onNavigateDiscover={handleNavigateDiscover}
           onNavigatePeople={handleNavigatePeople}
           onNavigateMessages={handleToggleMessages}
-          activePrimaryNav={activePrimarySection}
+          activePrimaryNav={desktopPrimarySection}
         />
 
         <div className="flex flex-1 flex-col">
@@ -541,7 +560,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           />
 
           <DiscoveryPrimaryNav
-            activeSection={activePrimarySection}
+            activeSection={desktopPrimarySection}
             unreadCount={unreadMessageCount}
             onSelectDiscover={handleNavigateDiscover}
             onSelectPeople={handleNavigatePeople}
@@ -629,7 +648,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       </div>
 
       <MobileActionBar
-        active={activePrimarySection}
+        active={derivedPrimarySection}
         onNavigateDiscover={handleNavigateDiscover}
         onNavigatePeople={handleNavigatePeople}
         onNavigateMessages={handleToggleMessages}
