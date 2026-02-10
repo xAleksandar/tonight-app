@@ -40,10 +40,12 @@
 - Task 19: Full-suite checkpoint — Commit `cc41d55`.
 - Task 20.1–20.5k: Design alignment waves (discovery/event creation/profile/mobile tweaks) — Commits `90a31dd`, `3fc95d9`, `0701f95`, `af6a3b6`, `c0dbe82`, `9291482`, `8012ae1`, `a7d82d8`, `a510921`, `81a8ff2`, `d17301e`, `865e1c9`, `09651e5`, `19de6d2`, `6831ee2`.
 - Task 20.6: Discovery navigation view-state sync (Messages tab, bottom nav highlighting, map/list query param handling, test updates) — Commit `f657d25`.
+- Task 20.7: Desktop sidebar navigation (Discover + People) now routes to live sections, added the interim /people experience, and wired mobile nav parity — Commit `4108e49`.
 ## In Progress / Priority Notes
 - 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
 - 2026-02-10 01:57 runner: Synced the mobile + desktop discovery toggles with the real view state: bottom nav now reflects the active section (including the Messages modal), map/list toggles stay in lockstep across breakpoints via URL search params, and the UI tests were updated to mock `usePathname`/`useSearchParams` so the new navigation plumbing stays covered.
+- 2026-02-10 02:40 runner: Wired the desktop sidebar buttons into real navigation callbacks, added the temporary /people shell so both desktop + mobile navs have somewhere to land, and reran `npm test` (68 suites, passing).
 
 ## Next Up
-1. Enable the desktop sidebar nav (“Discover”, “People nearby”) to navigate between shell sections so Profile isn’t a dead end.
-2. After the navigation fixes, continue the profile + design delta sweep from Aleks’ latest brief.
+1. Resume the profile + design delta sweep from Aleks’ latest brief (start with the profile hero polish + settings stack).
+2. Audit the new /people shell against the live V0 designs and outline the data plumbing it will need next.
