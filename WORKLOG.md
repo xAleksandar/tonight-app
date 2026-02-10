@@ -44,6 +44,7 @@
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 - Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 20:25 runner: Added a UI regression test that exercises the MobileActionBar state so the Messages toggle highlights correctly on open/close and keeps Discover active otherwise; `npm test` (74 suites) passes.
 - 2026-02-10 19:14 runner: Added regression tests for the discovery Messages tab, mobile action bar highlights, and desktop sidebar navigation so the navigation fixes stay locked in; `npm test` (73 suites) passes.
 - 2026-02-10 19:05 runner: Added the People radius desktop map preview so the range controls now mirror the V0 split-panel (mini map, coverage copy, and slider) ahead of wiring real geolocation; `npm test` (68 suites) passes.
 - 2026-02-10 18:44 runner: Persisted the discovery map/list toggle so it reads an explicit ?view= override, falls back to the last stored preference in localStorage, and writes updates from either breakpoint; added a regression test that seeds localStorage and cleared the jsdom window cleanup so the suite can keep the DOM available. `npm test` (68 suites) passes.
