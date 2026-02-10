@@ -43,6 +43,8 @@
 - Task 20.7: Desktop sidebar navigation (Discover + People) now routes to live sections, added the interim /people experience, and wired mobile nav parity — Commit `4108e49`.
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 07:17 runner: Rewired the discovery header’s Messages affordance to launch the shared `MessagesModal`, surfaced the unread count badge off the placeholder data, and added the modal callbacks so selecting a real thread closes the overlay before routing. `npm test` (68 suites) passes.
+- 2026-02-10 06:56 runner: Added the Messages status filters from the V0 design (All / Accepted / Pending chips with counts), threaded the filtered dataset + bespoke empty states into `ConversationList`, and reran `npm test` (68 suites, green).
 - 2026-02-10 04:59 runner: Hooked the People view up to the category filters so the desktop sidebar selection now narrows the roster, added a shared reset action/empty state copy, and re-ran `npm test` (68 suites, passing).
 - 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
 - 2026-02-10 01:57 runner: Synced the mobile + desktop discovery toggles with the real view state: bottom nav now reflects the active section (including the Messages modal), map/list toggles stay in lockstep across breakpoints via URL search params, and the UI tests were updated to mock `usePathname`/`useSearchParams` so the new navigation plumbing stays covered.
@@ -54,5 +56,8 @@
 - 2026-02-10 06:18 runner: Moved Tonight Messages into a first-class page that mirrors the live V0 hero/cards, extracted a reusable ConversationList + placeholder data helpers, and rerouted every Messages entry point (header tabs, sidebar CTA, mobile action bar, grid contacts) to push to /messages. `npm test` (68 suites) passes.
 
 ## Next Up
-1. Thread both the People roster and Messages list through the live APIs once they land so radius/category filters and conversations stay real-time.
-2. Finish the remaining discovery/people delta cleanup (map embed, quick-invite affordances, sidebar polish) after the backend plumbing is sorted.
+1. Make the discovery bottom nav reflect the active section on every breakpoint and ensure the map/list toggle actually swaps the primary content pane.
+2. Wire the desktop sidebar entries (Discover + People nearby) into the live routes from Profile/secondary pages so it’s easy to navigate back.
+3. Polish the dedicated chat screen in /messages to match the V0 mock (conversation header, composer stack, host badges) now that the list filters are in.
+4. Thread both the People roster and Messages list through the live APIs once they land so radius/category filters and conversations stay real-time.
+5. Finish the remaining discovery/people delta cleanup (map embed, quick-invite affordances, sidebar polish) after the backend plumbing is sorted.

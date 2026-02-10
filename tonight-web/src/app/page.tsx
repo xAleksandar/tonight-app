@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 
+import { MessagesModal } from "@/components/chat/MessagesModal";
+import { PLACEHOLDER_CONVERSATIONS } from "@/components/chat/conversations";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
@@ -200,6 +202,18 @@ function AuthenticatedHomePage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
+  const handleOpenMessages = useCallback(() => setMessagesModalOpen(true), []);
+  const handleCloseMessages = useCallback(() => setMessagesModalOpen(false), []);
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      if (conversationId.startsWith("demo-")) {
+        return;
+      }
+      setMessagesModalOpen(false);
+      router.push(`/chat/${conversationId}`);
+    },
+    [router]
+  );
   const initialView: ViewMode = searchParams?.get("view") === "map" ? "map" : "list";
   const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
@@ -216,6 +230,13 @@ function AuthenticatedHomePage() {
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [messagesModalOpen, setMessagesModalOpen] = useState(false);
+
+  const conversations = useMemo(() => PLACEHOLDER_CONVERSATIONS, []);
+  const unreadMessageCount = useMemo(
+    () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
+    [conversations]
+  );
 
   useEffect(() => {
     const param = searchParams?.get("view");
@@ -480,7 +501,8 @@ function AuthenticatedHomePage() {
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             onNavigateProfile={() => router.push("/profile")}
-            onNavigateMessages={() => router.push("/messages")}
+            onNavigateMessages={handleOpenMessages}
+            unreadCount={unreadMessageCount}
           />
 
           <MobileHero
@@ -582,6 +604,13 @@ function AuthenticatedHomePage() {
           onApply={applyRadiusChange}
         />
       )}
+
+      <MessagesModal
+        isOpen={messagesModalOpen}
+        onClose={handleCloseMessages}
+        conversations={conversations}
+        onSelectConversation={handleSelectConversation}
+      />
     </div>
   );
 
