@@ -473,6 +473,9 @@ function AuthenticatedHomePage() {
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           onCreate={handleCreate}
+          onNavigateDiscover={() => router.push("/")}
+          onNavigatePeople={() => router.push("/people")}
+          activePrimaryNav="discover"
         />
 
         <div className="flex flex-1 flex-col">
@@ -570,6 +573,7 @@ function AuthenticatedHomePage() {
       <MobileActionBar
         active={messagesOpen ? "messages" : "discover"}
         onNavigateDiscover={() => router.push("/")}
+        onNavigatePeople={() => router.push("/people")}
         onNavigateMessages={openMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}

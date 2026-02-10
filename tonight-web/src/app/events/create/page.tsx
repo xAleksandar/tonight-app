@@ -250,6 +250,9 @@ function AuthenticatedCreateEventPage() {
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           onCreate={() => router.push('/events/create')}
+          onNavigateDiscover={() => router.push('/')}
+          onNavigatePeople={() => router.push('/people')}
+          activePrimaryNav="discover"
         />
 
         <div className="flex flex-1 flex-col">
@@ -504,6 +507,7 @@ function AuthenticatedCreateEventPage() {
       <MobileActionBar
         active="create"
         onNavigateDiscover={() => router.push('/')}
+        onNavigatePeople={() => router.push('/people')}
         onCreate={() => router.push('/events/create')}
         onOpenProfile={() => router.push('/profile')}
       />

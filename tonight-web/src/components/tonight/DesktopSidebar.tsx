@@ -1,27 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import {
-  ChevronDown,
-  Compass,
-  Plus,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import { ChevronDown, Compass, Plus, Sparkles, Users } from "lucide-react";
 
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
+
+type PrimaryNavTarget = "discover" | "people";
 
 export type DesktopSidebarProps = {
   selectedCategory: CategoryId | null;
   onCategoryChange: (category: CategoryId | null) => void;
   onCreate: () => void;
+  onNavigateDiscover?: () => void;
+  onNavigatePeople?: () => void;
+  activePrimaryNav?: PrimaryNavTarget | null;
 };
 
-export function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }: DesktopSidebarProps) {
+export function DesktopSidebar({
+  selectedCategory,
+  onCategoryChange,
+  onCreate,
+  onNavigateDiscover,
+  onNavigatePeople,
+  activePrimaryNav,
+}: DesktopSidebarProps) {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const activeCategory = selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory] : null;
   const ActiveIcon = activeCategory?.icon ?? Sparkles;
+  const pathname = usePathname();
+
+  const inferredPrimaryNav = useMemo<PrimaryNavTarget | null>(() => {
+    if (!pathname) {
+      return null;
+    }
+    if (pathname === "/" || pathname.startsWith("/events") || pathname.startsWith("/chat")) {
+      return "discover";
+    }
+    if (pathname.startsWith("/people")) {
+      return "people";
+    }
+    return null;
+  }, [pathname]);
+
+  const currentPrimaryNav = activePrimaryNav ?? inferredPrimaryNav;
+
+  const primaryNavItems: Array<{
+    id: PrimaryNavTarget;
+    label: string;
+    icon: typeof Compass;
+    onClick?: () => void;
+  }> = [
+    { id: "discover", label: "Discover", icon: Compass, onClick: onNavigateDiscover },
+    { id: "people", label: "People nearby", icon: Users, onClick: onNavigatePeople },
+  ];
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-white/10 bg-card/30 px-5 py-6 text-foreground backdrop-blur-2xl md:flex md:flex-col">
@@ -36,21 +69,32 @@ export function DesktopSidebar({ selectedCategory, onCategoryChange, onCreate }:
       </div>
 
       <nav className="mt-8 space-y-1 text-sm" aria-label="Primary">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-xl bg-primary/10 px-3 py-2.5 font-medium text-primary transition-all"
-        >
-          <Compass className="h-4.5 w-4.5" />
-          Discover
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground/70"
-          disabled
-        >
-          <Users className="h-4.5 w-4.5" />
-          People nearby
-        </button>
+        {primaryNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPrimaryNav === item.id;
+          const disabled = typeof item.onClick !== "function";
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={disabled ? undefined : item.onClick}
+              className={classNames(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition-all",
+                isActive
+                  ? "bg-primary/10 text-primary"
+                  : disabled
+                    ? "text-muted-foreground/50"
+                    : "text-muted-foreground/80 hover:bg-white/5 hover:text-foreground"
+              )}
+              aria-current={isActive ? "page" : undefined}
+              aria-disabled={disabled || undefined}
+              disabled={disabled}
+            >
+              <Icon className="h-4.5 w-4.5" />
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="mt-8">

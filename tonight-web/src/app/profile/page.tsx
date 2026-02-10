@@ -336,6 +336,8 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
           selectedCategory={sidebarCategory}
           onCategoryChange={setSidebarCategory}
           onCreate={() => router.push('/events/create')}
+          onNavigateDiscover={() => router.push('/')}
+          onNavigatePeople={() => router.push('/people')}
         />
 
         <div className="flex flex-1 flex-col">
@@ -569,6 +571,7 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
       <MobileActionBar
         active="profile"
         onNavigateDiscover={() => router.push('/')}
+        onNavigatePeople={() => router.push('/people')}
         onCreate={() => router.push('/events/create')}
         onOpenProfile={() => router.push('/profile')}
       />
