@@ -154,6 +154,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+              <MessagesMobileHero />
               <MessagesHero />
 
               <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -217,6 +218,26 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         onCreate={handleCreate}
         onOpenProfile={handleProfile}
       />
+    </div>
+  );
+}
+
+function MessagesMobileHero() {
+  return (
+    <div className="rounded-3xl border border-border/60 bg-card/60 px-5 py-4 text-foreground shadow-xl shadow-black/20 md:hidden">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+      <h1 className="mt-1 text-2xl font-serif font-semibold leading-tight">Messages</h1>
+      <p className="text-xs text-muted-foreground">Your join requests and chats</p>
+      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground/80">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-3 py-1">
+          <MessageCircle className="h-3 w-3" />
+          Accepted + pending
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-3 py-1">
+          <ShieldCheck className="h-3 w-3" />
+          Safety tools on
+        </span>
+      </div>
     </div>
   );
 }

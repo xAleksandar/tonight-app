@@ -44,6 +44,7 @@
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 - Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 14:50 runner: Added the mobile Messages hero so the page now mirrors the V0 sticky header (title, subtitle, safety badges) before the desktop panels, keeping the discovery nav state consistent across breakpoints; `npm test` (68 suites) passes.
 - 2026-02-10 13:20 runner: Wired the MobileActionBar up to the real unread count so the Messages tab shows the same badge treatment as desktop/header, ensuring the nav reflects pending conversations on every page; `npm test` (68 suites) passes.
 - 2026-02-10 11:50 runner: Added the desktop discovery range control so the summary card can pop open the radius sheet (same slider/mobile UX) and folks can refresh or adjust without diving into mobile-only UI; `npm test` (68 suites) passes.
 - 2026-02-10 11:35 runner: Wired the Profile screen’s MobileActionBar up to the Messages route so the bottom nav stays interactive on every page; `npm test` (68 suites) passes.
