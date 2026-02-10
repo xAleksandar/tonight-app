@@ -44,6 +44,7 @@
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 - Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 11:35 runner: Wired the Profile screen’s MobileActionBar up to the Messages route so the bottom nav stays interactive on every page; `npm test` (68 suites) passes.
 - 2026-02-10 10:45 runner: Added the mobile category chips to the People header so folks on phones can filter the roster with the same icons/color system as desktop; ties directly into the shared category state so the sidebar + chips stay in sync. `npm test` (68 suites) passes.
 - 2026-02-10 10:25 runner: Synced the desktop sidebar’s Messages button with the discovery modal so selecting it opens the live conversation list (and lights up the nav while the modal is active). `npm test` (68 suites) passes.
 - 2026-02-10 09:45 runner: Added the Discover CTA to Messages empty states (and plumbed the new ConversationList prop) so the design-specified fallback keeps people moving; ready for the next delta as more data hooks land.
