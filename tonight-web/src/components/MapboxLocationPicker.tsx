@@ -23,6 +23,8 @@ export type MapboxLocationPickerProps = {
   label?: string;
   /** Initial coordinate rendered on first paint */
   initialValue?: MapCoordinates | null;
+  /** Initial center for the map (without placing a marker) */
+  initialCenter?: MapCoordinates | null;
   /** Called whenever the user selects a new coordinate */
   onChange?: (coords: MapCoordinates) => void;
   /** Optional className passed to the root container */
@@ -51,6 +53,7 @@ const areCoordsEqual = (a?: MapCoordinates | null, b?: MapCoordinates | null) =>
 export default function MapboxLocationPicker({
   label = "Event location",
   initialValue = null,
+  initialCenter = null,
   onChange,
   className,
   height = 320,
@@ -141,6 +144,19 @@ export default function MapboxLocationPicker({
   }, [initialValue?.lat, initialValue?.lng, mapReady, placeMarker]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !initialCenter || selected) {
+      return;
+    }
+
+    map.flyTo({
+      center: [initialCenter.lng, initialCenter.lat],
+      zoom: FOCUSED_ZOOM,
+      essential: true,
+    });
+  }, [initialCenter?.lat, initialCenter?.lng, mapReady, selected]);
+
+  useEffect(() => {
     let disposed = false;
 
     const initializeMap = async () => {
@@ -160,11 +176,14 @@ export default function MapboxLocationPicker({
           return;
         }
 
+        const centerCoords = initialValue ?? initialCenter ?? DEFAULT_CENTER;
+        const shouldZoomIn = Boolean(initialValue || initialCenter);
+
         const map = new mapboxgl.Map({
           container: containerRef.current,
           style: mapStyle,
-          center: [initialValue?.lng ?? DEFAULT_CENTER.lng, initialValue?.lat ?? DEFAULT_CENTER.lat],
-          zoom: initialValue ? FOCUSED_ZOOM : DEFAULT_ZOOM,
+          center: [centerCoords.lng, centerCoords.lat],
+          zoom: shouldZoomIn ? FOCUSED_ZOOM : DEFAULT_ZOOM,
           cooperativeGestures: true,
         });
 

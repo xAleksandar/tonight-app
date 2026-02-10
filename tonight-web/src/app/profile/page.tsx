@@ -114,13 +114,50 @@ const formatEventDatetime = (isoDate: string) => {
   }
 };
 
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
+const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<string> => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Unable to read file.'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        // Calculate new dimensions while maintaining aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Unable to get canvas context'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to JPEG for better compression
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Unable to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Unable to read file'));
     reader.readAsDataURL(file);
   });
+};
 
 const sanitize = (value: string) => value.trim();
 
@@ -162,6 +199,8 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
   const [overview, setOverview] = useState<ProfileOverviewResponse | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const safetyRef = useRef<HTMLDivElement | null>(null);
 
@@ -238,16 +277,92 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
   const currentPhotoPreview = photoInput || initialPhoto || undefined;
 
   const handleFileSelection = useCallback(async (file: File) => {
+    if (!profile) {
+      showErrorToast('Sign in required', 'You need to sign in to update your photo.');
+      return;
+    }
+
     try {
-      const dataUrl = await fileToDataUrl(file);
+      // Compress the image before uploading
+      const dataUrl = await compressImage(file);
       setPhotoInput(dataUrl);
-      setStatus({ type: 'success', message: 'Photo ready to upload' });
-      showSuccessToast('Photo ready', 'Remember to save your changes.');
+      setSaving(true);
+
+      // Auto-save the photo
+      const response = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoUrl: dataUrl }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        const message = data?.error ?? 'Unable to save your photo.';
+        setStatus({ type: 'error', message });
+        showErrorToast('Photo upload failed', message);
+        setPhotoInput(profile.photoUrl ?? '');
+        return;
+      }
+
+      setProfile(data.user);
+      setPhotoInput(data.user.photoUrl ?? '');
+      showSuccessToast('Photo updated', 'Your new photo is live.');
     } catch (error) {
       console.error(error);
-      setStatus({ type: 'error', message: 'Could not read that file' });
-      showErrorToast('Unable to read file', 'Pick a different image to continue.');
+      setStatus({ type: 'error', message: 'Could not upload photo' });
+      showErrorToast('Upload failed', 'Try again with a different image.');
+      setPhotoInput(profile.photoUrl ?? '');
+    } finally {
+      setSaving(false);
     }
+  }, [profile]);
+
+  const handleStartEditName = useCallback(() => {
+    setEditNameValue(profile?.displayName ?? '');
+    setIsEditingName(true);
+  }, [profile]);
+
+  const handleSaveName = useCallback(async () => {
+    if (!profile) return;
+
+    const trimmedName = sanitize(editNameValue);
+    if (trimmedName === (profile.displayName ?? '')) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: trimmedName || null }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        const message = data?.error ?? 'Unable to save your name.';
+        showErrorToast('Name update failed', message);
+        return;
+      }
+
+      setProfile(data.user);
+      setDisplayNameInput(data.user.displayName ?? '');
+      setIsEditingName(false);
+      fetchOverview().catch((error) => {
+        console.error('Failed to refresh overview', error);
+      });
+    } catch (error) {
+      console.error(error);
+      showErrorToast('Update failed', 'Unable to save your name.');
+    } finally {
+      setSaving(false);
+    }
+  }, [profile, editNameValue, fetchOverview]);
+
+  const handleCancelEditName = useCallback(() => {
+    setIsEditingName(false);
+    setEditNameValue('');
   }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -384,7 +499,7 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
                   We couldn’t load your profile. Try signing in again.
                 </div>
               ) : (
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
+                <div className="grid gap-6">
                   <div className="space-y-6">
                     <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
                       <div className="flex flex-col items-center gap-4 text-center">
@@ -405,8 +520,47 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
                           </button>
                         </div>
                         <div className="space-y-1">
-                          <h2 className="text-xl font-bold text-foreground">{profile.displayName ?? 'Add your name'}</h2>
-                          <p className="text-xs text-muted-foreground">Edit your display name</p>
+                          {isEditingName ? (
+                            <div className="flex flex-col gap-2">
+                              <input
+                                type="text"
+                                value={editNameValue}
+                                onChange={(e) => setEditNameValue(e.target.value)}
+                                placeholder="Enter your name"
+                                className="h-10 rounded-xl border border-border/70 bg-background/40 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleSaveName}
+                                  disabled={saving}
+                                  className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
+                                >
+                                  {saving ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditName}
+                                  disabled={saving}
+                                  className="flex-1 rounded-lg border border-border/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-background/40 disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleStartEditName}
+                                className="text-xl font-bold text-foreground transition hover:text-primary"
+                              >
+                                {profile.displayName ?? 'Add your name'}
+                              </button>
+                              <p className="text-xs text-muted-foreground">Click to edit your display name</p>
+                            </>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
                           {[
@@ -461,125 +615,19 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
                   </div>
 
                   <div className="space-y-6">
-                    <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
-                      <div className="space-y-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Profile</p>
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                          <div>
-                            <h3 className="font-serif text-2xl font-semibold">Personal details</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Keep the name and photo that hosts see aligned with the Tonight spec.
-                            </p>
-                          </div>
-                          <p className="text-xs text-muted-foreground sm:text-right">
-                            Visible on your event cards, chat requests, and profile.
-                          </p>
-                        </div>
-                      </div>
-                      <form className="mt-8 space-y-8" onSubmit={onSubmit}>
-                        <div className="space-y-3">
-                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <label
-                              htmlFor="profile-display-name"
-                              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-                            >
-                              Display name
-                            </label>
-                            <p className="text-xs text-muted-foreground">2–64 characters, no emojis.</p>
-                          </div>
-                          <input
-                            id="profile-display-name"
-                            type="text"
-                            value={displayNameInput}
-                            onChange={(event) => setDisplayNameInput(event.target.value)}
-                            placeholder="Add a friendly name"
-                            className={FORM_INPUT_CLASS}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            This is shown to people you host or request to join.
-                          </p>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <label
-                              htmlFor="profile-photo-url"
-                              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-                            >
-                              Photo
-                            </label>
-                            <p className="text-xs text-muted-foreground">Square images look best across Tonight.</p>
-                          </div>
-                          <input
-                            id="profile-photo-url"
-                            type="url"
-                            value={photoInput}
-                            onChange={(event) => setPhotoInput(event.target.value)}
-                            placeholder="https://example.com/photo.jpg"
-                            className={FORM_INPUT_CLASS}
-                          />
-                          <div className="flex flex-wrap gap-2 text-sm">
-                            <button
-                              type="button"
-                              className="rounded-full border border-primary/40 bg-primary/10 px-4 py-2 font-semibold text-primary transition hover:bg-primary/15"
-                              onClick={() => fileInputRef.current?.click()}
-                            >
-                              Upload photo
-                            </button>
-                            <button
-                              type="button"
-                              onClick={removePhoto}
-                              className="rounded-full border border-transparent px-4 py-2 font-semibold text-muted-foreground transition hover:border-border/50 hover:bg-background/40"
-                            >
-                              Remove
-                            </button>
-                            <button
-                              type="button"
-                              onClick={resetPhoto}
-                              className="rounded-full border border-transparent px-4 py-2 font-semibold text-muted-foreground transition hover:border-border/50 hover:bg-background/40"
-                            >
-                              Reset
-                            </button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Paste a public URL or upload a new image. Images stay local until you hit “Save changes.”
-                          </p>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (file) {
-                                void handleFileSelection(file);
-                                event.target.value = '';
-                              }
-                            }}
-                          />
-                        </div>
-
-                        {status ? <p className={classNames('text-sm font-semibold', statusStyles)}>{status.message}</p> : null}
-
-                        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-end">
-                          <button type="submit" disabled={!hasChanges || saving} className={CTA_BUTTON_CLASS}>
-                            {saving ? 'Saving…' : 'Save changes'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!hasChanges || saving}
-                            className={SECONDARY_BUTTON_CLASS}
-                            onClick={() => {
-                              setDisplayNameInput(initialDisplayName);
-                              setPhotoInput(initialPhoto);
-                              setStatus(null);
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    </section>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          void handleFileSelection(file);
+                          event.target.value = '';
+                        }
+                      }}
+                    />
 
                     <section
                       ref={safetyRef}

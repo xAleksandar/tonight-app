@@ -515,7 +515,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       if (previous && visibleEvents.some((event) => event.id === previous)) {
         return previous;
       }
-      return visibleEvents[0]?.id ?? null;
+      return null;
     });
   }, [visibleEvents]);
 
@@ -586,6 +586,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
+<<<<<<< HEAD
           <DiscoveryPrimaryNav
             activeSection={desktopPrimarySection}
             unreadCount={unreadMessageCount}
@@ -594,6 +595,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             onToggleMessages={handleToggleMessages}
           />
 
+=======
+>>>>>>> d4acd8c (Fixes)
           <MobileHero
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
@@ -632,6 +635,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                   />
                 ) : null}
 
+<<<<<<< HEAD
                 <div className="hidden md:block">
                   <DiscoverySummary
                     describeLocation={describeLocation}
@@ -644,6 +648,30 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     onAdjustRange={openRangeSheet}
                   />
                 </div>
+=======
+                {locationStatus !== "ready" && locationStatus !== "locating" && (
+                  <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 shadow-lg shadow-primary/10">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary">
+                        <MapPin className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <p className="text-sm font-semibold text-foreground">Enable location access</p>
+                        <p className="text-xs text-muted-foreground">
+                          We need your location to show events happening near you.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={attemptLocationDetection}
+                          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition hover:brightness-110"
+                        >
+                          Grant access
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+>>>>>>> d4acd8c (Fixes)
 
                 {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
 
@@ -1040,13 +1068,6 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-0.5 text-left">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground">
-          Live nearby meetups
-        </p>
-        <p className="text-xs text-muted-foreground/80">{radiusSummary}</p>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {events.map((event) => {
         const definition = event.categoryId ? CATEGORY_DEFINITIONS[event.categoryId] : null;
@@ -1076,10 +1097,10 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
             )}
             <div className="flex flex-1 flex-col gap-3 border-t border-border/60 p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <div
                     className={classNames(
-                      "flex h-10 w-10 items-center justify-center rounded-2xl border text-sm",
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border text-sm",
                       definition?.accent ?? "border-border/70 bg-background/60"
                     )}
                   >
@@ -1092,7 +1113,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
               </div>
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                 {event.datetimeLabel && (

@@ -34,7 +34,7 @@ export function DesktopHeader({
   const canToggleView = viewMode && typeof onViewModeChange === "function";
 
   return (
-    <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-background/85 px-10 py-5 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:grid md:grid-cols-3 md:items-center">
+    <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-background/85 px-10 py-3 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:grid md:grid-cols-3 md:items-center">
       <div>
         <h1 className="font-serif text-3xl font-semibold leading-tight">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}

@@ -16,19 +16,19 @@ export type ShowToastParams = {
 
 const INTENT_STYLES: Record<ToastIntent, { container: string; badge: string; icon: string }> = {
   success: {
-    container: "border-emerald-200/80 shadow-emerald-500/10",
-    badge: "bg-emerald-50 text-emerald-600",
-    icon: "text-emerald-600 bg-emerald-100",
+    container: "border-emerald-400/40 bg-emerald-500/10 shadow-emerald-500/30",
+    badge: "bg-emerald-500/20 text-emerald-100 border border-emerald-400/30",
+    icon: "text-emerald-100 bg-emerald-500/20",
   },
   error: {
-    container: "border-rose-200/80 shadow-rose-500/10",
-    badge: "bg-rose-50 text-rose-600",
-    icon: "text-rose-600 bg-rose-100",
+    container: "border-rose-400/40 bg-rose-500/10 shadow-rose-500/30",
+    badge: "bg-rose-500/20 text-rose-100 border border-rose-400/30",
+    icon: "text-rose-100 bg-rose-500/20",
   },
   info: {
-    container: "border-zinc-200/80 shadow-zinc-900/10",
-    badge: "bg-zinc-100 text-zinc-600",
-    icon: "text-zinc-600 bg-zinc-100",
+    container: "border-border/60 bg-card/80 shadow-black/30",
+    badge: "bg-primary/20 text-primary border border-primary/30",
+    icon: "text-primary bg-primary/20",
   },
 };
 
@@ -75,28 +75,28 @@ function ToastCard({ intent, title, description, visible, onDismiss }: ToastCard
 
   return (
     <div
-      className={`pointer-events-auto w-full max-w-sm translate-y-0 rounded-3xl border bg-white/95 p-4 text-left text-zinc-900 shadow-[0_25px_80px_rgba(15,23,42,0.18)] backdrop-blur transition-all duration-200 ${
+      className={`pointer-events-auto w-full max-w-md translate-y-0 rounded-2xl border p-4 text-left shadow-[0_8px_24px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all duration-300 ${
         styles.container
-      } ${visible ? "opacity-100" : "opacity-0"}`}
+      } ${visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
       role="status"
     >
       <div className="flex items-start gap-3">
-        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${styles.icon}`}>
+        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${styles.icon}`}>
           <Icon className="h-5 w-5" />
         </span>
-        <div className="flex-1 space-y-1">
+        <div className="flex-1 space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${styles.badge}`}>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${styles.badge}`}>
               {intent === "success" ? "Success" : intent === "error" ? "Heads up" : "Notice"}
             </span>
           </div>
-          <p className="text-sm font-semibold text-zinc-900">{title}</p>
-          {description ? <p className="text-sm text-zinc-600">{description}</p> : null}
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="rounded-full p-1 text-zinc-400 transition hover:text-zinc-600"
+          className="shrink-0 rounded-full p-1.5 text-muted-foreground transition hover:bg-background/40 hover:text-foreground"
           aria-label="Dismiss notification"
         >
           <X className="h-4 w-4" />

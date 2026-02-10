@@ -7,7 +7,7 @@ import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 const DISPLAY_NAME_MIN = 2;
 const DISPLAY_NAME_MAX = 64;
-const PHOTO_URL_MAX = 100_000;
+const PHOTO_URL_MAX = 2_000_000; // 2MB limit for base64 encoded images
 
 type NormalizedField = {
   provided: boolean;

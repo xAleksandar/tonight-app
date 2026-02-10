@@ -55,7 +55,6 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
       setMagicLinkUrl(payload.magicLinkUrl ?? null);
       setStatus("success");
       setMessage(null);
-      showSuccessToast("Magic link sent", "Check your email to continue.");
     } catch (error) {
       console.error("Magic link request failed", error);
       setStatus("error");

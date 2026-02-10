@@ -63,3 +63,29 @@ body {
 .text-balance {
   text-wrap: balance;
 }
+
+/* Mapbox event popup styling */
+.event-map-popup .mapboxgl-popup-content {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.event-map-popup .mapboxgl-popup-close-button {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 20px;
+  padding: 4px 8px;
+  right: 4px;
+  top: 4px;
+  transition: color 0.2s;
+}
+
+.event-map-popup .mapboxgl-popup-close-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.event-map-popup .mapboxgl-popup-tip {
+  border-top-color: rgb(39, 39, 42);
+  border-bottom-color: rgb(39, 39, 42);
+}

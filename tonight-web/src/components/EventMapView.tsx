@@ -58,10 +58,10 @@ const getEventMarkerClass = ({
   classNames(
     "pointer-events-auto grid h-5 w-5 place-items-center rounded-full border-2 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300",
     isSelected
-      ? "border-pink-100 bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/40"
+      ? "border-pink-100 bg-gradient-to-br from-pink-400 to-pink-500 text-white shadow-lg shadow-pink-400/50"
       : isHovered
-        ? "border-pink-200/80 bg-zinc-900 text-white shadow-md shadow-pink-500/20"
-        : "border-white/80 bg-zinc-950/90 text-white/90 shadow-md shadow-black/40"
+        ? "border-pink-200 bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-md shadow-rose-400/40"
+        : "border-rose-300/80 bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-md shadow-rose-400/30"
   );
 
 const applyMarkerAppearance = (entry: EventMarkerEntry, selectedEventId: string | null) => {
@@ -75,31 +75,31 @@ const applyMarkerAppearance = (entry: EventMarkerEntry, selectedEventId: string 
 
 const buildPopupContent = (event: EventMapItem) => {
   const wrapper = document.createElement("div");
-  wrapper.className = "space-y-1";
+  wrapper.className = "rounded-xl border border-rose-400/40 bg-gradient-to-br from-zinc-700 via-zinc-800 to-zinc-900 p-3 shadow-xl shadow-black/40 backdrop-blur-sm min-w-[200px]";
 
   const title = document.createElement("p");
-  title.className = "text-sm font-semibold text-zinc-900";
+  title.className = "text-sm font-semibold text-white mb-2";
   title.textContent = event.title;
   wrapper.appendChild(title);
 
   const venue = document.createElement("p");
-  venue.className = "text-xs text-zinc-600";
-  venue.textContent = event.locationName;
+  venue.className = "text-xs text-rose-200/80 mb-1.5 flex items-center gap-1";
+  venue.innerHTML = `<svg class="w-3 h-3 text-rose-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>${event.locationName}</span>`;
   wrapper.appendChild(venue);
 
   const formattedTime = formatDateTime(event.datetimeISO);
   if (formattedTime) {
     const time = document.createElement("p");
-    time.className = "text-xs text-zinc-500";
-    time.textContent = formattedTime;
+    time.className = "text-xs text-zinc-400 flex items-center gap-1";
+    time.innerHTML = `<svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M12 6v6l4 2"/></svg><span>${formattedTime}</span>`;
     wrapper.appendChild(time);
   }
 
   const formattedDistance = formatDistance(event.distanceMeters);
   if (formattedDistance) {
     const distance = document.createElement("p");
-    distance.className = "text-xs text-zinc-500";
-    distance.textContent = formattedDistance;
+    distance.className = "text-xs text-zinc-400 flex items-center gap-1 mt-1";
+    distance.innerHTML = `<svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg><span>${formattedDistance}</span>`;
     wrapper.appendChild(distance);
   }
 
@@ -297,7 +297,11 @@ export default function EventMapView({
         .setLngLat(lngLat)
         .addTo(map);
 
-      const popup = new mapbox.Popup({ closeButton: true, closeOnClick: false }).setDOMContent(
+      const popup = new mapbox.Popup({
+        closeButton: true,
+        closeOnClick: false,
+        className: 'event-map-popup'
+      }).setDOMContent(
         buildPopupContent(event)
       );
 

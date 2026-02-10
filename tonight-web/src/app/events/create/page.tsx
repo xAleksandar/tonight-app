@@ -1,7 +1,7 @@
 
 'use client';
 
-import { FormEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlignLeft, Clock, MapPin, Sparkles, Type, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -99,6 +99,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
   const [locationName, setLocationName] = useState('');
   const [maxParticipants, setMaxParticipants] = useState<number>(DEFAULT_MAX_PARTICIPANTS);
   const [location, setLocation] = useState<MapCoordinates | null>(null);
+  const [mapCenter, setMapCenter] = useState<MapCoordinates | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusIntent, setStatusIntent] = useState<'idle' | 'error' | 'success'>('idle');
@@ -106,6 +107,22 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
   const [geolocating, setGeolocating] = useState(false);
 
   const friendlyDatetime = useMemo(() => formatReadableDatetime(datetimeInput), [datetimeInput]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      () => {
+        // Silently fail - user hasn't granted permission or it failed
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+    );
+  }, []);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) {
@@ -272,32 +289,6 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
             <div className="mx-auto w-full max-w-4xl space-y-6">
               <MobileCreateHero />
 
-              <div className="hidden rounded-3xl border border-border/70 bg-card/40 px-6 py-5 shadow-xl shadow-black/20 md:block">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Host
-                </div>
-                <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h1 className="font-serif text-3xl font-semibold text-foreground leading-tight">Create an event</h1>
-                    <p className="text-sm text-muted-foreground">Tell people what's happening tonight and we'll surface it nearby.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleGeolocate}
-                    className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary"
-                    disabled={geolocating}
-                  >
-                    {geolocating ? 'Locating…' : 'Use my location'}
-                  </button>
-                </div>
-                <dl className="mt-6 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
-                  <SummaryItem label="Meetup label" value={locationName.trim() || 'Add a location'} />
-                  <SummaryItem label="Starts" value={friendlyDatetime} />
-                  <SummaryItem label="Capacity" value={`Up to ${maxParticipants} people`} />
-                </dl>
-              </div>
-
               {statusMessage && (
                 <StatusBanner intent={statusIntent} message={statusMessage} />
               )}
@@ -440,15 +431,14 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
 
                   <div className="mt-4 space-y-4">
-                    <div className="rounded-3xl border border-border/60 bg-background/30 p-3">
-                      <MapboxLocationPicker
-                        label="Event location"
-                        initialValue={location}
-                        onChange={setLocation}
-                        tone="dark"
-                        className="rounded-2xl border border-border/40 bg-card/30 p-3"
-                      />
-                    </div>
+                    <MapboxLocationPicker
+                      label="Event location"
+                      initialValue={location}
+                      initialCenter={mapCenter}
+                      onChange={setLocation}
+                      tone="dark"
+                      className="rounded-2xl border border-border/40 bg-card/30 p-3"
+                    />
                     {fieldErrors.location && <FieldError message={fieldErrors.location} />}
 
                     <div className="space-y-2">

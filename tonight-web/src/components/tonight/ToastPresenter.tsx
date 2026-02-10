@@ -6,20 +6,24 @@ export function ToastPresenter() {
   return (
     <Toaster
       position="top-center"
-      gutter={12}
-      containerClassName="top-4 sm:top-6"
+      gutter={16}
+      containerClassName="!top-6 !left-0 !right-0 !flex !justify-center md:!left-64"
+      containerStyle={{
+        top: '24px',
+      }}
       toastOptions={{
         duration: 4000,
         style: {
           background: "transparent",
           boxShadow: "none",
           padding: 0,
+          margin: "0 auto",
         },
         success: {
-          duration: 3800,
+          duration: 3200,
         },
         error: {
-          duration: 5500,
+          duration: 5000,
         },
       }}
     />
