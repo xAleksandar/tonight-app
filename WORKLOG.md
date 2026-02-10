@@ -48,7 +48,8 @@
 - 2026-02-10 02:58 runner: Polished the profile hero (cleaner avatar block + stat stack) and rebuilt the settings list to match the V0 rows, keeping the safety scroll target + logout wiring intact. `npm test` remains green.
 - 2026-02-10 02:46 runner: Brought the Personal details form + account info rows up to the latest V0 spec (new helper copy, tightened spacing, tiered button hierarchy, and refreshed action chips) and reran `npm test` (68 suites, green).
 - 2026-02-10 02:58 runner: Tightened the profile activity panels to match the V0 treatments (active events list now shows pending/confirmed badges with the new typography stack, refreshed the headers, and rebuilt the safety block with the shield hero, guidance bullets, and panel-style actions). `npm test` still passes (68 suites).
+- 2026-02-10 03:49 runner: Rebuilt the /people experience to match the V0 cards (grid-based glass layout, mobile range sheet, desktop slider, and contact CTA that opens the Messages modal) while filtering the mock roster by the active radius. Hardened ReportModal so tests can run outside the browser, re-ran `npm test` (68 suites, passing).
 
 ## Next Up
-1. Sweep the remaining profile glass panels (stats hero, info rows, settings) for the outstanding V0 spacing + typography deltas before moving back to the general backlog.
-2. Once the profile surfaces are fully aligned, resume the broader discovery/people backlog items.
+1. Swap the People roster over to real data (range-filtered API + empty state plumbing) and wire the event chips into the actual event-detail modal once the backend endpoints land.
+2. Follow up with the remaining discovery/people backlog deltas (e.g., map integration + quick-invite affordances) once the live data path is ready.

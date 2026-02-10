@@ -82,6 +82,10 @@ export default function ReportModal({
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") {
+      return () => {};
+    }
+
     if (!isOpen) {
       document.body.style.removeProperty("overflow");
       return () => {};
@@ -96,11 +100,15 @@ export default function ReportModal({
   }, [isOpen]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return () => {};
+    }
+
     if (!isOpen) {
       requestRef.current?.abort();
       setSubmissionState("idle");
       setStatusMessage(null);
-      return;
+      return () => {};
     }
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -216,7 +224,7 @@ export default function ReportModal({
     }
   }, [description, onSubmitted, reportedUserId, resolvedEventId, selectedReason, submissionState]);
 
-  if (!mounted || !isOpen) {
+  if (!mounted || !isOpen || typeof document === "undefined") {
     return null;
   }
 

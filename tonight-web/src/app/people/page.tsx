@@ -1,7 +1,22 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import * as SliderPrimitive from "@radix-ui/react-slider";
+import type { LucideIcon } from "lucide-react";
+import {
+  ChevronRight,
+  Clapperboard,
+  Coffee,
+  Dumbbell,
+  MapPin,
+  MessageCircle,
+  Music,
+  SlidersHorizontal,
+  Users as UsersIcon,
+  UtensilsCrossed,
+  Waves,
+} from "lucide-react";
 
 import { MessagesModal } from "@/components/chat/MessagesModal";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
@@ -10,6 +25,140 @@ import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import type { CategoryId } from "@/lib/categories";
+import { classNames } from "@/lib/classNames";
+
+const MIN_RANGE_KM = 1;
+const MAX_RANGE_KM = 50;
+const DEFAULT_RANGE_KM = 10;
+
+type PersonEventCategory = "cinema" | "food" | "outdoor" | "music" | "fitness" | "social";
+
+type PersonEvent = {
+  title: string;
+  category: PersonEventCategory;
+  timeLabel: string;
+  statusLabel: string;
+};
+
+type PersonProspect = {
+  id: string;
+  name: string;
+  initials: string;
+  distanceKm: number;
+  bio: string;
+  events: PersonEvent[];
+};
+
+const CATEGORY_ICON_MAP: Record<PersonEventCategory, LucideIcon> = {
+  cinema: Clapperboard,
+  food: UtensilsCrossed,
+  outdoor: Waves,
+  music: Music,
+  fitness: Dumbbell,
+  social: Coffee,
+};
+
+const CATEGORY_STYLE_MAP: Record<PersonEventCategory, string> = {
+  cinema: "border-sky-400/30 bg-sky-500/10 text-sky-200",
+  food: "border-amber-400/30 bg-amber-500/10 text-amber-200",
+  outdoor: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
+  music: "border-rose-400/30 bg-rose-500/10 text-rose-200",
+  fitness: "border-lime-400/30 bg-lime-500/10 text-lime-200",
+  social: "border-orange-400/30 bg-orange-500/10 text-orange-200",
+};
+
+const PEOPLE_PROSPECTS: PersonProspect[] = [
+  {
+    id: "alice",
+    name: "Alice W.",
+    initials: "AW",
+    distanceKm: 0.5,
+    bio: "Beach lover plotting a sunset walk. Down to coordinate rides or snacks for tomorrow's coastal meetup.",
+    events: [
+      {
+        title: "Going to Sea",
+        category: "outdoor",
+        timeLabel: "Tonight · 8:45 PM",
+        statusLabel: "Need 2 seats",
+      },
+    ],
+  },
+  {
+    id: "marco",
+    name: "Marco R.",
+    initials: "MR",
+    distanceKm: 1.2,
+    bio: "Movie enthusiast with a standing Friday pass. Happy to swap trailers and pick the perfect row.",
+    events: [
+      {
+        title: "Late cinema run",
+        category: "cinema",
+        timeLabel: "Tomorrow · 10:15 PM",
+        statusLabel: "2 invites",
+      },
+    ],
+  },
+  {
+    id: "sofia",
+    name: "Sofia M.",
+    initials: "SM",
+    distanceKm: 3.1,
+    bio: "Jazz fan + espresso evangelist. Looking for company for a mellow set downtown.",
+    events: [
+      {
+        title: "Live jazz night",
+        category: "music",
+        timeLabel: "Tonight · 9:30 PM",
+        statusLabel: "1 spot",
+      },
+    ],
+  },
+  {
+    id: "elena",
+    name: "Elena K.",
+    initials: "EK",
+    distanceKm: 2.8,
+    bio: "Restaurant-hopping this week. Always game to discover a new chef's menu.",
+    events: [
+      {
+        title: "Sushi tasting",
+        category: "food",
+        timeLabel: "Tomorrow · 7:00 PM",
+        statusLabel: "Host pick",
+      },
+    ],
+  },
+  {
+    id: "dan",
+    name: "Dan P.",
+    initials: "DP",
+    distanceKm: 0.8,
+    bio: "Trainer by day, pickleball fan by night. Need a push partner?",
+    events: [
+      {
+        title: "Evening gym drop-in",
+        category: "fitness",
+        timeLabel: "Today · 6:30 PM",
+        statusLabel: "Co-op",
+      },
+    ],
+  },
+  {
+    id: "ana",
+    name: "Ana B.",
+    initials: "AB",
+    distanceKm: 1.9,
+    bio: "Board game collector. Hosting casual sessions with good coffee and playlists.",
+    events: [
+      {
+        title: "Coffee & boards",
+        category: "social",
+        timeLabel: "Sunday · 4:00 PM",
+        statusLabel: "Open",
+      },
+    ],
+  },
+];
 
 export default function PeoplePage() {
   const { status: authStatus } = useRequireAuth();
@@ -23,9 +172,7 @@ export default function PeoplePage() {
   }
 
   if (authStatus === "error") {
-    return (
-      <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />
-    );
+    return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
   return <AuthenticatedPeoplePage />;
@@ -33,23 +180,28 @@ export default function PeoplePage() {
 
 function AuthenticatedPeoplePage() {
   const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(
-    null,
-  );
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [messagesOpen, setMessagesOpen] = useState(false);
-  const handleCreate = useCallback(
-    () => router.push("/events/create"),
-    [router],
+  const [rangeKm, setRangeKm] = useState(DEFAULT_RANGE_KM);
+  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+  const [rangeSheetValue, setRangeSheetValue] = useState(rangeKm);
+
+  const handleCreate = useCallback(() => router.push("/events/create"), [router]);
+  const handleDiscover = useCallback(() => router.push("/"), [router]);
+
+  const visibleProspects = useMemo(
+    () => PEOPLE_PROSPECTS.filter((person) => person.distanceKm <= rangeKm + 0.001),
+    [rangeKm],
   );
 
   return (
-    <div className="min-h-dvh text-foreground">
+    <div className="min-h-dvh bg-gradient-to-b from-[#070b1c] via-[#060814] to-[#05060f] text-foreground">
       <div className="flex min-h-dvh flex-col md:flex-row">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           onCreate={handleCreate}
-          onNavigateDiscover={() => router.push("/")}
+          onNavigateDiscover={handleDiscover}
           onNavigatePeople={() => router.push("/people")}
           activePrimaryNav="people"
         />
@@ -63,51 +215,32 @@ function AuthenticatedPeoplePage() {
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
-            <div className="mx-auto w-full max-w-4xl space-y-6">
-              <section className="rounded-3xl border border-border/60 bg-card/60 p-6 text-center shadow-xl shadow-black/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-                  Tonight
-                </p>
-                <h2 className="mt-3 text-3xl font-serif font-semibold">
-                  People nearby is on the way
-                </h2>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  We're polishing this section so you can see who else is free
-                  tonight. In the meantime, head back to Discover or post your
-                  own meetup.
-                </p>
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => router.push("/")}
-                    className="rounded-2xl border border-border/70 px-5 py-2.5 text-sm font-semibold text-foreground transition hover:text-primary"
-                  >
-                    Back to Discover
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreate}
-                    className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90"
-                  >
-                    Post an event
-                  </button>
-                </div>
-              </section>
+            <div className="mx-auto w-full max-w-6xl space-y-6">
+              <PeopleMobileHeader
+                rangeKm={rangeKm}
+                onOpenFilters={() => {
+                  setRangeSheetValue(rangeKm);
+                  setRangeSheetOpen(true);
+                }}
+              />
 
-              <section className="rounded-3xl border border-dashed border-border/50 bg-card/50 p-6 text-left text-sm text-muted-foreground">
-                <h3 className="text-base font-semibold text-foreground">
-                  What's coming
-                </h3>
-                <ul className="mt-3 list-disc space-y-1 pl-5">
-                  {[
-                    "Browse members who recently checked in nearby",
-                    "See who is open to spontaneous hangs tonight",
-                    "Send a hi or invite them to your event without leaving the page",
-                  ].map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </section>
+              <PeopleExplainerPanel />
+
+              <PeopleRangeControls
+                className="hidden md:block"
+                value={rangeKm}
+                onChange={setRangeKm}
+              />
+
+              {visibleProspects.length > 0 ? (
+                <PeopleGrid
+                  prospects={visibleProspects}
+                  onContact={() => setMessagesOpen(true)}
+                  onViewPlans={handleDiscover}
+                />
+              ) : (
+                <PeopleEmptyState onResetFilters={() => setRangeKm(DEFAULT_RANGE_KM)} />
+              )}
             </div>
           </main>
         </div>
@@ -115,17 +248,311 @@ function AuthenticatedPeoplePage() {
 
       <MobileActionBar
         active="people"
-        onNavigateDiscover={() => router.push("/")}
+        onNavigateDiscover={handleDiscover}
         onNavigatePeople={() => router.push("/people")}
         onNavigateMessages={() => setMessagesOpen(true)}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
       />
 
-      <MessagesModal
-        isOpen={messagesOpen}
-        onClose={() => setMessagesOpen(false)}
-      />
+      <MessagesModal isOpen={messagesOpen} onClose={() => setMessagesOpen(false)} />
+
+      {rangeSheetOpen ? (
+        <PeopleRangeSheet
+          value={rangeSheetValue}
+          onChange={setRangeSheetValue}
+          onApply={() => {
+            setRangeKm(rangeSheetValue);
+            setRangeSheetOpen(false);
+          }}
+          onClose={() => setRangeSheetOpen(false)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+type PeopleGridProps = {
+  prospects: PersonProspect[];
+  onContact: () => void;
+  onViewPlans: () => void;
+};
+
+function PeopleGrid({ prospects, onContact, onViewPlans }: PeopleGridProps) {
+  return (
+    <section>
+      <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Tonight</p>
+          <h2 className="font-serif text-2xl font-semibold">Who else is out?</h2>
+          <p className="text-sm text-muted-foreground">People who recently marked themselves available within your radius.</p>
+        </div>
+        <p className="text-xs text-muted-foreground/80">Sorted by distance · auto-refreshes every few minutes</p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {prospects.map((person) => (
+          <PeopleCard key={person.id} person={person} onContact={onContact} onViewPlans={onViewPlans} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+type PeopleCardProps = {
+  person: PersonProspect;
+  onContact: () => void;
+  onViewPlans: () => void;
+};
+
+function PeopleCard({ person, onContact, onViewPlans }: PeopleCardProps) {
+  return (
+    <article className="flex h-full flex-col gap-4 rounded-3xl border border-border/60 bg-card/60 p-5 shadow-xl shadow-black/20 transition hover:border-primary/40">
+      <header className="flex items-center gap-3">
+        <InitialsAvatar initials={person.initials} />
+        <div className="flex flex-1 flex-col">
+          <p className="text-sm font-semibold text-foreground">{person.name}</p>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" />
+            {person.distanceKm.toFixed(1)} km from you
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onContact}
+          className="inline-flex items-center gap-1.5 rounded-2xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          Contact
+        </button>
+      </header>
+
+      <p className="text-sm text-muted-foreground leading-relaxed">{person.bio}</p>
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Their plans</p>
+        {person.events.map((event) => {
+          const Icon = CATEGORY_ICON_MAP[event.category];
+          return (
+            <button
+              key={`${person.id}-${event.title}`}
+              type="button"
+              onClick={onViewPlans}
+              className="group flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-background/40 px-3 py-3 text-left transition hover:border-primary/40"
+            >
+              <span
+                className={classNames(
+                  "flex h-10 w-10 items-center justify-center rounded-xl border text-sm",
+                  CATEGORY_STYLE_MAP[event.category],
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="flex-1">
+                <span className="block text-sm font-semibold text-foreground">{event.title}</span>
+                <span className="text-xs text-muted-foreground">{event.timeLabel}</span>
+              </span>
+              <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {event.statusLabel}
+                <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+type PeopleRangeControlsProps = {
+  value: number;
+  onChange: (value: number) => void;
+  className?: string;
+};
+
+function PeopleRangeControls({ value, onChange, className }: PeopleRangeControlsProps) {
+  return (
+    <section className={classNames("rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20", className)}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">People range</p>
+          <h3 className="font-serif text-2xl font-semibold">{Math.round(value)} km radius</h3>
+          <p className="text-sm text-muted-foreground">Tune how far away we should surface members who marked an active plan.</p>
+        </div>
+        <div className="hidden text-right text-xs text-muted-foreground sm:block">
+          Auto-matches refresh when someone nearby updates their status.
+        </div>
+      </div>
+      <div className="mt-6 space-y-3">
+        <SliderPrimitive.Root
+          className="relative flex h-8 w-full touch-none select-none items-center"
+          max={MAX_RANGE_KM}
+          min={MIN_RANGE_KM}
+          step={1}
+          value={[value]}
+          aria-label="People radius"
+          onValueChange={([next]) => {
+            if (typeof next === "number") {
+              onChange(next);
+            }
+          }}
+        >
+          <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-border/60">
+            <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
+          </SliderPrimitive.Track>
+          <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-[3px] border-background bg-primary-foreground shadow-[0_6px_18px_rgba(0,0,0,0.45)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" />
+        </SliderPrimitive.Root>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{MIN_RANGE_KM} km</span>
+          <span>{MAX_RANGE_KM} km</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type PeopleMobileHeaderProps = {
+  rangeKm: number;
+  onOpenFilters: () => void;
+};
+
+function PeopleMobileHeader({ rangeKm, onOpenFilters }: PeopleMobileHeaderProps) {
+  return (
+    <div className="space-y-3 md:hidden">
+      <div className="flex items-center justify-between rounded-3xl border border-border/60 bg-card/60 px-4 py-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
+          <h1 className="text-2xl font-serif font-semibold leading-tight">People nearby</h1>
+          <p className="text-xs text-muted-foreground">Discover who's free to make plans.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenFilters}
+          className="inline-flex items-center gap-1.5 rounded-2xl border border-border/70 bg-background/40 px-3 py-2 text-xs font-semibold text-foreground"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          {Math.round(rangeKm)} km
+        </button>
+      </div>
+      <div className="flex items-start gap-3 rounded-3xl border border-primary/20 bg-primary/5 px-4 py-4 text-xs text-muted-foreground">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+          <UsersIcon className="h-4 w-4" />
+        </div>
+        <p>
+          <span className="font-semibold text-foreground">People range</span> highlights members near you who recently toggled “I have plans." They might be heading somewhere farther away but still want to coordinate rides.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PeopleExplainerPanel() {
+  return (
+    <section className="hidden items-start gap-3 rounded-3xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm text-muted-foreground md:flex">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+        <UsersIcon className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-foreground">Coordinate with travelers</p>
+        <p className="text-xs text-muted-foreground">
+          People nearby surfaces members who signaled an active plan in the last few hours. Distances show how close they are to you, not necessarily where their event happens.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+type PeopleEmptyStateProps = {
+  onResetFilters: () => void;
+};
+
+function PeopleEmptyState({ onResetFilters }: PeopleEmptyStateProps) {
+  return (
+    <section className="rounded-3xl border border-border/60 bg-card/60 p-8 text-center shadow-xl shadow-black/20">
+      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">People range</p>
+      <h3 className="mt-3 font-serif text-2xl font-semibold">No one within this radius yet</h3>
+      <p className="mt-3 text-sm text-muted-foreground">
+        Expand your range to 15–20 km and we’ll refresh the list. You can shrink it back anytime.
+      </p>
+      <button
+        type="button"
+        onClick={onResetFilters}
+        className="mt-6 rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90"
+      >
+        Reset to default
+      </button>
+    </section>
+  );
+}
+
+type PeopleRangeSheetProps = {
+  value: number;
+  onChange: (value: number) => void;
+  onApply: () => void;
+  onClose: () => void;
+};
+
+function PeopleRangeSheet({ value, onChange, onApply, onClose }: PeopleRangeSheetProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center md:hidden">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/70"
+        aria-label="Close range selector"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-md rounded-t-[32px] border border-white/10 bg-[#060815]/95 px-5 pb-8 pt-6 text-white shadow-[0_-24px_120px_rgba(2,6,23,0.88)]">
+        <div className="mx-auto mb-4 h-1 w-16 rounded-full bg-white/15" />
+        <div className="space-y-1 text-left">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/60">People range</p>
+          <h2 className="text-2xl font-serif font-semibold text-white">Tune your radius</h2>
+          <p className="text-sm text-white/70">Let Tonight know how far out we should look for fellow planners.</p>
+        </div>
+        <div className="mt-6 space-y-6">
+          <div>
+            <div className="flex items-center justify-between text-sm text-white/80">
+              <span>Distance</span>
+              <span className="font-semibold text-white">{Math.round(value)} km</span>
+            </div>
+            <SliderPrimitive.Root
+              className="relative mt-5 flex h-8 w-full touch-none select-none items-center"
+              max={MAX_RANGE_KM}
+              min={MIN_RANGE_KM}
+              step={1}
+              value={[value]}
+              aria-label="People radius"
+              onValueChange={([next]) => {
+                if (typeof next === "number") {
+                  onChange(next);
+                }
+              }}
+            >
+              <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-white/12">
+                <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
+              </SliderPrimitive.Track>
+              <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-[3px] border-[#050713] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.45)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60" />
+            </SliderPrimitive.Root>
+            <div className="mt-2 flex items-center justify-between text-xs text-white/50">
+              <span>{MIN_RANGE_KM} km</span>
+              <span>{MAX_RANGE_KM} km</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onApply}
+            className="w-full rounded-2xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:brightness-110"
+          >
+            Apply radius
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InitialsAvatar({ initials }: { initials: string }) {
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border/70 bg-background/60 text-sm font-semibold text-foreground">
+      {initials}
+    </span>
   );
 }
