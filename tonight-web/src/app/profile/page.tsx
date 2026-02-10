@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Calendar,
@@ -579,18 +579,34 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                       ref={safetyRef}
                       className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20"
                     >
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Safety</p>
-                        <h3 className="font-serif text-2xl font-semibold">Block & report</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Block or report someone if they make you uncomfortable. Safety notes stay private with the Tonight team.
-                        </p>
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
+                          <Shield className="h-5 w-5" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Safety</p>
+                          <h3 className="font-serif text-xl font-semibold text-foreground">Block & report</h3>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Block or report someone if they make you uncomfortable. Safety notes stay private with the Tonight team.
+                          </p>
+                          <ul className="space-y-1 text-xs text-muted-foreground">
+                            <li className="flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" aria-hidden="true" />
+                              Blocks hide chats, join requests, and future invites instantly.
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-rose-400/70" aria-hidden="true" />
+                              Reports alert Tonight’s safety team discreetly for review.
+                            </li>
+                          </ul>
+                        </div>
                       </div>
-                      <div className="mt-4 flex flex-col gap-3">
+                      <div className="mt-6 grid gap-3 sm:grid-cols-2">
                         <BlockUserButton
                           targetUserId={profile.id}
                           targetDisplayName={profile.displayName ?? profile.email}
-                          className="items-center rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground"
+                          className="w-full"
+                          variant="panel"
                           confirmTitle={profile.displayName ? `Block ${profile.displayName}?` : 'Block this user?'}
                           confirmMessage="They won’t be able to message you, join your events, or see your plans."
                           disabled={viewingOwnProfile}
@@ -602,13 +618,20 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                             setReportModalOpen(true);
                           }}
                           disabled={!canReportUser}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-rose-200/60 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex w-full items-center justify-between gap-2 rounded-2xl border border-rose-300/40 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:border-rose-200/60 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                         >
+                          <span>Report user</span>
                           <Flag className="h-4 w-4" />
-                          Report user
                         </button>
                       </div>
-                      <p className={classNames('mt-3 text-xs', reportNotice ? 'text-emerald-300' : 'text-muted-foreground')}>
+                      <p
+                        className={classNames(
+                          'mt-4 rounded-2xl border px-4 py-3 text-xs leading-relaxed',
+                          reportNotice
+                            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-50'
+                            : 'border-border/60 bg-background/30 text-muted-foreground'
+                        )}
+                      >
                         {reportNotice
                           ? reportNotice
                           : viewingOwnProfile
@@ -706,15 +729,22 @@ type ActiveEventsPanelProps = {
 };
 
 function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
+  const hasEvents = events.length > 0;
+
   return (
     <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Hosts</p>
-          <h3 className="font-serif text-2xl font-semibold">My active events</h3>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Hosts</p>
+          <h3 className="font-serif text-xl font-semibold text-foreground">Active plans</h3>
+          <p className="text-xs text-muted-foreground">Keep an eye on pending requests and RSVP health.</p>
         </div>
+        {!loading && !error && hasEvents ? (
+          <p className="text-xs text-muted-foreground/80">Updates land here as guests respond.</p>
+        ) : null}
       </div>
-      <div className="mt-4 space-y-3">
+
+      <div className="mt-5 space-y-3">
         {loading ? (
           Array.from({ length: 2 }).map((_, index) => (
             // eslint-disable-next-line react/no-array-index-key
@@ -724,42 +754,80 @@ function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
           <div className="rounded-2xl border border-rose-200/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
             {error}
           </div>
-        ) : events.length === 0 ? (
+        ) : !hasEvents ? (
           <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-5 text-sm text-muted-foreground">
-            No active events yet. Tap “Post event” to start hosting.
+            No live plans yet. Post an event to see it tracked here.
           </div>
         ) : (
-          events.map((event) => (
-            <div
-              key={event.id}
-              className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/30 px-4 py-3"
-            >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                {event.pendingRequests > 0 ? <Clapperboard className="h-5 w-5" /> : <Users className="h-5 w-5" />}
-              </div>
-              <div className="flex flex-1 flex-col">
-                <span className="text-sm font-semibold text-foreground">{event.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {event.locationName} · {formatEventDatetime(event.datetime)}
-                </span>
-              </div>
-              <span
-                className={classNames(
-                  'rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
-                  event.pendingRequests > 0
-                    ? 'border border-primary/40 bg-primary/10 text-primary'
-                    : 'border border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                )}
+          events.map((event) => {
+            const hasPending = event.pendingRequests > 0;
+            const hasAccepted = event.acceptedRequests > 0;
+
+            return (
+              <article
+                key={event.id}
+                className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/30 px-4 py-4 text-sm text-foreground sm:flex-row sm:items-center"
               >
-                {event.pendingRequests > 0
-                  ? `${event.pendingRequests} request${event.pendingRequests === 1 ? '' : 's'}`
-                  : 'Active'}
-              </span>
-            </div>
-          ))
+                <div
+                  className={classNames(
+                    'flex h-12 w-12 items-center justify-center rounded-2xl border text-primary',
+                    hasPending
+                      ? 'border-primary/40 bg-primary/10 text-primary'
+                      : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                  )}
+                >
+                  {hasPending ? <Clapperboard className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                </div>
+                <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">{event.title}</span>
+                    <StatusBadge tone={hasPending ? 'primary' : 'success'}>
+                      {hasPending
+                        ? `${event.pendingRequests} pending`
+                        : hasAccepted
+                          ? 'All confirmed'
+                          : 'Active'}
+                    </StatusBadge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{event.locationName}</span>
+                    <span className="h-1 w-1 rounded-full bg-border/60" aria-hidden="true" />
+                    <span>{formatEventDatetime(event.datetime)}</span>
+                    {hasAccepted ? (
+                      <StatusBadge tone="neutral">{event.acceptedRequests} confirmed</StatusBadge>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })
         )}
       </div>
     </section>
+  );
+}
+
+type StatusBadgeProps = {
+  tone: 'primary' | 'success' | 'neutral';
+  children: ReactNode;
+};
+
+function StatusBadge({ tone, children }: StatusBadgeProps) {
+  const toneClasses: Record<StatusBadgeProps['tone'], string> = {
+    primary: 'border-primary/40 bg-primary/10 text-primary',
+    success: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-50',
+    neutral: 'border-border/60 bg-background/50 text-foreground',
+  };
+
+  return (
+    <span
+      className={classNames(
+        'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
+        toneClasses[tone]
+      )}
+    >
+      {children}
+    </span>
   );
 }
 

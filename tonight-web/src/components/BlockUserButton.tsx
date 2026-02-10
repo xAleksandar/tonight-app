@@ -21,6 +21,7 @@ type BlockUserButtonProps = {
   targetDisplayName?: string | null;
   className?: string;
   label?: string;
+  variant?: 'pill' | 'panel';
   confirmTitle?: string;
   confirmMessage?: string;
   confirmCtaLabel?: string;
@@ -35,6 +36,7 @@ export default function BlockUserButton({
   targetDisplayName,
   className,
   label = 'Block',
+  variant = 'pill',
   confirmTitle,
   confirmMessage,
   confirmCtaLabel = 'Block user',
@@ -192,6 +194,27 @@ export default function BlockUserButton({
   const buttonLabel = hasBlocked ? 'Blocked' : label;
   const helperColor = inlineNotice?.type === 'success' ? 'text-emerald-600' : 'text-rose-600';
 
+  const sharedButtonClasses =
+    'inline-flex items-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 focus-visible:ring-offset-2';
+
+  const pillClasses = combineClasses(
+    'rounded-full border border-transparent px-3 py-2 text-xs font-semibold',
+    hasBlocked
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : 'border-zinc-200 bg-white/80 text-zinc-600 hover:text-zinc-900',
+    resolvedDisabled && !hasBlocked ? 'opacity-60' : ''
+  );
+
+  const panelClasses = combineClasses(
+    'w-full justify-between rounded-2xl border px-4 py-3 text-sm font-semibold',
+    hasBlocked
+      ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-50'
+      : 'border-border/60 bg-background/40 text-foreground hover:border-rose-200/60 hover:text-rose-100',
+    resolvedDisabled && !hasBlocked ? 'opacity-60' : ''
+  );
+
+  const buttonClasses = combineClasses(sharedButtonClasses, variant === 'panel' ? panelClasses : pillClasses);
+
   return (
     <div className={combineClasses('relative inline-flex flex-col items-start', className)}>
       <button
@@ -199,13 +222,7 @@ export default function BlockUserButton({
         type="button"
         onClick={handleOpenConfirm}
         disabled={resolvedDisabled}
-        className={combineClasses(
-          'inline-flex items-center gap-1.5 rounded-full border border-transparent px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 focus-visible:ring-offset-2',
-          hasBlocked
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            : 'border-zinc-200 bg-white/80 text-zinc-600 hover:text-zinc-900',
-          resolvedDisabled && !hasBlocked ? 'opacity-60' : ''
-        )}
+        className={buttonClasses}
         aria-pressed={hasBlocked}
       >
         <ShieldAlert className="h-3.5 w-3.5" />

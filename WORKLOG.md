@@ -47,7 +47,8 @@
 - 2026-02-10 02:40 runner: Wired the desktop sidebar buttons into real navigation callbacks, added the temporary /people shell so both desktop + mobile navs have somewhere to land, and reran `npm test` (68 suites, passing).
 - 2026-02-10 02:58 runner: Polished the profile hero (cleaner avatar block + stat stack) and rebuilt the settings list to match the V0 rows, keeping the safety scroll target + logout wiring intact. `npm test` remains green.
 - 2026-02-10 02:46 runner: Brought the Personal details form + account info rows up to the latest V0 spec (new helper copy, tightened spacing, tiered button hierarchy, and refreshed action chips) and reran `npm test` (68 suites, green).
+- 2026-02-10 02:58 runner: Tightened the profile activity panels to match the V0 treatments (active events list now shows pending/confirmed badges with the new typography stack, refreshed the headers, and rebuilt the safety block with the shield hero, guidance bullets, and panel-style actions). `npm test` still passes (68 suites).
 
 ## Next Up
-1. Tighten the Profile activity panels (active events list, safety block) to mirror the V0 typography + badge treatments before moving on to the rest of the profile deltas.
-2. Sweep the remaining profile glass panels (safety notice, stats hero, settings) for the outstanding design deltas before resuming the general backlog.
+1. Sweep the remaining profile glass panels (stats hero, info rows, settings) for the outstanding V0 spacing + typography deltas before moving back to the general backlog.
+2. Once the profile surfaces are fully aligned, resume the broader discovery/people backlog items.
