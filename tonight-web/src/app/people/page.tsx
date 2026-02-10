@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import type { LucideIcon } from "lucide-react";
@@ -8,10 +8,12 @@ import {
   ChevronRight,
   Clapperboard,
   Coffee,
+  Link2,
   Dumbbell,
   MapPin,
   MessageCircle,
   Music,
+  Share2,
   SlidersHorizontal,
   Sparkles,
   Users as UsersIcon,
@@ -298,6 +300,8 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
               />
 
               <PeopleExplainerPanel />
+
+              <PeopleQuickInvitePanel />
 
               <PeopleRangeControls
                 className="hidden md:block"
@@ -606,6 +610,130 @@ function PeopleExplainerPanel() {
         <p className="text-xs text-muted-foreground">
           People nearby surfaces members who signaled an active plan in the last few hours. Distances show how close they are to you, not necessarily where their event happens.
         </p>
+      </div>
+    </section>
+  );
+}
+
+
+
+type PeopleQuickInvitePanelProps = {
+  className?: string;
+};
+
+function PeopleQuickInvitePanel({ className }: PeopleQuickInvitePanelProps) {
+  const [inviteLink, setInviteLink] = useState("https://tonight.app/invite");
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const [shareState, setShareState] = useState<"idle" | "shared" | "error">("idle");
+  const [shareSupported, setShareSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setInviteLink(`${window.location.origin}/invite`);
+    }
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      setShareSupported(true);
+    }
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(inviteLink);
+      } else if (typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.value = inviteLink;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 2500);
+    } catch (error) {
+      console.error("Failed to copy invite link", error);
+      setCopyState("error");
+    }
+  }, [inviteLink]);
+
+  const handleShare = useCallback(async () => {
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      await handleCopy();
+      return;
+    }
+    try {
+      await navigator.share({
+        title: "Meet me on Tonight",
+        text: "Join me on Tonight to make last-minute plans tonight.",
+        url: inviteLink,
+      });
+      setShareState("shared");
+      setTimeout(() => setShareState("idle"), 2500);
+    } catch (error) {
+      if ((error as Error)?.name === "AbortError") {
+        return;
+      }
+      console.error("Share failed", error);
+      setShareState("error");
+    }
+  }, [handleCopy, inviteLink]);
+
+  const copyLabel = copyState === "copied" ? "Link copied" : copyState === "error" ? "Copy failed" : "Copy invite link";
+  const shareLabel =
+    shareState === "shared"
+      ? "Invite sent"
+      : shareState === "error"
+        ? "Share failed"
+        : shareSupported
+          ? "Share availability"
+          : "Share (copies link)";
+
+  return (
+    <section
+      className={classNames(
+        "rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-[#0b0f25] to-[#050713] p-5 shadow-xl shadow-black/30",
+        className
+      )}
+    >
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Quick invites</p>
+          <h3 className="font-serif text-2xl font-semibold text-foreground">Need one more person?</h3>
+          <p className="text-sm text-muted-foreground">
+            Nudge trusted friends before widening your radius. These links stay private but keep your Tonight plans feeling fresh.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-white/10"
+          >
+            <Link2 className="h-4 w-4" />
+            {copyLabel}
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[0_15px_40px_rgba(39,92,255,0.35)] transition hover:brightness-110"
+          >
+            <Share2 className="h-4 w-4" />
+            {shareLabel}
+          </button>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">Invite link</p>
+          <p className="mt-1 truncate font-mono text-sm text-foreground">{inviteLink}</p>
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/5 px-4 py-3 text-xs text-muted-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <p>Sharing or copying resets the freshness timer so your listing floats to the top for people nearby.</p>
+        </div>
       </div>
     </section>
   );
