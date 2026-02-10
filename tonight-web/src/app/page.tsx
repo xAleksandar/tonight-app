@@ -206,13 +206,16 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const [activePrimarySection, setActivePrimarySection] = useState<PrimarySection>("discover");
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
-  const handleOpenMessages = useCallback(() => {
-    setActivePrimarySection("messages");
-    setMessagesModalOpen(true);
-  }, []);
   const handleCloseMessages = useCallback(() => {
     setMessagesModalOpen(false);
     setActivePrimarySection("discover");
+  }, []);
+  const handleToggleMessages = useCallback(() => {
+    setMessagesModalOpen((current) => {
+      const next = !current;
+      setActivePrimarySection(next ? "messages" : "discover");
+      return next;
+    });
   }, []);
   const handleNavigateDiscover = useCallback(() => {
     handleCloseMessages();
@@ -519,7 +522,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           onCreate={handleCreate}
           onNavigateDiscover={handleNavigateDiscover}
           onNavigatePeople={handleNavigatePeople}
-          onNavigateMessages={handleOpenMessages}
+          onNavigateMessages={handleToggleMessages}
           activePrimaryNav={activePrimarySection}
         />
 
@@ -530,7 +533,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             onNavigateProfile={() => router.push("/profile")}
-            onNavigateMessages={handleOpenMessages}
+            onNavigateMessages={handleToggleMessages}
             unreadCount={unreadMessageCount}
             userDisplayName={currentUser?.displayName ?? null}
             userEmail={currentUser?.email ?? null}
@@ -542,7 +545,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             unreadCount={unreadMessageCount}
             onSelectSection={(section) => {
               if (section === "messages") {
-                handleOpenMessages();
+                handleToggleMessages();
               } else {
                 handleCloseMessages();
               }
@@ -633,7 +636,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         active={activePrimarySection}
         onNavigateDiscover={handleNavigateDiscover}
         onNavigatePeople={handleNavigatePeople}
-        onNavigateMessages={handleOpenMessages}
+        onNavigateMessages={handleToggleMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
         messagesUnreadCount={unreadMessageCount}

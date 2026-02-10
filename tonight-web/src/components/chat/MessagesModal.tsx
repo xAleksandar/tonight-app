@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { MessageCircle, X } from "lucide-react";
 
 import { ConversationList } from "@/components/chat/ConversationList";
@@ -24,6 +24,80 @@ export function MessagesModal({
   onSelectConversation,
   emptyStateAction,
 }: MessagesModalProps) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const dialog = dialogRef.current;
+      if (!dialog) {
+        return;
+      }
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => {
+        return !element.hasAttribute("disabled") && !element.getAttribute("aria-hidden");
+      });
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (activeElement === first || !dialog.contains(activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (activeElement === last || !dialog.contains(activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen]);
+
   const items = useMemo(() => {
     if (Array.isArray(conversations) && conversations.length) {
       return conversations;
@@ -44,8 +118,10 @@ export function MessagesModal({
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         className="relative z-10 flex w-full max-w-2xl flex-col gap-4 rounded-3xl border border-white/10 bg-gradient-to-b from-[#11142a] via-[#0c1022] to-[#070912] p-6 text-foreground shadow-2xl shadow-black/50"
       >
         <header className="flex items-start justify-between gap-3">
@@ -55,6 +131,7 @@ export function MessagesModal({
             <p className="text-sm text-muted-foreground">Keep up with hosts and guests you've matched with.</p>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             className="rounded-full border border-white/10 p-2 text-white/80 transition hover:text-white"

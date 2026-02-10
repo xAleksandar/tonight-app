@@ -44,6 +44,7 @@
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 - Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 16:54 runner: Wired the discovery header + mobile nav "Messages" controls into a true toggle (and added ESC/focus trapping to the modal) so tapping the chip again or pressing Escape cleanly closes the overlay before returning to Discover; `npm test` (68 suites) passes.
 - 2026-02-10 16:39 runner: Closing the discovery Messages modal and promoting the People nav to a first-class primary section keeps the bottom bar + sidebar highlights accurate and prevents the overlay from lingering when routing to /people; `npm test` (68 suites) passes.
 - 2026-02-10 16:05 runner: Synced the Discover + People navigation callbacks on the home screen so hitting those entries or the bottom bar now closes the Messages modal before routing and keeps the active state in lockstep across the sidebar/mobile nav; `npm test` (68 suites) passes.
 - 2026-02-10 14:50 runner: Added the mobile Messages hero so the page now mirrors the V0 sticky header (title, subtitle, safety badges) before the desktop panels, keeping the discovery nav state consistent across breakpoints; `npm test` (68 suites) passes.
