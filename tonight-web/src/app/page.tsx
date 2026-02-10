@@ -543,13 +543,9 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           <DiscoveryPrimaryNav
             activeSection={activePrimarySection}
             unreadCount={unreadMessageCount}
-            onSelectSection={(section) => {
-              if (section === "messages") {
-                handleToggleMessages();
-              } else {
-                handleCloseMessages();
-              }
-            }}
+            onSelectDiscover={handleNavigateDiscover}
+            onSelectPeople={handleNavigatePeople}
+            onToggleMessages={handleToggleMessages}
           />
 
           <MobileHero
@@ -666,16 +662,24 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
 type DiscoveryPrimaryNavProps = {
   activeSection: PrimarySection;
   unreadCount: number;
-  onSelectSection: (section: PrimarySection) => void;
+  onSelectDiscover: () => void;
+  onSelectPeople: () => void;
+  onToggleMessages: () => void;
 };
 
-function DiscoveryPrimaryNav({ activeSection, unreadCount, onSelectSection }: DiscoveryPrimaryNavProps) {
+function DiscoveryPrimaryNav({
+  activeSection,
+  unreadCount,
+  onSelectDiscover,
+  onSelectPeople,
+  onToggleMessages,
+}: DiscoveryPrimaryNavProps) {
   return (
     <nav className="hidden border-b border-white/5 bg-background/80 px-10 py-3 text-sm text-muted-foreground md:flex">
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => onSelectSection("discover")}
+          onClick={onSelectDiscover}
           className={classNames(
             "rounded-full px-4 py-2 font-semibold transition",
             activeSection === "discover"
@@ -688,7 +692,20 @@ function DiscoveryPrimaryNav({ activeSection, unreadCount, onSelectSection }: Di
         </button>
         <button
           type="button"
-          onClick={() => onSelectSection("messages")}
+          onClick={onSelectPeople}
+          className={classNames(
+            "rounded-full px-4 py-2 font-semibold transition",
+            activeSection === "people"
+              ? "bg-primary text-primary-foreground shadow-[0_12px_30px_rgba(62,36,255,0.35)]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          aria-pressed={activeSection === "people"}
+        >
+          People nearby
+        </button>
+        <button
+          type="button"
+          onClick={onToggleMessages}
           className={classNames(
             "flex items-center gap-2 rounded-full px-4 py-2 font-semibold transition",
             activeSection === "messages"
