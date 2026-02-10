@@ -561,7 +561,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
 
   return (
     <>
-      <div className="flex min-h-dvh flex-col text-foreground md:flex-row">
+      <div className="flex min-h-dvh flex-col overflow-x-hidden text-foreground md:flex-row">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -594,7 +594,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             onCategoryChange={setSelectedCategory}
           />
 
-          <main className="flex-1 pb-28 pt-0 md:px-10 md:pb-12 md:pt-8">
+          <main className="flex-1 pb-20 pt-0 md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
               <section className="mt-4 flex flex-col gap-4">
                 {locationStatus === "denied" || locationStatus === "unsupported" ? (
