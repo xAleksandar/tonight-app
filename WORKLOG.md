@@ -45,7 +45,8 @@
 - 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
 - 2026-02-10 01:57 runner: Synced the mobile + desktop discovery toggles with the real view state: bottom nav now reflects the active section (including the Messages modal), map/list toggles stay in lockstep across breakpoints via URL search params, and the UI tests were updated to mock `usePathname`/`useSearchParams` so the new navigation plumbing stays covered.
 - 2026-02-10 02:40 runner: Wired the desktop sidebar buttons into real navigation callbacks, added the temporary /people shell so both desktop + mobile navs have somewhere to land, and reran `npm test` (68 suites, passing).
+- 2026-02-10 02:58 runner: Polished the profile hero (cleaner avatar block + stat stack) and rebuilt the settings list to match the V0 rows, keeping the safety scroll target + logout wiring intact. `npm test` remains green.
 
 ## Next Up
-1. Resume the profile + design delta sweep from Aleks’ latest brief (start with the profile hero polish + settings stack).
-2. Audit the new /people shell against the live V0 designs and outline the data plumbing it will need next.
+1. Bring the Personal details form + info rows up to the latest profile spec (spacing, helper copy, button hierarchy).
+2. Tighten the Profile activity panels (active events list, safety block) to mirror the V0 typography + badge treatments before moving on to the rest of the profile deltas.

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Calendar,
@@ -11,6 +11,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Settings,
   Shield,
   Users,
 } from 'lucide-react';
@@ -329,6 +330,25 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
 
   const stats = overview?.stats ?? { eventsHosted: 0, eventsJoined: 0, peopleMet: 0 };
 
+  const settingsRows: SettingsRowConfig[] = [
+    {
+      icon: Settings,
+      label: 'Settings',
+      onClick: () => showSuccessToast('Coming soon', 'Settings panel will live here soon.'),
+    },
+    {
+      icon: Shield,
+      label: 'Safety & privacy',
+      onClick: () => safetyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    },
+    {
+      icon: LogOut,
+      label: 'Sign out',
+      variant: 'destructive',
+      onClick: () => logout().catch((error) => console.error('Failed to log out', error)),
+    },
+  ];
+
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] text-foreground">
       <div className="flex min-h-dvh flex-col md:flex-row">
@@ -361,7 +381,7 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
                   <div className="space-y-6">
                     <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
-                      <div className="flex flex-col items-center gap-3 text-center">
+                      <div className="flex flex-col items-center gap-4 text-center">
                         <div className="relative">
                           <UserAvatar
                             displayName={profile.displayName}
@@ -378,16 +398,23 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                             <Camera className="h-4 w-4" />
                           </button>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                           <h2 className="text-xl font-bold text-foreground">{profile.displayName ?? 'Add your name'}</h2>
-                          <p className="text-xs text-muted-foreground">Edit how your name appears across Tonight</p>
+                          <p className="text-xs text-muted-foreground">Edit your display name</p>
                         </div>
-                        <div className="flex w-full flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/50 bg-background/30 px-4 py-3 text-sm">
-                          <StatItem label="Events posted" value={stats.eventsHosted} />
-                          <div className="h-9 w-px bg-border/60" />
-                          <StatItem label="Events joined" value={stats.eventsJoined} />
-                          <div className="h-9 w-px bg-border/60" />
-                          <StatItem label="People met" value={stats.peopleMet} />
+                        <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+                          {[
+                            { label: 'Events posted', value: stats.eventsHosted },
+                            { label: 'Events joined', value: stats.eventsJoined },
+                            { label: 'People met', value: stats.peopleMet },
+                          ].map((stat, index, array) => (
+                            <Fragment key={stat.label}>
+                              <StatItem label={stat.label} value={stat.value} />
+                              {index < array.length - 1 ? (
+                                <div className="h-8 w-px bg-border/60" aria-hidden="true" />
+                              ) : null}
+                            </Fragment>
+                          ))}
                         </div>
                       </div>
                     </section>
@@ -405,25 +432,9 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                     />
 
                     <section className="rounded-3xl border border-border/60 bg-card/60">
-                      <SettingsButton
-                        icon={Users}
-                        label="Account settings"
-                        onClick={() => showSuccessToast('Coming soon', 'Settings panel will live here soon.')}
-                      />
-                      <SettingsButton
-                        icon={Shield}
-                        label="Safety & privacy"
-                        onClick={() => safetyRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => logout().catch((error) => console.error('Failed to log out', error))}
-                        className="flex w-full items-center gap-3 px-5 py-4 text-left text-rose-200 transition hover:bg-rose-500/5"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        <span className="text-sm font-medium">Sign out</span>
-                        <ChevronRight className="ml-auto h-4 w-4" />
-                      </button>
+                      {settingsRows.map((row) => (
+                        <SettingsRow key={row.label} {...row} />
+                      ))}
                     </section>
                   </div>
 
@@ -696,24 +707,30 @@ function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
   );
 }
 
-type SettingsButtonProps = {
+type SettingsRowConfig = {
   icon: LucideIcon;
   label: string;
   onClick?: () => void;
+  variant?: 'default' | 'destructive';
 };
 
-function SettingsButton({ icon: Icon, label, onClick }: SettingsButtonProps) {
+function SettingsRow({ icon: Icon, label, onClick, variant = 'default' }: SettingsRowConfig) {
+  const isDestructive = variant === 'destructive';
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 border-b border-border/50 px-5 py-4 text-left text-foreground last:border-b-0 transition hover:bg-background/40"
+      className={classNames(
+        'flex w-full items-center gap-3 border-b border-border/50 px-5 py-4 text-left last:border-b-0 transition',
+        isDestructive ? 'text-rose-200 hover:bg-rose-500/5' : 'text-foreground hover:bg-background/40'
+      )}
     >
-      <span className="text-muted-foreground">
+      <span className={classNames('text-muted-foreground', isDestructive && 'text-rose-200/70')}>
         <Icon className="h-4 w-4" />
       </span>
       <span className="flex-1 text-sm font-medium">{label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      {!isDestructive ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : null}
     </button>
   );
 }
