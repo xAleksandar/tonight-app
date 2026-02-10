@@ -12,6 +12,7 @@ import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import type { CategoryId } from "@/lib/categories";
+import { classNames } from "@/lib/classNames";
 
 export default function MessagesPage() {
   const { status } = useRequireAuth();
@@ -31,12 +32,39 @@ export default function MessagesPage() {
   return <AuthenticatedMessagesPage />;
 }
 
+type ConversationFilter = "all" | "accepted" | "pending";
+
 function AuthenticatedMessagesPage() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [conversations] = useState<ConversationPreview[]>(PLACEHOLDER_CONVERSATIONS);
+  const [statusFilter, setStatusFilter] = useState<ConversationFilter>("all");
 
   const hasOnlyPlaceholders = useMemo(() => hasPlaceholderConversationData(conversations), [conversations]);
+
+  const filterCounts = useMemo(() => {
+    let accepted = 0;
+    let pending = 0;
+    conversations.forEach((conversation) => {
+      if (conversation.status === "accepted") {
+        accepted += 1;
+      } else if (conversation.status === "pending") {
+        pending += 1;
+      }
+    });
+    return {
+      all: conversations.length,
+      accepted,
+      pending,
+    } satisfies Record<ConversationFilter, number>;
+  }, [conversations]);
+
+  const filteredConversations = useMemo(() => {
+    if (statusFilter === "all") {
+      return conversations;
+    }
+    return conversations.filter((conversation) => conversation.status === statusFilter);
+  }, [conversations, statusFilter]);
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -55,6 +83,44 @@ function AuthenticatedMessagesPage() {
   const handleMessages = useCallback(() => router.push("/messages"), [router]);
 
   const headline = hasOnlyPlaceholders ? "You're all caught up" : "Latest conversations";
+
+  const filterOptions = useMemo(
+    () => [
+      { id: "all" as ConversationFilter, label: "All", description: "Every chat", count: filterCounts.all },
+      {
+        id: "accepted" as ConversationFilter,
+        label: "Accepted",
+        description: "Ready to chat",
+        count: filterCounts.accepted,
+      },
+      {
+        id: "pending" as ConversationFilter,
+        label: "Pending",
+        description: "Waiting on hosts",
+        count: filterCounts.pending,
+      },
+    ],
+    [filterCounts]
+  );
+
+  const emptyStateByFilter = useMemo<Record<ConversationFilter, { title: string; description: string }>>(
+    () => ({
+      all: {
+        title: "No messages yet",
+        description:
+          "Join a meetup and you'll be able to keep the conversation going right here once the host approves you.",
+      },
+      accepted: {
+        title: "No accepted chats",
+        description: "Once a host approves you, the full conversation unlocks instantly with typing states and receipts.",
+      },
+      pending: {
+        title: "No pending requests",
+        description: "Send a few join requests from Discover to see them tracked here while you wait for hosts.",
+      },
+    }),
+    []
+  );
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#05070f] via-[#05060d] to-[#04040a] text-foreground">
@@ -93,8 +159,34 @@ function AuthenticatedMessagesPage() {
                   </div>
                 </div>
 
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {filterOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setStatusFilter(option.id)}
+                      className={classNames(
+                        "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
+                        statusFilter === option.id
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "border-border/60 text-muted-foreground hover:text-foreground"
+                      )}
+                      aria-pressed={statusFilter === option.id}
+                    >
+                      <span>{option.label}</span>
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-foreground/80">
+                        {option.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="mt-5 rounded-2xl border border-border/50 bg-background/40 p-4">
-                  <ConversationList conversations={conversations} onSelectConversation={handleSelectConversation} />
+                  <ConversationList
+                    conversations={filteredConversations}
+                    onSelectConversation={handleSelectConversation}
+                    emptyState={emptyStateByFilter[statusFilter]}
+                  />
                 </div>
               </section>
             </div>

@@ -6,21 +6,28 @@ import type { ConversationPreview } from "@/components/chat/conversations";
 type ConversationListProps = {
   conversations: ConversationPreview[];
   onSelectConversation?: (conversationId: string) => void;
+  emptyState?: {
+    title: string;
+    description: string;
+  };
 };
 
-export function ConversationList({ conversations, onSelectConversation }: ConversationListProps) {
+export function ConversationList({ conversations, onSelectConversation, emptyState }: ConversationListProps) {
   const hasConversations = conversations.length > 0;
 
   if (!hasConversations) {
+    const emptyTitle = emptyState?.title ?? "No messages yet";
+    const emptyDescription =
+      emptyState?.description ??
+      "Join a meetup and you'll be able to keep the conversation going right here once the host approves you.";
+
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 bg-card/30 px-6 py-16 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
           <MessageCircle className="h-7 w-7 text-primary" />
         </div>
-        <p className="text-sm font-semibold text-foreground">No messages yet</p>
-        <p className="max-w-sm text-xs text-muted-foreground">
-          Join a meetup and you&apos;ll be able to keep the conversation going right here once the host approves you.
-        </p>
+        <p className="text-sm font-semibold text-foreground">{emptyTitle}</p>
+        <p className="max-w-sm text-xs text-muted-foreground">{emptyDescription}</p>
       </div>
     );
   }
