@@ -36,7 +36,7 @@ const MAP_HEIGHT_DESKTOP = 520;
 const MAP_HEIGHT_MOBILE = 360;
 
 type ViewMode = "list" | "map";
-type PrimarySection = "discover" | "messages";
+type PrimarySection = "discover" | "people" | "messages";
 type NearbyEventPayload = {
   id: string;
   title: string;
@@ -219,9 +219,10 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     router.push("/");
   }, [handleCloseMessages, router]);
   const handleNavigatePeople = useCallback(() => {
-    handleCloseMessages();
+    setMessagesModalOpen(false);
+    setActivePrimarySection("people");
     router.push("/people");
-  }, [handleCloseMessages, router]);
+  }, [router]);
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
       if (conversationId.startsWith("demo-")) {
