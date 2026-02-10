@@ -26,7 +26,7 @@ const ensureDomGlobals = () => {
     return;
   }
 
-  jsdomInstance = new JSDOM('<!doctype html><html><body></body></html>');
+  jsdomInstance = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://tonight.test' });
   const { window } = jsdomInstance;
 
   Object.defineProperties(globalThis, {
@@ -230,10 +230,6 @@ afterAll(() => {
     delete (navigator as Partial<Navigator>).geolocation;
   }
 
-  delete (globalThis as any).window;
-  delete (globalThis as any).document;
-  delete (globalThis as any).navigator;
-  delete (globalThis as any).HTMLElement;
   global.fetch = originalFetch;
 });
 
@@ -244,6 +240,9 @@ beforeEach(() => {
   global.fetch = mockFetchSuccess() as unknown as typeof fetch;
   installMatchMedia();
   installGeolocation();
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.clear();
+  }
 });
 
 afterEach(() => {
@@ -304,6 +303,14 @@ describe('Authenticated home/discovery experience', () => {
 
     const mapButtons = screen.getAllByRole('button', { name: /^map$/i });
     fireEvent.click(mapButtons[mapButtons.length - 1]);
+
+    expect(await screen.findByTestId('event-map-view')).toBeInTheDocument();
+  });
+
+  it('remembers the last selected view mode when revisiting the page', async () => {
+    window.localStorage.setItem('tonight:view-mode', 'map');
+
+    render(<HomePage />);
 
     expect(await screen.findByTestId('event-map-view')).toBeInTheDocument();
   });

@@ -31,6 +31,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 const DEFAULT_RADIUS_KM = 10;
 const MIN_RADIUS_KM = 1;
 const MAX_RADIUS_KM = 50;
+const VIEW_MODE_STORAGE_KEY = "tonight:view-mode";
 
 const MAP_HEIGHT_DESKTOP = 520;
 const MAP_HEIGHT_MOBILE = 360;
@@ -205,6 +206,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const searchParams = useSearchParams();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
+  const explicitViewParam = searchParams?.get("view");
   const derivedPrimarySection = useMemo<MobileNavTarget>(() => {
     if (messagesModalOpen) {
       return "messages";
@@ -260,7 +262,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     () => ({ label: "Browse Discover", onAction: handleCloseMessages }),
     [handleCloseMessages]
   );
-  const initialView: ViewMode = searchParams?.get("view") === "map" ? "map" : "list";
+  const initialView: ViewMode = explicitViewParam === "map" ? "map" : "list";
   const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -284,10 +286,35 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   );
 
   useEffect(() => {
-    const param = searchParams?.get("view");
-    const nextMode: ViewMode = param === "map" ? "map" : "list";
-    setViewMode((current) => (current === nextMode ? current : nextMode));
-  }, [searchParams]);
+    if (explicitViewParam === "map" || explicitViewParam === "list") {
+      setViewMode((current) => (current === explicitViewParam ? current : (explicitViewParam as ViewMode)));
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      if (stored === "map" || stored === "list") {
+        setViewMode((current) => (current === stored ? current : (stored as ViewMode)));
+      }
+    } catch (error) {
+      console.warn("Unable to read persisted view mode", error);
+    }
+  }, [explicitViewParam]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch (error) {
+      console.warn("Unable to persist view mode", error);
+    }
+  }, [viewMode]);
 
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
