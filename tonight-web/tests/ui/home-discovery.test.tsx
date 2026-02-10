@@ -20,6 +20,7 @@ let screen: TestingLibrary['screen'];
 let waitFor: TestingLibrary['waitFor'];
 let fireEvent: TestingLibrary['fireEvent'];
 let cleanup: TestingLibrary['cleanup'];
+let within: TestingLibrary['within'];
 
 const ensureDomGlobals = () => {
   if (typeof document !== 'undefined') {
@@ -205,6 +206,7 @@ beforeAll(async () => {
   waitFor = testingLibrary.waitFor;
   fireEvent = testingLibrary.fireEvent;
   cleanup = testingLibrary.cleanup;
+  within = testingLibrary.within;
 });
 
 afterAll(() => {
@@ -334,5 +336,27 @@ describe('Authenticated home/discovery experience', () => {
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: /messages/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('highlights the MobileActionBar tab that matches the active section', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const nav = screen.getByRole('navigation', { name: /primary navigation/i });
+    const discoverButton = within(nav).getByRole('button', { name: /discover/i });
+    const messagesButton = within(nav).getByRole('button', { name: /messages/i });
+
+    expect(discoverButton).toHaveAttribute('aria-current', 'page');
+    expect(messagesButton).not.toHaveAttribute('aria-current');
+
+    fireEvent.click(messagesButton);
+
+    await waitFor(() => expect(messagesButton).toHaveAttribute('aria-current', 'page'));
+    expect(discoverButton).not.toHaveAttribute('aria-current');
+
+    fireEvent.click(discoverButton);
+
+    await waitFor(() => expect(discoverButton).toHaveAttribute('aria-current', 'page'));
+    expect(messagesButton).not.toHaveAttribute('aria-current');
   });
 });
