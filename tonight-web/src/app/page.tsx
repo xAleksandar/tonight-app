@@ -214,6 +214,14 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     setMessagesModalOpen(false);
     setActivePrimarySection("discover");
   }, []);
+  const handleNavigateDiscover = useCallback(() => {
+    handleCloseMessages();
+    router.push("/");
+  }, [handleCloseMessages, router]);
+  const handleNavigatePeople = useCallback(() => {
+    handleCloseMessages();
+    router.push("/people");
+  }, [handleCloseMessages, router]);
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
       if (conversationId.startsWith("demo-")) {
@@ -508,8 +516,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
           onCreate={handleCreate}
-          onNavigateDiscover={() => router.push("/")}
-          onNavigatePeople={() => router.push("/people")}
+          onNavigateDiscover={handleNavigateDiscover}
+          onNavigatePeople={handleNavigatePeople}
           onNavigateMessages={handleOpenMessages}
           activePrimaryNav={activePrimarySection}
         />
@@ -622,8 +630,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
 
       <MobileActionBar
         active={activePrimarySection}
-        onNavigateDiscover={() => router.push("/")}
-        onNavigatePeople={() => router.push("/people")}
+        onNavigateDiscover={handleNavigateDiscover}
+        onNavigatePeople={handleNavigatePeople}
         onNavigateMessages={handleOpenMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
