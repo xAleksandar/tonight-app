@@ -217,6 +217,7 @@ function AuthenticatedPeoplePage() {
           onCreate={handleCreate}
           onNavigateDiscover={handleDiscover}
           onNavigatePeople={() => router.push("/people")}
+          onNavigateMessages={handleMessages}
           activePrimaryNav="people"
         />
 

@@ -358,6 +358,7 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
           onCreate={() => router.push('/events/create')}
           onNavigateDiscover={() => router.push('/')}
           onNavigatePeople={() => router.push('/people')}
+          onNavigateMessages={() => router.push('/messages')}
         />
 
         <div className="flex flex-1 flex-col">

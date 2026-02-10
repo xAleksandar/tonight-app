@@ -252,6 +252,7 @@ function AuthenticatedCreateEventPage() {
           onCreate={() => router.push('/events/create')}
           onNavigateDiscover={() => router.push('/')}
           onNavigatePeople={() => router.push('/people')}
+          onNavigateMessages={() => router.push('/messages')}
           activePrimaryNav="discover"
         />
 

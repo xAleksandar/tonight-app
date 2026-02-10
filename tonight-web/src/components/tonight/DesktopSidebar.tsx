@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Compass, Plus, Sparkles, Users } from "lucide-react";
+import { ChevronDown, Compass, MessageCircle, Plus, Sparkles, Users } from "lucide-react";
 
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
 
-type PrimaryNavTarget = "discover" | "people";
+type PrimaryNavTarget = "discover" | "people" | "messages";
 
 export type DesktopSidebarProps = {
   selectedCategory: CategoryId | null;
@@ -15,6 +15,7 @@ export type DesktopSidebarProps = {
   onCreate: () => void;
   onNavigateDiscover?: () => void;
   onNavigatePeople?: () => void;
+  onNavigateMessages?: () => void;
   activePrimaryNav?: PrimaryNavTarget | null;
 };
 
@@ -24,6 +25,7 @@ export function DesktopSidebar({
   onCreate,
   onNavigateDiscover,
   onNavigatePeople,
+  onNavigateMessages,
   activePrimaryNav,
 }: DesktopSidebarProps) {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -35,8 +37,11 @@ export function DesktopSidebar({
     if (!pathname) {
       return null;
     }
-    if (pathname === "/" || pathname.startsWith("/events") || pathname.startsWith("/chat")) {
+    if (pathname === "/" || pathname.startsWith("/events")) {
       return "discover";
+    }
+    if (pathname.startsWith("/messages") || pathname.startsWith("/chat")) {
+      return "messages";
     }
     if (pathname.startsWith("/people")) {
       return "people";
@@ -53,6 +58,9 @@ export function DesktopSidebar({
     onClick?: () => void;
   }> = [
     { id: "discover", label: "Discover", icon: Compass, onClick: onNavigateDiscover },
+    ...(typeof onNavigateMessages === "function"
+      ? [{ id: "messages" as const, label: "Messages", icon: MessageCircle, onClick: onNavigateMessages }]
+      : []),
     { id: "people", label: "People nearby", icon: Users, onClick: onNavigatePeople },
   ];
 

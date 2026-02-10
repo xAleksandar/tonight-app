@@ -131,7 +131,8 @@ function AuthenticatedMessagesPage() {
           onCreate={handleCreate}
           onNavigateDiscover={handleDiscover}
           onNavigatePeople={handlePeople}
-          activePrimaryNav={null}
+          onNavigateMessages={handleMessages}
+          activePrimaryNav="messages"
         />
 
         <div className="flex flex-1 flex-col">

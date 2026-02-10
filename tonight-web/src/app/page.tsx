@@ -500,6 +500,7 @@ function AuthenticatedHomePage() {
           onCreate={handleCreate}
           onNavigateDiscover={() => router.push("/")}
           onNavigatePeople={() => router.push("/people")}
+          onNavigateMessages={() => router.push("/messages")}
           activePrimaryNav="discover"
         />
 
