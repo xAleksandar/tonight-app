@@ -106,7 +106,6 @@ export function DesktopHeader({
             className="h-11 w-11 border border-border/70 bg-card/70 text-foreground"
             initialsClassName="text-[13px]"
           />
-          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.7)]" aria-hidden />
         </button>
       </div>
     </header>

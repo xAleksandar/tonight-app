@@ -49,7 +49,7 @@ export function MobileActionBar({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/55 text-foreground shadow-[0_-18px_45px_rgba(2,6,23,0.7)] backdrop-blur-lg md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/55 pb-[env(safe-area-inset-bottom)] text-foreground shadow-[0_-18px_45px_rgba(2,6,23,0.7)] backdrop-blur-lg md:hidden"
       role="navigation"
       aria-label="Primary navigation"
     >
@@ -120,7 +120,6 @@ export function MobileActionBar({
           );
         })}
       </div>
-      <div className="h-[env(safe-area-inset-bottom)]" />
     </nav>
   );
 }

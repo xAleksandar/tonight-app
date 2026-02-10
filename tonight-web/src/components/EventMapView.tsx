@@ -463,21 +463,6 @@ export default function EventMapView({
 
   return (
     <div className={className}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium text-zinc-700">Event map</p>
-          <p className="text-xs text-zinc-500" aria-live="polite">
-            {summaryText}
-          </p>
-        </div>
-        {userLocation && (
-          <p className="text-xs text-zinc-500">
-            Showing around {formatCoordinate(userLocation.latitude)},{" "}
-            {formatCoordinate(userLocation.longitude)}
-          </p>
-        )}
-      </div>
-
       <div className="relative">
         <div
           ref={containerRef}

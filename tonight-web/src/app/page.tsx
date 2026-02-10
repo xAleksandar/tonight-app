@@ -560,8 +560,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     locationStatus === "locating" || (eventsStatus === "loading" && visibleEvents.length === 0);
 
   return (
-    <div className="min-h-dvh text-foreground">
-      <div className="flex min-h-dvh flex-col md:flex-row">
+    <>
+      <div className="flex min-h-dvh flex-col text-foreground md:flex-row">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -585,18 +585,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             userEmail={currentUser?.email ?? null}
             userPhotoUrl={currentUser?.photoUrl ?? null}
           />
-
-<<<<<<< HEAD
-          <DiscoveryPrimaryNav
-            activeSection={desktopPrimarySection}
-            unreadCount={unreadMessageCount}
-            onSelectDiscover={handleNavigateDiscover}
-            onSelectPeople={handleNavigatePeople}
-            onToggleMessages={handleToggleMessages}
-          />
-
-=======
->>>>>>> d4acd8c (Fixes)
           <MobileHero
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
@@ -634,21 +622,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     onAction={handleRefresh}
                   />
                 ) : null}
-
-<<<<<<< HEAD
-                <div className="hidden md:block">
-                  <DiscoverySummary
-                    describeLocation={describeLocation}
-                    lastUpdatedLabel={lastUpdatedLabel}
-                    rangeSummary={buildRadiusSummary(radiusKm)}
-                    onUpdateLocation={attemptLocationDetection}
-                    onRefresh={handleRefresh}
-                    locationStatus={locationStatus}
-                    eventsStatus={eventsStatus}
-                    onAdjustRange={openRangeSheet}
-                  />
-                </div>
-=======
                 {locationStatus !== "ready" && locationStatus !== "locating" && (
                   <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 shadow-lg shadow-primary/10">
                     <div className="flex items-start gap-3">
@@ -671,12 +644,50 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     </div>
                   </div>
                 )}
->>>>>>> d4acd8c (Fixes)
 
                 {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
 
                 {!isLoading && viewMode === "map" && (
                   <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
+                    <div className="border-b border-border/60 bg-card/40 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Filter events
+                        </p>
+                        {selectedCategory && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCategory(null)}
+                            className="text-[11px] font-semibold text-primary transition hover:text-primary/80"
+                          >
+                            Clear filter
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                        {CATEGORY_ORDER.filter((id) => id !== "all").map((categoryId) => {
+                          const category = CATEGORY_DEFINITIONS[categoryId];
+                          if (!category) return null;
+                          const isSelected = selectedCategory === category.id;
+                          return (
+                            <button
+                              key={category.id}
+                              type="button"
+                              onClick={() => setSelectedCategory(isSelected ? null : category.id)}
+                              className={classNames(
+                                "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                                isSelected
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border/60 bg-background/40 text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <category.icon className="h-4 w-4" />
+                              {category.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <EventMapView
                       events={mapItems}
                       userLocation={userLocation || undefined}
@@ -728,9 +739,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         onSelectConversation={handleSelectConversation}
         emptyStateAction={messagesEmptyStateAction}
       />
-    </div>
+    </>
   );
-
 }
 
 type DiscoveryPrimaryNavProps = {
@@ -832,7 +842,7 @@ function MobileHero({
               aria-pressed={viewMode === 'list'}
               onClick={() => onViewModeChange('list')}
               className={classNames(
-                'rounded-md px-2 py-1.5 transition-colors',
+                'rounded-lg px-2 py-1.5 transition-colors',
                 viewMode === 'list'
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -846,7 +856,7 @@ function MobileHero({
               aria-pressed={viewMode === 'map'}
               onClick={() => onViewModeChange('map')}
               className={classNames(
-                'rounded-md px-2 py-1.5 transition-colors',
+                'rounded-lg px-2 py-1.5 transition-colors',
                 viewMode === 'map'
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -1081,7 +1091,7 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
             type="button"
             onClick={() => onSelect(event.id)}
             className={classNames(
-              "group flex w-full max-w-[330px] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99]",
+              "group flex w-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/60 text-left transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.99] md:max-w-[330px]",
               selectedEventId === event.id && "border-primary/60 shadow-primary/20"
             )}
           >
