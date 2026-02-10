@@ -35,6 +35,7 @@ const MAP_HEIGHT_DESKTOP = 520;
 const MAP_HEIGHT_MOBILE = 360;
 
 type ViewMode = "list" | "map";
+type PrimarySection = "discover" | "messages";
 type NearbyEventPayload = {
   id: string;
   title: string;
@@ -202,13 +203,22 @@ function AuthenticatedHomePage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const handleOpenMessages = useCallback(() => setMessagesModalOpen(true), []);
-  const handleCloseMessages = useCallback(() => setMessagesModalOpen(false), []);
+  const [activePrimarySection, setActivePrimarySection] = useState<PrimarySection>("discover");
+  const [messagesModalOpen, setMessagesModalOpen] = useState(false);
+  const handleOpenMessages = useCallback(() => {
+    setActivePrimarySection("messages");
+    setMessagesModalOpen(true);
+  }, []);
+  const handleCloseMessages = useCallback(() => {
+    setMessagesModalOpen(false);
+    setActivePrimarySection("discover");
+  }, []);
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
       if (conversationId.startsWith("demo-")) {
         return;
       }
+      setActivePrimarySection("discover");
       setMessagesModalOpen(false);
       router.push(`/chat/${conversationId}`);
     },
@@ -230,7 +240,6 @@ function AuthenticatedHomePage() {
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [messagesModalOpen, setMessagesModalOpen] = useState(false);
 
   const conversations = useMemo(() => PLACEHOLDER_CONVERSATIONS, []);
   const unreadMessageCount = useMemo(
@@ -505,6 +514,18 @@ function AuthenticatedHomePage() {
             unreadCount={unreadMessageCount}
           />
 
+          <DiscoveryPrimaryNav
+            activeSection={activePrimarySection}
+            unreadCount={unreadMessageCount}
+            onSelectSection={(section) => {
+              if (section === "messages") {
+                handleOpenMessages();
+              } else {
+                handleCloseMessages();
+              }
+            }}
+          />
+
           <MobileHero
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
@@ -588,10 +609,10 @@ function AuthenticatedHomePage() {
       </div>
 
       <MobileActionBar
-        active="discover"
+        active={activePrimarySection}
         onNavigateDiscover={() => router.push("/")}
         onNavigatePeople={() => router.push("/people")}
-        onNavigateMessages={() => router.push("/messages")}
+        onNavigateMessages={handleOpenMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
       />
@@ -614,6 +635,52 @@ function AuthenticatedHomePage() {
     </div>
   );
 
+}
+
+type DiscoveryPrimaryNavProps = {
+  activeSection: PrimarySection;
+  unreadCount: number;
+  onSelectSection: (section: PrimarySection) => void;
+};
+
+function DiscoveryPrimaryNav({ activeSection, unreadCount, onSelectSection }: DiscoveryPrimaryNavProps) {
+  return (
+    <nav className="hidden border-b border-white/5 bg-background/80 px-10 py-3 text-sm text-muted-foreground md:flex">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onSelectSection("discover")}
+          className={classNames(
+            "rounded-full px-4 py-2 font-semibold transition",
+            activeSection === "discover"
+              ? "bg-primary text-primary-foreground shadow-[0_12px_30px_rgba(62,36,255,0.35)]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          aria-pressed={activeSection === "discover"}
+        >
+          Discover tonight
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelectSection("messages")}
+          className={classNames(
+            "flex items-center gap-2 rounded-full px-4 py-2 font-semibold transition",
+            activeSection === "messages"
+              ? "bg-primary text-primary-foreground shadow-[0_12px_30px_rgba(62,36,255,0.35)]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          aria-pressed={activeSection === "messages"}
+        >
+          Messages
+          {unreadCount > 0 && (
+            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-white">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </div>
+    </nav>
+  );
 }
 
 type MobileHeroProps = {
