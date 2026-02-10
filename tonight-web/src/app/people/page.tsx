@@ -18,7 +18,6 @@ import {
   Waves,
 } from "lucide-react";
 
-import { MessagesModal } from "@/components/chat/MessagesModal";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
@@ -181,13 +180,13 @@ export default function PeoplePage() {
 function AuthenticatedPeoplePage() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const [messagesOpen, setMessagesOpen] = useState(false);
   const [rangeKm, setRangeKm] = useState(DEFAULT_RANGE_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [rangeSheetValue, setRangeSheetValue] = useState(rangeKm);
 
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const handleDiscover = useCallback(() => router.push("/"), [router]);
+  const handleMessages = useCallback(() => router.push("/messages"), [router]);
 
   const visibleProspects = useMemo(() => {
     return PEOPLE_PROSPECTS.filter((person) => {
@@ -226,7 +225,7 @@ function AuthenticatedPeoplePage() {
             title="People nearby"
             subtitle="See who's open to meeting up tonight"
             onNavigateProfile={() => router.push("/profile")}
-            onNavigateMessages={() => setMessagesOpen(true)}
+            onNavigateMessages={() => router.push("/messages")}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -250,7 +249,7 @@ function AuthenticatedPeoplePage() {
               {visibleProspects.length > 0 ? (
                 <PeopleGrid
                   prospects={visibleProspects}
-                  onContact={() => setMessagesOpen(true)}
+                  onContact={handleMessages}
                   onViewPlans={handleDiscover}
                 />
               ) : (
@@ -265,12 +264,10 @@ function AuthenticatedPeoplePage() {
         active="people"
         onNavigateDiscover={handleDiscover}
         onNavigatePeople={() => router.push("/people")}
-        onNavigateMessages={() => setMessagesOpen(true)}
+        onNavigateMessages={handleMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
       />
-
-      <MessagesModal isOpen={messagesOpen} onClose={() => setMessagesOpen(false)} />
 
       {rangeSheetOpen ? (
         <PeopleRangeSheet

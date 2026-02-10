@@ -41,6 +41,7 @@
 - Task 20.1–20.5k: Design alignment waves (discovery/event creation/profile/mobile tweaks) — Commits `90a31dd`, `3fc95d9`, `0701f95`, `af6a3b6`, `c0dbe82`, `9291482`, `8012ae1`, `a7d82d8`, `a510921`, `81a8ff2`, `d17301e`, `865e1c9`, `09651e5`, `19de6d2`, `6831ee2`.
 - Task 20.6: Discovery navigation view-state sync (Messages tab, bottom nav highlighting, map/list query param handling, test updates) — Commit `f657d25`.
 - Task 20.7: Desktop sidebar navigation (Discover + People) now routes to live sections, added the interim /people experience, and wired mobile nav parity — Commit `4108e49`.
+- Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 ## In Progress / Priority Notes
 - 2026-02-10 04:59 runner: Hooked the People view up to the category filters so the desktop sidebar selection now narrows the roster, added a shared reset action/empty state copy, and re-ran `npm test` (68 suites, passing).
 - 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
@@ -50,7 +51,8 @@
 - 2026-02-10 02:46 runner: Brought the Personal details form + account info rows up to the latest V0 spec (new helper copy, tightened spacing, tiered button hierarchy, and refreshed action chips) and reran `npm test` (68 suites, green).
 - 2026-02-10 02:58 runner: Tightened the profile activity panels to match the V0 treatments (active events list now shows pending/confirmed badges with the new typography stack, refreshed the headers, and rebuilt the safety block with the shield hero, guidance bullets, and panel-style actions). `npm test` still passes (68 suites).
 - 2026-02-10 03:49 runner: Rebuilt the /people experience to match the V0 cards (grid-based glass layout, mobile range sheet, desktop slider, and contact CTA that opens the Messages modal) while filtering the mock roster by the active radius. Hardened ReportModal so tests can run outside the browser, re-ran `npm test` (68 suites, passing).
+- 2026-02-10 06:18 runner: Moved Tonight Messages into a first-class page that mirrors the live V0 hero/cards, extracted a reusable ConversationList + placeholder data helpers, and rerouted every Messages entry point (header tabs, sidebar CTA, mobile action bar, grid contacts) to push to /messages. `npm test` (68 suites) passes.
 
 ## Next Up
-1. Thread the People roster through the upcoming API so the range + category filters run on live data, and wire the card event chips into the EventDetailModal once those endpoints land.
-2. Continue the discovery/people delta cleanup (map embed, quick-invite affordances, and any remaining sidebar polish) after the live data plumbing is sorted.
+1. Thread both the People roster and Messages list through the live APIs once they land so radius/category filters and conversations stay real-time.
+2. Finish the remaining discovery/people delta cleanup (map embed, quick-invite affordances, sidebar polish) after the backend plumbing is sorted.

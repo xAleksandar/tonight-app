@@ -24,7 +24,6 @@ import { classNames } from "@/lib/classNames";
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { MessagesModal } from "@/components/chat/MessagesModal";
 
 const DEFAULT_RADIUS_KM = 10;
 const MIN_RADIUS_KM = 1;
@@ -217,10 +216,6 @@ function AuthenticatedHomePage() {
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [messagesOpen, setMessagesOpen] = useState(false);
-
-  const openMessages = useCallback(() => setMessagesOpen(true), []);
-  const closeMessages = useCallback(() => setMessagesOpen(false), []);
 
   useEffect(() => {
     const param = searchParams?.get("view");
@@ -485,7 +480,7 @@ function AuthenticatedHomePage() {
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             onNavigateProfile={() => router.push("/profile")}
-            onNavigateMessages={openMessages}
+            onNavigateMessages={() => router.push("/messages")}
           />
 
           <MobileHero
@@ -571,10 +566,10 @@ function AuthenticatedHomePage() {
       </div>
 
       <MobileActionBar
-        active={messagesOpen ? "messages" : "discover"}
+        active="discover"
         onNavigateDiscover={() => router.push("/")}
         onNavigatePeople={() => router.push("/people")}
-        onNavigateMessages={openMessages}
+        onNavigateMessages={() => router.push("/messages")}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
       />
@@ -587,8 +582,6 @@ function AuthenticatedHomePage() {
           onApply={applyRadiusChange}
         />
       )}
-
-      <MessagesModal isOpen={messagesOpen} onClose={closeMessages} />
     </div>
   );
 
