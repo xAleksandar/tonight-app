@@ -314,4 +314,25 @@ describe('Authenticated home/discovery experience', () => {
 
     expect(await screen.findByTestId('event-map-view')).toBeInTheDocument();
   });
+
+  it('opens and closes the Messages modal from the discovery header tab', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const navMessageButton = screen
+      .getAllByRole('button', { name: /messages/i })
+      .find((button) => button.textContent?.toLowerCase().includes('messages'));
+
+    expect(navMessageButton).toBeDefined();
+
+    fireEvent.click(navMessageButton!);
+
+    expect(await screen.findByRole('heading', { name: /messages/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /close messages/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /messages/i })).not.toBeInTheDocument();
+    });
+  });
 });
