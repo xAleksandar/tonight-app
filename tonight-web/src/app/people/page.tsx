@@ -21,6 +21,8 @@ import {
 
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
 import type { AuthUser } from "@/components/auth/AuthProvider";
+import { MessagesModal } from "@/components/chat/MessagesModal";
+import { PLACEHOLDER_CONVERSATIONS } from "@/components/chat/conversations";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
@@ -31,6 +33,8 @@ import { classNames } from "@/lib/classNames";
 const MIN_RANGE_KM = 1;
 const MAX_RANGE_KM = 50;
 const DEFAULT_RANGE_KM = 10;
+
+type PrimarySection = "discover" | "people" | "messages";
 
 type PersonEventCategory = CategoryId;
 
@@ -185,10 +189,31 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
   const [rangeKm, setRangeKm] = useState(DEFAULT_RANGE_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [rangeSheetValue, setRangeSheetValue] = useState(rangeKm);
+  const [activePrimarySection, setActivePrimarySection] = useState<PrimarySection>("people");
+  const [messagesModalOpen, setMessagesModalOpen] = useState(false);
 
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const handleDiscover = useCallback(() => router.push("/"), [router]);
-  const handleMessages = useCallback(() => router.push("/messages"), [router]);
+  const handleCloseMessages = useCallback(() => {
+    setMessagesModalOpen(false);
+    setActivePrimarySection("people");
+  }, []);
+  const handleToggleMessages = useCallback(() => {
+    setMessagesModalOpen((current) => {
+      const next = !current;
+      setActivePrimarySection(next ? "messages" : "people");
+      return next;
+    });
+  }, []);
+  const handleDiscover = useCallback(() => {
+    setMessagesModalOpen(false);
+    setActivePrimarySection("discover");
+    router.push("/");
+  }, [router]);
+  const handlePeopleNav = useCallback(() => {
+    setMessagesModalOpen(false);
+    setActivePrimarySection("people");
+    router.push("/people");
+  }, [router]);
 
   const visibleProspects = useMemo(() => {
     return PEOPLE_PROSPECTS.filter((person) => {
@@ -210,6 +235,27 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
     setSelectedCategory(null);
   }, []);
 
+  const conversations = useMemo(() => PLACEHOLDER_CONVERSATIONS, []);
+  const unreadMessageCount = useMemo(
+    () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
+    [conversations]
+  );
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      if (conversationId.startsWith("demo-")) {
+        return;
+      }
+      setActivePrimarySection("people");
+      setMessagesModalOpen(false);
+      router.push(`/chat/${conversationId}`);
+    },
+    [router]
+  );
+  const messagesEmptyStateAction = useMemo(
+    () => ({ label: "Browse Discover", onAction: handleDiscover }),
+    [handleDiscover]
+  );
+
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#070b1c] via-[#060814] to-[#05060f] text-foreground">
       <div className="flex min-h-dvh flex-col md:flex-row">
@@ -218,9 +264,9 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
           onCategoryChange={setSelectedCategory}
           onCreate={handleCreate}
           onNavigateDiscover={handleDiscover}
-          onNavigatePeople={() => router.push("/people")}
-          onNavigateMessages={handleMessages}
-          activePrimaryNav="people"
+          onNavigatePeople={handlePeopleNav}
+          onNavigateMessages={handleToggleMessages}
+          activePrimaryNav={activePrimarySection}
         />
 
         <div className="flex flex-1 flex-col">
@@ -228,7 +274,8 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
             title="People nearby"
             subtitle="See who's open to meeting up tonight"
             onNavigateProfile={() => router.push("/profile")}
-            onNavigateMessages={() => router.push("/messages")}
+            onNavigateMessages={handleToggleMessages}
+            unreadCount={unreadMessageCount}
             userDisplayName={currentUser?.displayName ?? null}
             userEmail={currentUser?.email ?? null}
             userPhotoUrl={currentUser?.photoUrl ?? null}
@@ -257,7 +304,7 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
               {visibleProspects.length > 0 ? (
                 <PeopleGrid
                   prospects={visibleProspects}
-                  onContact={handleMessages}
+                  onContact={handleToggleMessages}
                   onViewPlans={handleDiscover}
                 />
               ) : (
@@ -269,12 +316,13 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
       </div>
 
       <MobileActionBar
-        active="people"
+        active={activePrimarySection === "messages" ? "messages" : activePrimarySection}
         onNavigateDiscover={handleDiscover}
-        onNavigatePeople={() => router.push("/people")}
-        onNavigateMessages={handleMessages}
+        onNavigatePeople={handlePeopleNav}
+        onNavigateMessages={handleToggleMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
+        messagesUnreadCount={unreadMessageCount}
       />
 
       {rangeSheetOpen ? (
