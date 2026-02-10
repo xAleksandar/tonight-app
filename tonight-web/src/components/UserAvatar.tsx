@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { classNames } from '@/lib/classNames';
+
 const sizeMap = {
   sm: 'h-10 w-10 text-sm',
   md: 'h-14 w-14 text-base',
@@ -14,6 +16,9 @@ interface UserAvatarProps {
   email?: string;
   photoUrl?: string | null;
   size?: UserAvatarSize;
+  className?: string;
+  initialsClassName?: string;
+  imageClassName?: string;
 }
 
 const getInitials = (displayName?: string | null, fallback?: string) => {
@@ -29,10 +34,24 @@ const getInitials = (displayName?: string | null, fallback?: string) => {
     .join('');
 };
 
-export default function UserAvatar({ displayName, email, photoUrl, size = 'lg' }: UserAvatarProps) {
+export default function UserAvatar({
+  displayName,
+  email,
+  photoUrl,
+  size = 'lg',
+  className,
+  initialsClassName,
+  imageClassName,
+}: UserAvatarProps) {
   const [imageError, setImageError] = useState(false);
   const initials = getInitials(displayName, email);
-  const classes = `flex items-center justify-center rounded-full bg-zinc-100 text-zinc-600 ${sizeMap[size]}`;
+  const showDefaultPalette = !className;
+  const classes = classNames(
+    'flex items-center justify-center rounded-full',
+    sizeMap[size],
+    showDefaultPalette ? 'bg-zinc-100 text-zinc-600' : undefined,
+    className
+  );
 
   const shouldShowImage = photoUrl && !imageError;
 
@@ -43,11 +62,11 @@ export default function UserAvatar({ displayName, email, photoUrl, size = 'lg' }
         <img
           src={photoUrl}
           alt={displayName ?? email ?? 'User avatar'}
-          className="h-full w-full rounded-full object-cover"
+          className={classNames('h-full w-full rounded-full object-cover', imageClassName)}
           onError={() => setImageError(true)}
         />
       ) : (
-        <span className="font-semibold">{initials}</span>
+        <span className={classNames('font-semibold', initialsClassName)}>{initials}</span>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import { DesktopHeader } from '@/components/tonight/DesktopHeader';
 import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
 import { MobileActionBar } from '@/components/tonight/MobileActionBar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
+import type { AuthUser } from '@/components/auth/AuthProvider';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { CATEGORY_DEFINITIONS, type CategoryId } from '@/lib/categories';
 import { classNames } from '@/lib/classNames';
@@ -72,7 +73,7 @@ type ApiErrorPayload = {
 };
 
 export default function CreateEventPage() {
-  const { status: authStatus } = useRequireAuth();
+  const { status: authStatus, user: authUser } = useRequireAuth();
 
   if (authStatus === 'loading') {
     return <AuthStatusMessage label="Checking your session…" />;
@@ -86,10 +87,10 @@ export default function CreateEventPage() {
     return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
-  return <AuthenticatedCreateEventPage />;
+  return <AuthenticatedCreateEventPage currentUser={authUser ?? null} />;
 }
 
-function AuthenticatedCreateEventPage() {
+function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [title, setTitle] = useState('');
@@ -261,6 +262,10 @@ function AuthenticatedCreateEventPage() {
             title="Create"
             subtitle="Share what you're planning tonight"
             onNavigateProfile={() => router.push('/profile')}
+            onNavigateMessages={() => router.push('/messages')}
+            userDisplayName={currentUser?.displayName ?? null}
+            userEmail={currentUser?.email ?? null}
+            userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">

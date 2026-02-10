@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
+import type { AuthUser } from "@/components/auth/AuthProvider";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
@@ -160,7 +161,7 @@ const PEOPLE_PROSPECTS: PersonProspect[] = [
 ];
 
 export default function PeoplePage() {
-  const { status: authStatus } = useRequireAuth();
+  const { status: authStatus, user: authUser } = useRequireAuth();
 
   if (authStatus === "loading") {
     return <AuthStatusMessage label="Checking your session…" />;
@@ -174,10 +175,10 @@ export default function PeoplePage() {
     return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
-  return <AuthenticatedPeoplePage />;
+  return <AuthenticatedPeoplePage currentUser={authUser ?? null} />;
 }
 
-function AuthenticatedPeoplePage() {
+function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [rangeKm, setRangeKm] = useState(DEFAULT_RANGE_KM);
@@ -227,6 +228,9 @@ function AuthenticatedPeoplePage() {
             subtitle="See who's open to meeting up tonight"
             onNavigateProfile={() => router.push("/profile")}
             onNavigateMessages={() => router.push("/messages")}
+            userDisplayName={currentUser?.displayName ?? null}
+            userEmail={currentUser?.email ?? null}
+            userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">

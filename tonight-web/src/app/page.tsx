@@ -25,6 +25,7 @@ import { classNames } from "@/lib/classNames";
 
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
+import type { AuthUser } from "@/components/auth/AuthProvider";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 const DEFAULT_RADIUS_KM = 10;
@@ -181,7 +182,7 @@ const formatSpotsLabel = (value: number | null) => {
 };
 
 export default function HomePage() {
-  const { status: authStatus } = useRequireAuth();
+  const { status: authStatus, user: authUser } = useRequireAuth();
 
   if (authStatus === "loading") {
     return <AuthStatusMessage label="Checking your session…" />;
@@ -195,10 +196,10 @@ export default function HomePage() {
     return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
-  return <AuthenticatedHomePage />;
+  return <AuthenticatedHomePage currentUser={authUser ?? null} />;
 }
 
-function AuthenticatedHomePage() {
+function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -513,6 +514,9 @@ function AuthenticatedHomePage() {
             onNavigateProfile={() => router.push("/profile")}
             onNavigateMessages={handleOpenMessages}
             unreadCount={unreadMessageCount}
+            userDisplayName={currentUser?.displayName ?? null}
+            userEmail={currentUser?.email ?? null}
+            userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
           <DiscoveryPrimaryNav

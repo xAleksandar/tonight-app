@@ -43,6 +43,7 @@
 - Task 20.7: Desktop sidebar navigation (Discover + People) now routes to live sections, added the interim /people experience, and wired mobile nav parity — Commit `4108e49`.
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 08:55 runner: Hooked DesktopHeader up to the authenticated user so it now shows the real avatar/initials across Discover, People, Messages, Create, and Profile (including dark-mode friendly colors + presence dot). Added the flexibility we need in `UserAvatar` to restyle it per screen and reran `npm test` (68 suites, green).
 - 2026-02-10 08:24 runner: Added Messages as a first-class desktop sidebar destination so it stays clickable/highlighted across Discover, People, /messages, and /chat.
 - 2026-02-10 07:39 runner: Synced the discovery header tabs + mobile nav with the Messages modal so clicking Messages opens the conversation list everywhere, highlights the active section, and keeps the map/list toggle driving the main pane.
 - 2026-02-10 07:24 runner: Added the split-view Messages preview (hero, badges, and composer) so the desktop layout mirrors the V0 chat screen and nudges people toward accepted threads.

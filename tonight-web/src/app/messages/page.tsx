@@ -7,6 +7,7 @@ import { BadgeCheck, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users }
 import { ConversationList } from "@/components/chat/ConversationList";
 import { PLACEHOLDER_CONVERSATIONS, hasPlaceholderConversationData, type ConversationPreview } from "@/components/chat/conversations";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
+import type { AuthUser } from "@/components/auth/AuthProvider";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
@@ -15,7 +16,7 @@ import type { CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
 
 export default function MessagesPage() {
-  const { status } = useRequireAuth();
+  const { status, user } = useRequireAuth();
 
   if (status === "loading") {
     return <AuthStatusMessage label="Checking your session…" />;
@@ -29,12 +30,12 @@ export default function MessagesPage() {
     return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
-  return <AuthenticatedMessagesPage />;
+  return <AuthenticatedMessagesPage currentUser={user ?? null} />;
 }
 
 type ConversationFilter = "all" | "accepted" | "pending";
 
-function AuthenticatedMessagesPage() {
+function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [conversations] = useState<ConversationPreview[]>(PLACEHOLDER_CONVERSATIONS);
@@ -141,6 +142,9 @@ function AuthenticatedMessagesPage() {
             subtitle="Keep pace with the hosts and guests you've matched with"
             onNavigateProfile={handleProfile}
             onNavigateMessages={handleMessages}
+            userDisplayName={currentUser?.displayName ?? null}
+            userEmail={currentUser?.email ?? null}
+            userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">

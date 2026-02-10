@@ -21,7 +21,7 @@ import BlockUserButton from '@/components/BlockUserButton';
 import ReportModal from '@/components/ReportModal';
 import UserAvatar from '@/components/UserAvatar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
-import { useAuthContext } from '@/components/auth/AuthProvider';
+import { useAuthContext, type AuthUser } from '@/components/auth/AuthProvider';
 import { DesktopHeader } from '@/components/tonight/DesktopHeader';
 import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
 import { MobileActionBar } from '@/components/tonight/MobileActionBar';
@@ -139,14 +139,15 @@ export default function ProfilePage() {
     return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
   }
 
-  return <AuthenticatedProfilePage currentUserId={authUser?.id ?? null} />;
+  return <AuthenticatedProfilePage currentUserId={authUser?.id ?? null} currentUser={authUser ?? null} />;
 }
 
 type AuthenticatedProfilePageProps = {
   currentUserId: string | null;
+  currentUser: AuthUser | null;
 };
 
-function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePageProps) {
+function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedProfilePageProps) {
   const router = useRouter();
   const { logout } = useAuthContext();
   const [sidebarCategory, setSidebarCategory] = useState<CategoryId | null>(null);
@@ -366,6 +367,10 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
             title="Profile"
             subtitle="Keep your Tonight identity current"
             onNavigateProfile={() => router.push('/profile')}
+            onNavigateMessages={() => router.push('/messages')}
+            userDisplayName={profile?.displayName ?? currentUser?.displayName ?? null}
+            userEmail={profile?.email ?? currentUser?.email ?? null}
+            userPhotoUrl={profile?.photoUrl ?? currentUser?.photoUrl ?? null}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">

@@ -2,6 +2,7 @@
 
 import { List as ListIcon, Map as MapIcon, MessageCircle } from "lucide-react";
 
+import UserAvatar from "@/components/UserAvatar";
 import { classNames } from "@/lib/classNames";
 
 export type DesktopHeaderProps = {
@@ -12,6 +13,9 @@ export type DesktopHeaderProps = {
   onNavigateMessages?: () => void;
   viewMode?: "list" | "map";
   onViewModeChange?: (mode: "list" | "map") => void;
+  userDisplayName?: string | null;
+  userEmail?: string | null;
+  userPhotoUrl?: string | null;
 };
 
 export function DesktopHeader({
@@ -22,6 +26,9 @@ export function DesktopHeader({
   onNavigateMessages,
   viewMode,
   onViewModeChange,
+  userDisplayName,
+  userEmail,
+  userPhotoUrl,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -88,10 +95,18 @@ export function DesktopHeader({
         <button
           type="button"
           onClick={onNavigateProfile}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-border/80 bg-card/60 text-sm font-semibold text-foreground"
+          className="relative flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           aria-label="Profile"
         >
-          <span>YN</span>
+          <UserAvatar
+            displayName={userDisplayName ?? undefined}
+            email={userEmail ?? undefined}
+            photoUrl={userPhotoUrl ?? undefined}
+            size="sm"
+            className="h-11 w-11 border border-border/70 bg-card/70 text-foreground"
+            initialsClassName="text-[13px]"
+          />
+          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.7)]" aria-hidden />
         </button>
       </div>
     </header>
