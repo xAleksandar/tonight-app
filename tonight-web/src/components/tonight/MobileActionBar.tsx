@@ -13,6 +13,15 @@ export type MobileActionBarProps = {
   onNavigateMessages?: () => void;
   onCreate: () => void;
   onOpenProfile: () => void;
+  messagesUnreadCount?: number;
+};
+
+type NavItem = {
+  id: MobileNavTarget;
+  label: string;
+  icon: typeof Compass;
+  onPress?: () => void;
+  badgeCount?: number;
 };
 
 export function MobileActionBar({
@@ -22,12 +31,19 @@ export function MobileActionBar({
   onNavigateMessages,
   onCreate,
   onOpenProfile,
+  messagesUnreadCount = 0,
 }: MobileActionBarProps) {
-  const navItems = [
+  const navItems: NavItem[] = [
     { id: "discover" as const, label: "Discover", icon: Compass, onPress: onNavigateDiscover },
     { id: "people" as const, label: "People", icon: Users, onPress: onNavigatePeople },
     { id: "create" as const, label: "Post", icon: Plus, onPress: onCreate },
-    { id: "messages" as const, label: "Messages", icon: MessageCircle, onPress: onNavigateMessages },
+    {
+      id: "messages" as const,
+      label: "Messages",
+      icon: MessageCircle,
+      onPress: onNavigateMessages,
+      badgeCount: messagesUnreadCount,
+    },
     { id: "profile" as const, label: "Profile", icon: User, onPress: onOpenProfile },
   ];
 
@@ -43,6 +59,9 @@ export function MobileActionBar({
           const isActive = active === item.id;
           const isCreate = item.id === "create";
           const disabled = typeof item.onPress !== "function" && !isCreate;
+          const badgeCount = item.badgeCount ?? 0;
+          const showUnreadBadge = item.id === "messages" && badgeCount > 0;
+          const unreadLabel = showUnreadBadge ? (badgeCount > 99 ? "99+" : badgeCount.toString()) : null;
 
           if (isCreate) {
             return (
@@ -90,8 +109,10 @@ export function MobileActionBar({
               />
               <span className="relative flex h-5 w-5 items-center justify-center">
                 <Icon className="h-5 w-5" />
-                {item.id === "messages" && isActive && (
-                  <span className="absolute -right-1.5 -top-1.5 h-2 w-2 rounded-full bg-primary" />
+                {showUnreadBadge && (
+                  <span className="absolute -right-2 -top-2 min-h-[16px] min-w-[16px] rounded-full bg-primary px-1 text-[10px] font-bold leading-4 text-primary-foreground shadow-[0_0_12px_rgba(14,34,255,0.35)]">
+                    {unreadLabel}
+                  </span>
                 )}
               </span>
               <span className="relative">{item.label}</span>

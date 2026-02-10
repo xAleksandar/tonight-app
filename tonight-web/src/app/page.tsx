@@ -627,6 +627,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         onNavigateMessages={handleOpenMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
+        messagesUnreadCount={unreadMessageCount}
       />
 
       {rangeSheetOpen && (
