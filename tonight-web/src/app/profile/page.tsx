@@ -34,10 +34,10 @@ const FORM_INPUT_CLASS =
   'h-12 w-full rounded-2xl border border-border/70 bg-background/40 px-4 text-sm text-foreground placeholder:text-muted-foreground shadow-inner shadow-black/10 transition focus:border-primary focus:ring-2 focus:ring-primary/30 focus:outline-none';
 
 const CTA_BUTTON_CLASS =
-  'inline-flex items-center justify-center rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40';
+  'inline-flex h-12 w-full items-center justify-center rounded-2xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[0_20px_45px_rgba(14,34,255,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto';
 
 const SECONDARY_BUTTON_CLASS =
-  'rounded-2xl border border-border/60 px-6 py-2.5 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-40';
+  'inline-flex h-11 items-center justify-center rounded-2xl px-4 text-sm font-semibold text-muted-foreground transition hover:bg-background/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40';
 
 type ProfileResponse = {
   user: Profile | null;
@@ -420,9 +420,25 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                     </section>
 
                     <section className="rounded-3xl border border-border/60 bg-card/60 divide-y divide-border/50">
-                      <InfoRow icon={Mail} label="Email" value={profile.email} />
-                      <InfoRow icon={Calendar} label="Joined" value={formatMonthYear(profile.createdAt)} />
-                      <InfoRow icon={MapPin} label="Location" value="Grant access from Discover" isAction />
+                      <InfoRow
+                        icon={Mail}
+                        label="Email"
+                        value={profile.email}
+                        helper="Used for sign-in, safety alerts, and Tonight notifications."
+                      />
+                      <InfoRow
+                        icon={Calendar}
+                        label="Joined"
+                        value={formatMonthYear(profile.createdAt)}
+                        helper="When you first created your Tonight account."
+                      />
+                      <InfoRow
+                        icon={MapPin}
+                        label="Location"
+                        value="Grant access from Discover"
+                        helper="Share your general area from the Discover screen to improve local matches."
+                        isAction
+                      />
                     </section>
 
                     <ActiveEventsPanel
@@ -440,27 +456,56 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
 
                   <div className="space-y-6">
                     <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Profile</p>
-                        <h3 className="font-serif text-2xl font-semibold">Personal details</h3>
-                        <p className="text-sm text-muted-foreground">Update your public name and avatar.</p>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                          <div>
+                            <h3 className="font-serif text-2xl font-semibold">Personal details</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Keep the name and photo that hosts see aligned with the Tonight spec.
+                            </p>
+                          </div>
+                          <p className="text-xs text-muted-foreground sm:text-right">
+                            Visible on your event cards, chat requests, and profile.
+                          </p>
+                        </div>
                       </div>
-                      <form className="mt-6 space-y-6" onSubmit={onSubmit}>
-                        <div className="space-y-2">
-                          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Display name</label>
+                      <form className="mt-8 space-y-8" onSubmit={onSubmit}>
+                        <div className="space-y-3">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <label
+                              htmlFor="profile-display-name"
+                              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Display name
+                            </label>
+                            <p className="text-xs text-muted-foreground">2–64 characters, no emojis.</p>
+                          </div>
                           <input
+                            id="profile-display-name"
                             type="text"
                             value={displayNameInput}
                             onChange={(event) => setDisplayNameInput(event.target.value)}
                             placeholder="Add a friendly name"
                             className={FORM_INPUT_CLASS}
                           />
-                          <p className="text-xs text-muted-foreground">Between 2 and 64 characters.</p>
+                          <p className="text-xs text-muted-foreground">
+                            This is shown to people you host or request to join.
+                          </p>
                         </div>
 
-                        <div className="space-y-3">
-                          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photo</label>
+                        <div className="space-y-4">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <label
+                              htmlFor="profile-photo-url"
+                              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              Photo
+                            </label>
+                            <p className="text-xs text-muted-foreground">Square images look best across Tonight.</p>
+                          </div>
                           <input
+                            id="profile-photo-url"
                             type="url"
                             value={photoInput}
                             onChange={(event) => setPhotoInput(event.target.value)}
@@ -470,7 +515,7 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                           <div className="flex flex-wrap gap-2 text-sm">
                             <button
                               type="button"
-                              className="rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:text-primary"
+                              className="rounded-full border border-primary/40 bg-primary/10 px-4 py-2 font-semibold text-primary transition hover:bg-primary/15"
                               onClick={() => fileInputRef.current?.click()}
                             >
                               Upload photo
@@ -491,7 +536,7 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Paste a public URL or upload a new image (stored as a data URL for preview).
+                            Paste a public URL or upload a new image. Images stay local until you hit “Save changes.”
                           </p>
                           <input
                             ref={fileInputRef}
@@ -510,7 +555,7 @@ function AuthenticatedProfilePage({ currentUserId }: AuthenticatedProfilePagePro
 
                         {status ? <p className={classNames('text-sm font-semibold', statusStyles)}>{status.message}</p> : null}
 
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-end">
                           <button type="submit" disabled={!hasChanges || saving} className={CTA_BUTTON_CLASS}>
                             {saving ? 'Saving…' : 'Save changes'}
                           </button>
@@ -626,19 +671,30 @@ type InfoRowProps = {
   icon: LucideIcon;
   label: string;
   value: string;
+  helper?: string;
   isAction?: boolean;
 };
 
-function InfoRow({ icon: Icon, label, value, isAction = false }: InfoRowProps) {
+function InfoRow({ icon: Icon, label, value, helper, isAction = false }: InfoRowProps) {
   return (
-    <div className="flex items-center gap-3 px-5 py-4 text-sm">
-      <span className="text-muted-foreground">
+    <div className="flex items-start gap-4 px-5 py-5">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-background/40 text-muted-foreground">
         <Icon className="h-4 w-4" />
-      </span>
-      <span className="text-muted-foreground">{label}</span>
-      <span className={classNames('ml-auto font-medium', isAction ? 'text-primary' : 'text-foreground')}>
-        {value}
-      </span>
+      </div>
+      <div className="flex flex-1 flex-col gap-1 text-sm">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+          <span
+            className={classNames(
+              'text-sm font-semibold sm:ml-auto',
+              isAction ? 'text-primary' : 'text-foreground'
+            )}
+          >
+            {value}
+          </span>
+        </div>
+        {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
+      </div>
     </div>
   );
 }
