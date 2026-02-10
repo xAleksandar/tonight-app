@@ -25,6 +25,7 @@ import { MessagesModal } from "@/components/chat/MessagesModal";
 import { PLACEHOLDER_CONVERSATIONS } from "@/components/chat/conversations";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
+import { MiniMap } from "@/components/tonight/MiniMap";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
@@ -33,6 +34,9 @@ import { classNames } from "@/lib/classNames";
 const MIN_RANGE_KM = 1;
 const MAX_RANGE_KM = 50;
 const DEFAULT_RANGE_KM = 10;
+const PEOPLE_MAP_LATITUDE = 42.6977;
+const PEOPLE_MAP_LONGITUDE = 23.3219;
+const PEOPLE_MAP_LOCATION_LABEL = "Downtown radius preview";
 
 type PrimarySection = "discover" | "people" | "messages";
 
@@ -440,41 +444,71 @@ type PeopleRangeControlsProps = {
 function PeopleRangeControls({ value, onChange, className }: PeopleRangeControlsProps) {
   return (
     <section className={classNames("rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20", className)}>
-      <div className="flex items-center justify-between">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">People range</p>
-          <h3 className="font-serif text-2xl font-semibold">{Math.round(value)} km radius</h3>
-          <p className="text-sm text-muted-foreground">Tune how far away we should surface members who marked an active plan.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">People range</p>
+              <h3 className="font-serif text-2xl font-semibold">{Math.round(value)} km radius</h3>
+              <p className="text-sm text-muted-foreground">
+                Tune how far away we should surface members who marked an active plan.
+              </p>
+            </div>
+            <div className="hidden text-right text-xs text-muted-foreground sm:block">
+              Auto-matches refresh when someone nearby updates their status.
+            </div>
+          </div>
+          <div className="mt-6 space-y-3">
+            <SliderPrimitive.Root
+              className="relative flex h-8 w-full touch-none select-none items-center"
+              max={MAX_RANGE_KM}
+              min={MIN_RANGE_KM}
+              step={1}
+              value={[value]}
+              aria-label="People radius"
+              onValueChange={([next]) => {
+                if (typeof next === "number") {
+                  onChange(next);
+                }
+              }}
+            >
+              <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-border/60">
+                <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
+              </SliderPrimitive.Track>
+              <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-[3px] border-background bg-primary-foreground shadow-[0_6px_18px_rgba(0,0,0,0.45)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" />
+            </SliderPrimitive.Root>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{MIN_RANGE_KM} km</span>
+              <span>{MAX_RANGE_KM} km</span>
+            </div>
+          </div>
         </div>
-        <div className="hidden text-right text-xs text-muted-foreground sm:block">
-          Auto-matches refresh when someone nearby updates their status.
-        </div>
-      </div>
-      <div className="mt-6 space-y-3">
-        <SliderPrimitive.Root
-          className="relative flex h-8 w-full touch-none select-none items-center"
-          max={MAX_RANGE_KM}
-          min={MIN_RANGE_KM}
-          step={1}
-          value={[value]}
-          aria-label="People radius"
-          onValueChange={([next]) => {
-            if (typeof next === "number") {
-              onChange(next);
-            }
-          }}
-        >
-          <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-border/60">
-            <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
-          </SliderPrimitive.Track>
-          <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full border-[3px] border-background bg-primary-foreground shadow-[0_6px_18px_rgba(0,0,0,0.45)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" />
-        </SliderPrimitive.Root>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{MIN_RANGE_KM} km</span>
-          <span>{MAX_RANGE_KM} km</span>
-        </div>
+
+        <PeopleRangeMapPreview radiusKm={value} />
       </div>
     </section>
+  );
+}
+
+function PeopleRangeMapPreview({ radiusKm }: { radiusKm: number }) {
+  const roundedRadius = Math.round(radiusKm);
+  return (
+    <div className="rounded-3xl border border-white/10 bg-background/60 p-3">
+      <MiniMap
+        latitude={PEOPLE_MAP_LATITUDE}
+        longitude={PEOPLE_MAP_LONGITUDE}
+        locationName={PEOPLE_MAP_LOCATION_LABEL}
+        height={220}
+        className="rounded-2xl border border-white/5"
+      />
+      <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+        <p className="text-sm font-semibold text-foreground">Preview coverage</p>
+        <p>
+          Showing roughly a {roundedRadius} km catchment so coordinators can sense how wide tonight&apos;s net is. We&apos;ll
+          swap this preview for your live location once permissions are wired in.
+        </p>
+      </div>
+    </div>
   );
 }
 
