@@ -505,8 +505,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           onCreate={handleCreate}
           onNavigateDiscover={() => router.push("/")}
           onNavigatePeople={() => router.push("/people")}
-          onNavigateMessages={() => router.push("/messages")}
-          activePrimaryNav="discover"
+          onNavigateMessages={handleOpenMessages}
+          activePrimaryNav={activePrimarySection}
         />
 
         <div className="flex flex-1 flex-col">
