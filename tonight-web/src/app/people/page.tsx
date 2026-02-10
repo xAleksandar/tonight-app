@@ -309,6 +309,12 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
                 onChange={setRangeKm}
               />
 
+              <PeopleCategoryFiltersPanel
+                className="hidden md:block"
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+              />
+
               {visibleProspects.length > 0 ? (
                 <PeopleGrid
                   prospects={visibleProspects}
@@ -558,9 +564,10 @@ function PeopleMobileHeader({ rangeKm, onOpenFilters, selectedCategory, onCatego
 type PeopleCategoryRowProps = {
   selectedCategory: CategoryId | null;
   onCategoryChange: (category: CategoryId | null) => void;
+  layout?: "scroll" | "wrap";
 };
 
-function PeopleCategoryRow({ selectedCategory, onCategoryChange }: PeopleCategoryRowProps) {
+function PeopleCategoryRow({ selectedCategory, onCategoryChange, layout = "scroll" }: PeopleCategoryRowProps) {
   const options = CATEGORY_ORDER.map((entry) => {
     if (entry === "all") {
       return { id: null, label: "All", Icon: Sparkles };
@@ -570,10 +577,13 @@ function PeopleCategoryRow({ selectedCategory, onCategoryChange }: PeopleCategor
   });
 
   return (
-    <div className="-mx-1">
+    <div className={classNames(layout === "scroll" ? "-mx-1" : undefined)}>
       <div
-        className="flex gap-2 overflow-x-auto px-1 pb-1"
-        style={{ WebkitOverflowScrolling: "touch" }}
+        className={classNames(
+          "flex gap-2",
+          layout === "scroll" ? "overflow-x-auto px-1 pb-1" : "flex-wrap"
+        )}
+        style={layout === "scroll" ? { WebkitOverflowScrolling: "touch" } : undefined}
         aria-label="Filter people by category"
       >
         {options.map(({ id, label, Icon }) => {
@@ -596,6 +606,38 @@ function PeopleCategoryRow({ selectedCategory, onCategoryChange }: PeopleCategor
         })}
       </div>
     </div>
+  );
+}
+
+type PeopleCategoryFiltersPanelProps = {
+  selectedCategory: CategoryId | null;
+  onCategoryChange: (category: CategoryId | null) => void;
+  className?: string;
+};
+
+function PeopleCategoryFiltersPanel({ selectedCategory, onCategoryChange, className }: PeopleCategoryFiltersPanelProps) {
+  return (
+    <section className={classNames("rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20", className)}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Categories</p>
+          <h3 className="font-serif text-2xl font-semibold text-foreground">Match tonight&apos;s vibe</h3>
+          <p className="text-sm text-muted-foreground">Highlight people who recently logged plans in these categories.</p>
+        </div>
+        {selectedCategory && (
+          <button
+            type="button"
+            onClick={() => onCategoryChange(null)}
+            className="self-start rounded-full border border-border/70 px-4 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary hover:text-primary"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="mt-4">
+        <PeopleCategoryRow selectedCategory={selectedCategory} onCategoryChange={onCategoryChange} layout="wrap" />
+      </div>
+    </section>
   );
 }
 
