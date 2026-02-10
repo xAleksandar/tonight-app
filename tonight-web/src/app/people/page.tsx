@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Music,
   SlidersHorizontal,
+  Sparkles,
   Users as UsersIcon,
   UtensilsCrossed,
   Waves,
@@ -24,7 +25,7 @@ import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import type { CategoryId } from "@/lib/categories";
+import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
 
 const MIN_RANGE_KM = 1;
@@ -241,6 +242,8 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
                   setRangeSheetValue(rangeKm);
                   setRangeSheetOpen(true);
                 }}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
               />
 
               <PeopleExplainerPanel />
@@ -430,9 +433,11 @@ function PeopleRangeControls({ value, onChange, className }: PeopleRangeControls
 type PeopleMobileHeaderProps = {
   rangeKm: number;
   onOpenFilters: () => void;
+  selectedCategory: CategoryId | null;
+  onCategoryChange: (category: CategoryId | null) => void;
 };
 
-function PeopleMobileHeader({ rangeKm, onOpenFilters }: PeopleMobileHeaderProps) {
+function PeopleMobileHeader({ rangeKm, onOpenFilters, selectedCategory, onCategoryChange }: PeopleMobileHeaderProps) {
   return (
     <div className="space-y-3 md:hidden">
       <div className="flex items-center justify-between rounded-3xl border border-border/60 bg-card/60 px-4 py-4">
@@ -457,6 +462,52 @@ function PeopleMobileHeader({ rangeKm, onOpenFilters }: PeopleMobileHeaderProps)
         <p>
           <span className="font-semibold text-foreground">People range</span> highlights members near you who recently toggled “I have plans." They might be heading somewhere farther away but still want to coordinate rides.
         </p>
+      </div>
+
+      <PeopleCategoryRow selectedCategory={selectedCategory} onCategoryChange={onCategoryChange} />
+    </div>
+  );
+}
+
+type PeopleCategoryRowProps = {
+  selectedCategory: CategoryId | null;
+  onCategoryChange: (category: CategoryId | null) => void;
+};
+
+function PeopleCategoryRow({ selectedCategory, onCategoryChange }: PeopleCategoryRowProps) {
+  const options = CATEGORY_ORDER.map((entry) => {
+    if (entry === "all") {
+      return { id: null, label: "All", Icon: Sparkles };
+    }
+    const definition = CATEGORY_DEFINITIONS[entry];
+    return { id: definition.id, label: definition.label, Icon: definition.icon };
+  });
+
+  return (
+    <div className="-mx-1">
+      <div
+        className="flex gap-2 overflow-x-auto px-1 pb-1"
+        style={{ WebkitOverflowScrolling: "touch" }}
+        aria-label="Filter people by category"
+      >
+        {options.map(({ id, label, Icon }) => {
+          const isActive = selectedCategory === id;
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onCategoryChange(id)}
+              className={classNames(
+                "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                isActive ? "border-primary bg-primary/10 text-primary" : "border-border/70 bg-card/60 text-muted-foreground"
+              )}
+              aria-pressed={isActive}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
