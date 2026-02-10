@@ -42,6 +42,7 @@
 - Task 20.6: Discovery navigation view-state sync (Messages tab, bottom nav highlighting, map/list query param handling, test updates) — Commit `f657d25`.
 - Task 20.7: Desktop sidebar navigation (Discover + People) now routes to live sections, added the interim /people experience, and wired mobile nav parity — Commit `4108e49`.
 ## In Progress / Priority Notes
+- 2026-02-10 04:59 runner: Hooked the People view up to the category filters so the desktop sidebar selection now narrows the roster, added a shared reset action/empty state copy, and re-ran `npm test` (68 suites, passing).
 - 2026-02-10 01:44 runner: Wired the discovery header + mobile action bar “Messages” affordances into a lightweight Messages modal so the nav returns a real conversation list. Added the stop-gap modal (reusable client component) with the current V0 visual treatment, hooked it into the home page, and reran `npm test` from `tonight-web/` (passes, 68 suites).
 - 2026-02-10 01:57 runner: Synced the mobile + desktop discovery toggles with the real view state: bottom nav now reflects the active section (including the Messages modal), map/list toggles stay in lockstep across breakpoints via URL search params, and the UI tests were updated to mock `usePathname`/`useSearchParams` so the new navigation plumbing stays covered.
 - 2026-02-10 02:40 runner: Wired the desktop sidebar buttons into real navigation callbacks, added the temporary /people shell so both desktop + mobile navs have somewhere to land, and reran `npm test` (68 suites, passing).
@@ -51,5 +52,5 @@
 - 2026-02-10 03:49 runner: Rebuilt the /people experience to match the V0 cards (grid-based glass layout, mobile range sheet, desktop slider, and contact CTA that opens the Messages modal) while filtering the mock roster by the active radius. Hardened ReportModal so tests can run outside the browser, re-ran `npm test` (68 suites, passing).
 
 ## Next Up
-1. Swap the People roster over to real data (range-filtered API + empty state plumbing) and wire the event chips into the actual event-detail modal once the backend endpoints land.
-2. Follow up with the remaining discovery/people backlog deltas (e.g., map integration + quick-invite affordances) once the live data path is ready.
+1. Thread the People roster through the upcoming API so the range + category filters run on live data, and wire the card event chips into the EventDetailModal once those endpoints land.
+2. Continue the discovery/people delta cleanup (map embed, quick-invite affordances, and any remaining sidebar polish) after the live data plumbing is sorted.

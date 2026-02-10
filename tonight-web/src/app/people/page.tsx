@@ -31,7 +31,7 @@ const MIN_RANGE_KM = 1;
 const MAX_RANGE_KM = 50;
 const DEFAULT_RANGE_KM = 10;
 
-type PersonEventCategory = "cinema" | "food" | "outdoor" | "music" | "fitness" | "social";
+type PersonEventCategory = CategoryId;
 
 type PersonEvent = {
   title: string;
@@ -189,10 +189,25 @@ function AuthenticatedPeoplePage() {
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const handleDiscover = useCallback(() => router.push("/"), [router]);
 
-  const visibleProspects = useMemo(
-    () => PEOPLE_PROSPECTS.filter((person) => person.distanceKm <= rangeKm + 0.001),
-    [rangeKm],
-  );
+  const visibleProspects = useMemo(() => {
+    return PEOPLE_PROSPECTS.filter((person) => {
+      const withinRange = person.distanceKm <= rangeKm + 0.001;
+      if (!withinRange) {
+        return false;
+      }
+      if (!selectedCategory) {
+        return true;
+      }
+      return person.events.some((event) => event.category === selectedCategory);
+    });
+  }, [rangeKm, selectedCategory]);
+
+  const filtersActive = selectedCategory !== null || rangeKm !== DEFAULT_RANGE_KM;
+
+  const handleResetFilters = useCallback(() => {
+    setRangeKm(DEFAULT_RANGE_KM);
+    setSelectedCategory(null);
+  }, []);
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#070b1c] via-[#060814] to-[#05060f] text-foreground">
@@ -239,7 +254,7 @@ function AuthenticatedPeoplePage() {
                   onViewPlans={handleDiscover}
                 />
               ) : (
-                <PeopleEmptyState onResetFilters={() => setRangeKm(DEFAULT_RANGE_KM)} />
+                <PeopleEmptyState filtersActive={filtersActive} onResetFilters={handleResetFilters} />
               )}
             </div>
           </main>
@@ -463,9 +478,16 @@ function PeopleExplainerPanel() {
 
 type PeopleEmptyStateProps = {
   onResetFilters: () => void;
+  filtersActive: boolean;
 };
 
-function PeopleEmptyState({ onResetFilters }: PeopleEmptyStateProps) {
+function PeopleEmptyState({ onResetFilters, filtersActive }: PeopleEmptyStateProps) {
+  const title = filtersActive ? "No one matches these filters yet" : "No one within this radius yet";
+  const description = filtersActive
+    ? "Try clearing your category filter or widening your radius to see who's planning something nearby."
+    : "Expand your range to 15–20 km and we'll refresh the list. You can shrink it back anytime.";
+  const buttonLabel = filtersActive ? "Clear filters" : "Reset to default";
+
   return (
     <section className="rounded-3xl border border-border/60 bg-card/60 p-8 text-center shadow-xl shadow-black/20">
       <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">People range</p>
@@ -478,7 +500,7 @@ function PeopleEmptyState({ onResetFilters }: PeopleEmptyStateProps) {
         onClick={onResetFilters}
         className="mt-6 rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90"
       >
-        Reset to default
+        {buttonLabel}
       </button>
     </section>
   );
