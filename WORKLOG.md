@@ -44,6 +44,7 @@
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 - Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 19:05 runner: Added the People radius desktop map preview so the range controls now mirror the V0 split-panel (mini map, coverage copy, and slider) ahead of wiring real geolocation; `npm test` (68 suites) passes.
 - 2026-02-10 18:44 runner: Persisted the discovery map/list toggle so it reads an explicit ?view= override, falls back to the last stored preference in localStorage, and writes updates from either breakpoint; added a regression test that seeds localStorage and cleared the jsdom window cleanup so the suite can keep the DOM available. `npm test` (68 suites) passes.
 - 2026-02-10 17:54 runner: Added the People tab to the discovery header nav so desktop users can jump straight from Discover to /people, and rewired the nav callbacks to use the real routing handlers while Messages continues to toggle the modal; `npm test` (68 suites) passes.
 - 2026-02-10 18:20 runner: Swapped the nav highlight logic to derive from the router path + Messages modal state so the desktop header, sidebar, and mobile action bar stay synced even when users jump via deep links or open/close the overlay; `npm test` (68 suites) passes.
@@ -75,6 +76,6 @@
 - 2026-02-10 06:18 runner: Moved Tonight Messages into a first-class page that mirrors the live V0 hero/cards, extracted a reusable ConversationList + placeholder data helpers, and rerouted every Messages entry point (header tabs, sidebar CTA, mobile action bar, grid contacts) to push to /messages. `npm test` (68 suites) passes.
 
 ## Next Up
-1. Finish the remaining discovery/people parity deltas (map embed, quick-invite affordances, sidebar detailing) now that navigation/view state stays in sync.
+1. Finish the remaining discovery/people parity deltas (quick-invite affordances, sidebar detailing) now that navigation/view state stays in sync.
 2. Thread both the People roster and Messages list through the live APIs once backend support lands so filters and unread states stay real-time.
 3. Wire the new Messages preview panel into real chat selection (surface live conversation summaries + composer state) once sockets + data are ready.
