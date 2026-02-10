@@ -225,6 +225,10 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     },
     [router]
   );
+  const messagesEmptyStateAction = useMemo(
+    () => ({ label: "Browse Discover", onAction: handleCloseMessages }),
+    [handleCloseMessages]
+  );
   const initialView: ViewMode = searchParams?.get("view") === "map" ? "map" : "list";
   const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
@@ -636,6 +640,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         onClose={handleCloseMessages}
         conversations={conversations}
         onSelectConversation={handleSelectConversation}
+        emptyStateAction={messagesEmptyStateAction}
       />
     </div>
   );

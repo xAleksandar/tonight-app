@@ -11,6 +11,10 @@ export type MessagesModalProps = {
   onClose: () => void;
   conversations?: ConversationPreview[];
   onSelectConversation?: (conversationId: string) => void;
+  emptyStateAction?: {
+    label: string;
+    onAction: () => void;
+  };
 };
 
 export function MessagesModal({
@@ -18,6 +22,7 @@ export function MessagesModal({
   onClose,
   conversations,
   onSelectConversation,
+  emptyStateAction,
 }: MessagesModalProps) {
   const items = useMemo(() => {
     if (Array.isArray(conversations) && conversations.length) {
@@ -65,7 +70,11 @@ export function MessagesModal({
         </section>
 
         <div className="max-h-[60vh] overflow-y-auto pr-1">
-          <ConversationList conversations={items} onSelectConversation={onSelectConversation} />
+          <ConversationList
+            conversations={items}
+            onSelectConversation={onSelectConversation}
+            emptyStateAction={emptyStateAction}
+          />
         </div>
       </div>
     </div>

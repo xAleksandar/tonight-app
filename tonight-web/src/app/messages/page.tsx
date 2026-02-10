@@ -123,6 +123,11 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     []
   );
 
+  const emptyStateAction = useMemo(
+    () => ({ label: "Browse Discover", onAction: handleDiscover }),
+    [handleDiscover]
+  );
+
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#05070f] via-[#05060d] to-[#04040a] text-foreground">
       <div className="flex min-h-dvh flex-col md:flex-row">
@@ -192,6 +197,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                       conversations={filteredConversations}
                       onSelectConversation={handleSelectConversation}
                       emptyState={emptyStateByFilter[statusFilter]}
+                      emptyStateAction={emptyStateAction}
                     />
                   </div>
                 </section>

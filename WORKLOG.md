@@ -42,7 +42,9 @@
 - Task 20.6: Discovery navigation view-state sync (Messages tab, bottom nav highlighting, map/list query param handling, test updates) — Commit `f657d25`.
 - Task 20.7: Desktop sidebar navigation (Discover + People) now routes to live sections, added the interim /people experience, and wired mobile nav parity — Commit `4108e49`.
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
+- Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 09:45 runner: Added the Discover CTA to Messages empty states (and plumbed the new ConversationList prop) so the design-specified fallback keeps people moving; ready for the next delta as more data hooks land.
 - 2026-02-10 08:55 runner: Hooked DesktopHeader up to the authenticated user so it now shows the real avatar/initials across Discover, People, Messages, Create, and Profile (including dark-mode friendly colors + presence dot). Added the flexibility we need in `UserAvatar` to restyle it per screen and reran `npm test` (68 suites, green).
 - 2026-02-10 08:24 runner: Added Messages as a first-class desktop sidebar destination so it stays clickable/highlighted across Discover, People, /messages, and /chat.
 - 2026-02-10 07:39 runner: Synced the discovery header tabs + mobile nav with the Messages modal so clicking Messages opens the conversation list everywhere, highlights the active section, and keeps the map/list toggle driving the main pane.

@@ -10,9 +10,13 @@ type ConversationListProps = {
     title: string;
     description: string;
   };
+  emptyStateAction?: {
+    label: string;
+    onAction: () => void;
+  };
 };
 
-export function ConversationList({ conversations, onSelectConversation, emptyState }: ConversationListProps) {
+export function ConversationList({ conversations, onSelectConversation, emptyState, emptyStateAction }: ConversationListProps) {
   const hasConversations = conversations.length > 0;
 
   if (!hasConversations) {
@@ -28,6 +32,15 @@ export function ConversationList({ conversations, onSelectConversation, emptySta
         </div>
         <p className="text-sm font-semibold text-foreground">{emptyTitle}</p>
         <p className="max-w-sm text-xs text-muted-foreground">{emptyDescription}</p>
+        {emptyStateAction ? (
+          <button
+            type="button"
+            onClick={emptyStateAction.onAction}
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:bg-primary/15"
+          >
+            {emptyStateAction.label}
+          </button>
+        ) : null}
       </div>
     );
   }
