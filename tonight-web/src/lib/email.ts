@@ -21,9 +21,18 @@ export interface MagicLinkEmailPayload {
   html: string;
 }
 
-const DEFAULT_FROM = 'Tonight <onboarding@resend.dev>';
 const MAGIC_LINK_SUBJECT = 'Your Tonight login link';
 let cachedClient: ResendLike | null | undefined;
+
+const getFromEmail = (): string => {
+  const fromEnv = process.env.RESEND_FROM_EMAIL;
+  if (fromEnv) {
+    return fromEnv.includes('@') && !fromEnv.includes('<')
+      ? `Tonight <${fromEnv}>`
+      : fromEnv;
+  }
+  return 'Tonight <onboarding@resend.dev>';
+};
 
 const sanitizeBaseUrl = (url: string): string => {
   if (url.endsWith('/')) {
@@ -44,10 +53,13 @@ const getResendClient = (): ResendLike | null => {
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
+    console.log('⚠️  [Resend] RESEND_API_KEY not found in environment variables');
+    console.log('📋 [Resend] Available env vars:', Object.keys(process.env).filter(k => k.includes('RESEND')));
     cachedClient = null;
     return null;
   }
 
+  console.log(`✅ [Resend] API key found (${apiKey.substring(0, 10)}...)`);
   cachedClient = new Resend(apiKey);
   return cachedClient;
 };
@@ -98,7 +110,7 @@ export const sendMagicLink = async (
   const body = buildEmailBody(verificationUrl, expiresAt);
 
   const payload: MagicLinkEmailPayload = {
-    from: DEFAULT_FROM,
+    from: getFromEmail(),
     to: email,
     subject: MAGIC_LINK_SUBJECT,
     text: body.text,
@@ -107,13 +119,17 @@ export const sendMagicLink = async (
 
   const client = options?.resendClient ?? getResendClient();
   if (!client) {
-    (options?.logger ?? console).info(`[Magic Link] ${email}: ${verificationUrl}`);
+    console.log('⚠️  [Magic Link] No Resend client - RESEND_API_KEY is missing!');
+    console.log(`📧 [Magic Link] Would send to ${email}: ${verificationUrl}`);
     return;
   }
 
   try {
-    await client.emails.send(payload);
+    console.log(`📧 [Magic Link] Sending email from ${payload.from} to ${email}...`);
+    const result = await client.emails.send(payload);
+    console.log(`✅ [Magic Link] Email sent successfully to ${email}`, result);
   } catch (error) {
+    console.error(`❌ [Magic Link] Failed to send email to ${email}:`, error);
     throw new Error(`Failed to send magic link email: ${(error as Error).message}`);
   }
 };
