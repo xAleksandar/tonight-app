@@ -38,7 +38,7 @@ export const getJoinRequestsForEventHandler: AuthenticatedRouteHandler<NextRespo
   const normalizedEventId = normalizeEventId(eventIdParam);
   if ('error' in normalizedEventId) {
     return createErrorResponse({
-      message: normalizedEventId.error,
+      message: normalizedEventId.error ?? 'Invalid event ID',
       status: 400,
       context: ROUTE_CONTEXT,
     });

@@ -78,7 +78,7 @@ export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = asyn
   const reasonField = normalizeReason(body.reason);
   if ('error' in reasonField) {
     return createErrorResponse({
-      message: reasonField.error,
+      message: reasonField.error ?? 'Invalid reason',
       status: 400,
       context: ROUTE_CONTEXT,
     });
@@ -87,7 +87,7 @@ export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = asyn
   const descriptionField = normalizeDescription(body.description);
   if ('error' in descriptionField) {
     return createErrorResponse({
-      message: descriptionField.error,
+      message: descriptionField.error ?? 'Invalid description',
       status: 400,
       context: ROUTE_CONTEXT,
     });
@@ -96,7 +96,7 @@ export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = asyn
   const eventField = normalizeOptionalId('eventId', body.eventId);
   if ('error' in eventField) {
     return createErrorResponse({
-      message: eventField.error,
+      message: eventField.error ?? 'Invalid event ID',
       status: 400,
       context: ROUTE_CONTEXT,
     });
@@ -105,7 +105,7 @@ export const createReportHandler: AuthenticatedRouteHandler<NextResponse> = asyn
   const reportedUserField = normalizeOptionalId('reportedUserId', body.reportedUserId);
   if ('error' in reportedUserField) {
     return createErrorResponse({
-      message: reportedUserField.error,
+      message: reportedUserField.error ?? 'Invalid user ID',
       status: 400,
       context: ROUTE_CONTEXT,
     });

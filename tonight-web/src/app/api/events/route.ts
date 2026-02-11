@@ -112,13 +112,13 @@ export const validateEventPayload = (body: Record<string, unknown>): ValidationR
 
   const titleField = normalizeString(body.title, TITLE_MIN, TITLE_MAX, 'Title');
   if ('error' in titleField) {
-    errors.title = titleField.error;
+    errors.title = titleField.error ?? 'Invalid title';
   }
   const titleValue = 'error' in titleField ? null : titleField.value;
 
   const descriptionField = normalizeString(body.description, DESCRIPTION_MIN, DESCRIPTION_MAX, 'Description');
   if ('error' in descriptionField) {
-    errors.description = descriptionField.error;
+    errors.description = descriptionField.error ?? 'Invalid description';
   }
   const descriptionValue = 'error' in descriptionField ? null : descriptionField.value;
 
@@ -131,7 +131,7 @@ export const validateEventPayload = (body: Record<string, unknown>): ValidationR
 
   const locationField = normalizeLocation(body.location);
   if ('error' in locationField) {
-    errors.location = locationField.error;
+    errors.location = locationField.error ?? 'Invalid location';
   }
   const locationValue = 'value' in locationField ? locationField.value : null;
 
@@ -142,13 +142,13 @@ export const validateEventPayload = (body: Record<string, unknown>): ValidationR
     'Location name'
   );
   if ('error' in locationNameField) {
-    errors.locationName = locationNameField.error;
+    errors.locationName = locationNameField.error ?? 'Invalid location name';
   }
   const locationNameValue = 'error' in locationNameField ? null : locationNameField.value;
 
   const maxParticipantsField = normalizeMaxParticipants(body.maxParticipants);
   if ('error' in maxParticipantsField) {
-    errors.maxParticipants = maxParticipantsField.error;
+    errors.maxParticipants = maxParticipantsField.error ?? 'Invalid max participants';
   }
   const maxParticipantsValue = 'error' in maxParticipantsField ? null : maxParticipantsField.value;
 

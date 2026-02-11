@@ -8,7 +8,7 @@ import {
   JOIN_REQUEST_JOIN_EVENT,
   JOIN_REQUEST_MESSAGE_EVENT,
   type SocketMessagePayload,
-} from '@/lib/socket';
+} from '@/lib/socket-shared';
 
 export type SocketConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
@@ -102,10 +102,10 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
   const tokenRef = useRef<string | null>(token ?? null);
   const isMountedRef = useRef(true);
   const reconnectAttemptsRef = useRef(0);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectCountdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectCountdownIntervalRef = useRef<number | null>(null);
   const manualDisconnectRef = useRef(false);
-  const startConnectionRef = useRef<({ isRetry }?: { isRetry?: boolean }) => Promise<void>>();
+  const startConnectionRef = useRef<(({ isRetry }?: { isRetry?: boolean }) => Promise<void>) | undefined>(undefined);
 
   const [connectionState, setConnectionState] = useState<SocketConnectionState>('idle');
   const [error, setError] = useState<Error | null>(null);

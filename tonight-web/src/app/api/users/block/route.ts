@@ -50,7 +50,7 @@ export const blockUserHandler: AuthenticatedRouteHandler<NextResponse> = async (
   const userField = normalizeTargetUserId(body.userId);
   if ('error' in userField) {
     return createErrorResponse({
-      message: userField.error,
+      message: userField.error ?? 'Invalid user ID',
       status: 400,
       context: ROUTE_CONTEXT,
     });

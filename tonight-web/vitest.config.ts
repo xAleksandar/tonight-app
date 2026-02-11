@@ -10,7 +10,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    environmentMatchGlobs: [['**/*.test.tsx', 'jsdom']],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
   },
 });

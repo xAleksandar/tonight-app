@@ -59,7 +59,7 @@ export const getChatMessagesHandler: AuthenticatedRouteHandler<NextResponse> = a
   const normalizedJoinRequestId = normalizeJoinRequestId(joinRequestIdParam);
   if ('error' in normalizedJoinRequestId) {
     return createErrorResponse({
-      message: normalizedJoinRequestId.error,
+      message: normalizedJoinRequestId.error ?? 'Invalid join request ID',
       status: 400,
       context: GET_CONTEXT,
     });
@@ -118,7 +118,7 @@ export const postChatMessageHandler: AuthenticatedRouteHandler<NextResponse> = a
   const normalizedJoinRequestId = normalizeJoinRequestId(joinRequestIdParam);
   if ('error' in normalizedJoinRequestId) {
     return createErrorResponse({
-      message: normalizedJoinRequestId.error,
+      message: normalizedJoinRequestId.error ?? 'Invalid join request ID',
       status: 400,
       context: POST_CONTEXT,
     });
@@ -136,7 +136,7 @@ export const postChatMessageHandler: AuthenticatedRouteHandler<NextResponse> = a
   const contentField = normalizeMessageContentField(body.content);
   if ('error' in contentField) {
     return createErrorResponse({
-      message: contentField.error,
+      message: contentField.error ?? 'Invalid message content',
       status: 400,
       context: POST_CONTEXT,
     });

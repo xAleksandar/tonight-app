@@ -75,7 +75,7 @@ export const patchJoinRequestHandler: AuthenticatedRouteHandler<NextResponse> = 
   const statusField = normalizeStatus(body.status);
   if ('error' in statusField) {
     return createErrorResponse({
-      message: statusField.error,
+      message: statusField.error ?? 'Invalid status',
       status: 400,
       context: ROUTE_CONTEXT,
     });

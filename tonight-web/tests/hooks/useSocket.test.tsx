@@ -4,8 +4,8 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSocket } from '@/hooks/useSocket';
-import { JOIN_REQUEST_MESSAGE_EVENT, JOIN_REQUEST_JOIN_EVENT } from '@/lib/socket';
-import type { SocketMessagePayload } from '@/lib/socket';
+import { JOIN_REQUEST_MESSAGE_EVENT, JOIN_REQUEST_JOIN_EVENT } from '@/lib/socket-shared';
+import type { SocketMessagePayload } from '@/lib/socket-shared';
 
 type Listener = (...args: unknown[]) => void;
 

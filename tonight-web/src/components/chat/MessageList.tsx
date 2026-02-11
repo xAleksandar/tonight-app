@@ -8,6 +8,7 @@ export type MessageListStatus = 'loading' | 'ready' | 'error';
 
 export type ChatMessage = SerializedMessage & {
   deliveryStatus?: 'queued' | 'sending' | 'failed';
+  clientReferenceId?: string;
 };
 
 const classNames = (...classes: Array<string | boolean | null | undefined>) =>

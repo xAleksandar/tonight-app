@@ -3,15 +3,16 @@ import { fetchEventById, serializeEvent } from '@/lib/events';
 import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 type RouteContext = {
-  params: {
-    id?: string;
-  };
+  params: Promise<{
+    id: string;
+  }>;
 };
 
 const ROUTE_CONTEXT = 'GET /api/events/[id]';
 
 export const getEventHandler = async (_request: NextRequest, context: RouteContext) => {
-  const eventId = context.params?.id;
+  const params = await context.params;
+  const eventId = params.id;
   if (!eventId) {
     return createErrorResponse({
       message: 'Event id is required',

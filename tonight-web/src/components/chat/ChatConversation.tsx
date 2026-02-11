@@ -104,6 +104,9 @@ const createClientMessageId = () => {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 };
 
+const classNames = (...classes: Array<string | boolean | null | undefined>) =>
+  classes.filter(Boolean).join(' ');
+
 export default function ChatConversation({
   joinRequestId,
   currentUserId,

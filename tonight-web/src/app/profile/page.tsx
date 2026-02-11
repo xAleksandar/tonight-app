@@ -466,7 +466,7 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
   ];
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] text-foreground">
+    <div className="min-h-dvh text-foreground">
       <div className="flex min-h-dvh flex-col md:flex-row">
         <DesktopSidebar
           selectedCategory={sidebarCategory}
@@ -562,7 +562,7 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
                             </>
                           )}
                         </div>
-                        <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+                        <div className="flex items-center justify-center gap-2 text-sm sm:gap-4">
                           {[
                             { label: 'Events posted', value: stats.eventsHosted },
                             { label: 'Events joined', value: stats.eventsJoined },
@@ -631,7 +631,7 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
 
                     <section
                       ref={safetyRef}
-                      className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20"
+                      className="hidden rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20"
                     >
                       <div className="flex items-start gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
@@ -739,8 +739,8 @@ type StatItemProps = {
 function StatItem({ label, value }: StatItemProps) {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-lg font-bold text-foreground">{value}</span>
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-base font-bold text-foreground sm:text-lg">{value}</span>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-[11px]">{label}</span>
     </div>
   );
 }
@@ -790,8 +790,7 @@ function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
     <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-xl shadow-black/20">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80">Hosts</p>
-          <h3 className="font-serif text-xl font-semibold text-foreground">Active plans</h3>
+          <h3 className="font-serif text-xl font-semibold text-foreground">Active Events</h3>
           <p className="text-xs text-muted-foreground">Keep an eye on pending requests and RSVP health.</p>
         </div>
         {!loading && !error && hasEvents ? (
@@ -821,11 +820,11 @@ function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
             return (
               <article
                 key={event.id}
-                className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/30 px-4 py-4 text-sm text-foreground sm:flex-row sm:items-center"
+                className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/30 px-4 py-4 text-sm text-foreground"
               >
                 <div
                   className={classNames(
-                    'flex h-12 w-12 items-center justify-center rounded-2xl border text-primary',
+                    'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border',
                     hasPending
                       ? 'border-primary/40 bg-primary/10 text-primary'
                       : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
@@ -833,25 +832,9 @@ function ActiveEventsPanel({ loading, error, events }: ActiveEventsPanelProps) {
                 >
                   {hasPending ? <Clapperboard className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                 </div>
-                <div className="flex flex-1 flex-col gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">{event.title}</span>
-                    <StatusBadge tone={hasPending ? 'primary' : 'success'}>
-                      {hasPending
-                        ? `${event.pendingRequests} pending`
-                        : hasAccepted
-                          ? 'All confirmed'
-                          : 'Active'}
-                    </StatusBadge>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{event.locationName}</span>
-                    <span className="h-1 w-1 rounded-full bg-border/60" aria-hidden="true" />
-                    <span>{formatEventDatetime(event.datetime)}</span>
-                    {hasAccepted ? (
-                      <StatusBadge tone="neutral">{event.acceptedRequests} confirmed</StatusBadge>
-                    ) : null}
-                  </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate text-sm font-semibold text-foreground">{event.title}</span>
+                  <span className="text-xs text-muted-foreground">{formatEventDatetime(event.datetime)}</span>
                 </div>
               </article>
             );

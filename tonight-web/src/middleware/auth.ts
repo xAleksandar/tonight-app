@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAuthCookieName, verifyJWT } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/http/errors';
 
@@ -15,22 +15,22 @@ const unauthorizedResponse = () =>
     context: 'middleware/auth',
   });
 
-const readTokenFromCookies = (request?: NextRequest): string | null => {
-  const cookieStore = request?.cookies ?? safeCookies();
+const readTokenFromCookies = async (request?: NextRequest): Promise<string | null> => {
+  const cookieStore = request?.cookies ?? (await safeCookies());
   const token = cookieStore?.get(getAuthCookieName())?.value;
   return token ?? null;
 };
 
-const safeCookies = () => {
+const safeCookies = async () => {
   try {
-    return cookies();
+    return await cookies();
   } catch (error) {
     return undefined;
   }
 };
 
 export const getCurrentUser = async (request?: NextRequest): Promise<AuthenticatedUser | null> => {
-  const token = readTokenFromCookies(request);
+  const token = await readTokenFromCookies(request);
   if (!token) {
     return null;
   }

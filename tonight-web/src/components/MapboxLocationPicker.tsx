@@ -189,7 +189,7 @@ export default function MapboxLocationPicker({
 
         map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
 
-        const handleClick = (event: mapboxgl.MapMouseEvent & mapboxgl.EventData) => {
+        const handleClick = (event: mapboxgl.MapMouseEvent) => {
           if (disabledRef.current) {
             return;
           }

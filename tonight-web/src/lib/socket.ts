@@ -2,18 +2,14 @@ import type { Server as HTTPServer } from 'node:http';
 import { Server as SocketIOServer, type Socket, type ServerOptions, type DefaultEventsMap } from 'socket.io';
 
 import { verifyJWT } from '@/lib/auth';
+import {
+  JOIN_REQUEST_ROOM_PREFIX,
+  JOIN_REQUEST_MESSAGE_EVENT,
+  JOIN_REQUEST_JOIN_EVENT,
+  type SocketMessagePayload,
+} from '@/lib/socket-shared';
 
-export const JOIN_REQUEST_ROOM_PREFIX = 'join-request:' as const;
-export const JOIN_REQUEST_MESSAGE_EVENT = 'join-request:message' as const;
-export const JOIN_REQUEST_JOIN_EVENT = 'join-request:join' as const;
-
-export type SocketMessagePayload = {
-  id: string;
-  joinRequestId: string;
-  senderId: string;
-  content: string;
-  createdAt: string;
-};
+export type { SocketMessagePayload };
 
 type SocketData = {
   userId?: string;

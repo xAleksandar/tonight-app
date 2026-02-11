@@ -80,13 +80,14 @@ export const buildHostInitials = (value: string | null | undefined) => {
 
 const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>>[number]) => {
   const hostInitials = buildHostInitials(event.hostDisplayName);
-  const spotsRemaining = Math.max(event.maxParticipants - event.acceptedCount, 0);
+  const acceptedCount = Number(event.acceptedCount ?? 0);
+  const spotsRemaining = Math.max(event.maxParticipants - acceptedCount, 0);
 
   return {
     id: event.id,
     title: event.title,
     description: event.description,
-    datetime: event.datetime.toISOString(),
+    datetime: typeof event.datetime === 'string' ? event.datetime : event.datetime.toISOString(),
     locationName: event.locationName,
     maxParticipants: event.maxParticipants,
     status: event.status,
@@ -95,8 +96,8 @@ const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>
     hostPhotoUrl: event.hostPhotoUrl,
     hostInitials,
     spotsRemaining,
-    createdAt: event.createdAt.toISOString(),
-    updatedAt: event.updatedAt.toISOString(),
+    createdAt: typeof event.createdAt === 'string' ? event.createdAt : event.createdAt.toISOString(),
+    updatedAt: typeof event.updatedAt === 'string' ? event.updatedAt : event.updatedAt.toISOString(),
     distanceMeters: event.distanceMeters,
     location: {
       latitude: event.latitude,
