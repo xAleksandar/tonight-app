@@ -15,3 +15,8 @@ Each run should:
 - Drafted the `EventInsideExperience` component (glass panels, attendee buckets, join-request queue, chat preview placeholder) plus a new `/events/[id]` page that renders mock host data so we can see the inside screen full-bleed.
 - Added a focused Vitest suite to lock the layout + checklist behavior so future data wiring can't regress the structure.
 - Next: hook the component up to real queries (event, attendees, join-requests) and start threading the host approval actions through the existing join-request APIs so the buttons become live.
+
+## 2026-02-12 21:20 EET — Event-inside page now queries live data
+- Replaced the mock `/events/[id]` screen with a server-side loader that requires auth, fetches the event, and hydrates attendees + join-request cards from Prisma via the existing helpers.
+- The component now reflects the current RSVP state (accepted/pending/waitlist) instead of placeholder data.
+- Next: activate the approve/reject buttons by calling the join-request PATCH endpoint and optimistically updating the UI buckets so hosts can act from this screen.
