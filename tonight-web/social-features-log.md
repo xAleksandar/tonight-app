@@ -41,3 +41,8 @@ Each run should:
 - Added a host-specific chat preview builder that aggregates the latest guest DM across all accepted join requests, surfaces unread counts, and deep-links the CTA to the conversation that most recently pinged the host.
 - Backfilled graceful fallbacks (no accepted guests vs. no guest pings yet) plus a regression test that locks the disabled CTA explanation so hosts always know why the button is inactive.
 - Next: list the top unread guest threads (name + last line) under the chat card so hosts can jump directly into the right DM instead of guessing which guest needs attention.
+
+## 2026-02-12 23:00 EET — Home cards open event detail
+- Added a dedicated select handler so discovery cards/map markers now push to `/events/[id]` when clicked, letting hosts/guests jump straight into the inside experience.
+- Kept the selection state update so the map/list highlighting still works while we navigate.
+- Next: continue with the logged chat backlog item (top unread guest threads beneath the chat card).

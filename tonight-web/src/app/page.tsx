@@ -286,6 +286,13 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
     [conversations]
   );
+  const handleSelectEvent = useCallback(
+    (eventId: string) => {
+      setSelectedEventId(eventId);
+      router.push(`/events/`);
+    },
+    [router]
+  );
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -750,7 +757,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                       events={mapItems}
                       userLocation={userLocation || undefined}
                       selectedEventId={selectedEventId}
-                      onEventSelect={setSelectedEventId}
+                      onEventSelect={handleSelectEvent}
                       height={isDesktop ? MAP_HEIGHT_DESKTOP : MAP_HEIGHT_MOBILE}
                     />
                   </div>
@@ -760,7 +767,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                   <DiscoveryList
                     events={visibleEvents}
                     selectedEventId={selectedEventId}
-                    onSelect={setSelectedEventId}
+                    onSelect={handleSelectEvent}
                     locationReady={locationReady}
                     radiusSummary={buildRadiusSummary(radiusKm)}
                   />
