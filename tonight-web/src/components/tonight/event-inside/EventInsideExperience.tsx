@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, type ComponentType, type ReactNode, type SVGProps } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { CheckCircle2, Clock3, MapPin, MessageCircle, Shield, Sparkles, Users } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
 import { classNames } from "@/lib/classNames";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export type EventInsideExperienceProps = {
   event: {
@@ -33,6 +34,7 @@ export type EventInsideExperienceProps = {
   }>;
   joinRequests: Array<{
     id: string;
+    userId: string;
     displayName: string;
     intro?: string | null;
     submittedAtISO?: string | null;
@@ -53,6 +55,8 @@ const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: 
   pending: { label: "Awaiting host approval", tone: "bg-sky-500/10 text-sky-600" },
 };
 
+type JoinRequestActionState = "approving" | "rejecting";
+
 export function EventInsideExperience({
   event,
   host,
@@ -61,8 +65,95 @@ export function EventInsideExperience({
   viewerRole,
   chatPreview,
 }: EventInsideExperienceProps) {
-  const groupedAttendees = useMemo(() => groupAttendees(attendees), [attendees]);
+  const [pendingRequests, setPendingRequests] = useState(joinRequests);
+  const [roster, setRoster] = useState(attendees);
+  const [requestActionState, setRequestActionState] = useState<Record<string, JoinRequestActionState | undefined>>({});
+
+  useEffect(() => {
+    setPendingRequests(joinRequests);
+  }, [joinRequests]);
+
+  useEffect(() => {
+    setRoster(attendees);
+  }, [attendees]);
+
+  const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
+
+  const handleJoinRequestDecision = useCallback(
+    async ({
+      requestId,
+      userId,
+      displayName,
+      nextStatus,
+    }: {
+      requestId: string;
+      userId: string;
+      displayName: string;
+      nextStatus: "accepted" | "rejected";
+    }) => {
+      const intent: JoinRequestActionState = nextStatus === "accepted" ? "approving" : "rejecting";
+      setRequestActionState((prev) => ({
+        ...prev,
+        [requestId]: intent,
+      }));
+
+      try {
+        const response = await fetch(`/api/join-requests/${requestId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: nextStatus }),
+        });
+
+        if (!response.ok) {
+          const fallback = nextStatus === "accepted" ? "Unable to approve this request." : "Unable to reject this request.";
+          const message = await readErrorPayload(response, fallback);
+          throw new Error(message);
+        }
+
+        setPendingRequests((prev) => prev.filter((request) => request.id !== requestId));
+        setRoster((prev) => {
+          let found = false;
+          const status = nextStatus === "accepted" ? "confirmed" : "waitlist";
+          const blurb = nextStatus === "accepted" ? "Coming tonight" : "Moved to waitlist";
+
+          const nextRoster = prev.map((attendee) => {
+            if (attendee.id === userId) {
+              found = true;
+              return { ...attendee, status, blurb };
+            }
+            return attendee;
+          });
+
+          if (!found) {
+            nextRoster.push({
+              id: userId,
+              displayName,
+              status,
+              blurb,
+            });
+          }
+
+          return nextRoster;
+        });
+
+        showSuccessToast(nextStatus === "accepted" ? "Guest confirmed" : "Request rejected");
+      } catch (error) {
+        const fallback = nextStatus === "accepted" ? "Unable to approve this request." : "Unable to reject this request.";
+        const message = (error as Error)?.message ?? fallback;
+        showErrorToast("Join request update failed", message);
+      } finally {
+        setRequestActionState((prev) => {
+          const next = { ...prev };
+          delete next[requestId];
+          return next;
+        });
+      }
+    },
+    []
+  );
 
   return (
     <section className="space-y-8">
@@ -170,47 +261,69 @@ export function EventInsideExperience({
         <div className="space-y-6">
           <Card>
             <SectionHeading icon={CheckCircle2} title="Join requests" subtitle="Hosts see who's waiting" />
-            {joinRequests.length === 0 ? (
+            {pendingRequests.length === 0 ? (
               <p className="mt-4 text-sm text-white/60">No new requests right now.</p>
             ) : (
               <ul className="mt-4 space-y-3">
-                {joinRequests.map((request) => (
-                  <li key={request.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <div className="flex items-start gap-3">
-                      <UserAvatar displayName={request.displayName} size="sm" />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-white">{request.displayName}</p>
-                        <p className="text-xs text-white/60">
-                          Sent {formatRelativeTime(request.submittedAtISO)}
-                          {typeof request.mutualFriends === "number" && request.mutualFriends > 0
-                            ? ` · ${request.mutualFriends} mutual`
-                            : ""}
-                        </p>
-                        {request.intro ? <p className="mt-2 text-sm text-white/80">“{request.intro}”</p> : null}
+                {pendingRequests.map((request) => {
+                  const actionState = requestActionState[request.id];
+                  const isApproving = actionState === "approving";
+                  const isRejecting = actionState === "rejecting";
+                  const busy = Boolean(actionState);
+                  return (
+                    <li key={request.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <div className="flex items-start gap-3">
+                        <UserAvatar displayName={request.displayName} size="sm" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-white">{request.displayName}</p>
+                          <p className="text-xs text-white/60">
+                            Sent {formatRelativeTime(request.submittedAtISO)}
+                            {typeof request.mutualFriends === "number" && request.mutualFriends > 0
+                              ? ` · ${request.mutualFriends} mutual`
+                              : ""}
+                          </p>
+                          {request.intro ? <p className="mt-2 text-sm text-white/80">“{request.intro}”</p> : null}
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        className="flex-1 rounded-xl bg-emerald-500/80 px-3 py-2 text-sm font-semibold text-emerald-950 opacity-70"
-                        disabled
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1 rounded-xl border border-white/20 px-3 py-2 text-sm font-semibold text-white/80 opacity-70"
-                        disabled
-                      >
-                        Ask question
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleJoinRequestDecision({
+                              requestId: request.id,
+                              userId: request.userId,
+                              displayName: request.displayName,
+                              nextStatus: "accepted",
+                            })
+                          }
+                          className="flex-1 rounded-xl bg-emerald-500/80 px-3 py-2 text-sm font-semibold text-emerald-950"
+                          disabled={busy}
+                        >
+                          {isApproving ? "Approving…" : "Approve"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleJoinRequestDecision({
+                              requestId: request.id,
+                              userId: request.userId,
+                              displayName: request.displayName,
+                              nextStatus: "rejected",
+                            })
+                          }
+                          className="flex-1 rounded-xl border border-white/20 px-3 py-2 text-sm font-semibold text-white/80"
+                          disabled={busy}
+                        >
+                          {isRejecting ? "Passing…" : "Pass"}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <p className="mt-4 text-xs text-white/50">
-              Real approvals hook into the join-requests API. This scaffold lets us block the interaction states before wiring data.
+              Actions update the live join-requests API, so every tap stays in sync with the host tools page.
             </p>
           </Card>
 
@@ -347,4 +460,16 @@ const formatRelativeTime = (value?: string | null) => {
   }
   const deltaDays = Math.round(deltaHours / 24);
   return formatter.format(deltaDays, "day");
+};
+
+const readErrorPayload = async (response: Response, fallback: string) => {
+  try {
+    const payload = (await response.json()) as { error?: string };
+    if (payload && typeof payload.error === "string" && payload.error.trim().length > 0) {
+      return payload.error.trim();
+    }
+  } catch {
+    // Ignore JSON parsing issues and fall back to the default message.
+  }
+  return fallback;
 };

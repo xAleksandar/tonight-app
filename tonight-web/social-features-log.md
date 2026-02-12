@@ -20,3 +20,8 @@ Each run should:
 - Replaced the mock `/events/[id]` screen with a server-side loader that requires auth, fetches the event, and hydrates attendees + join-request cards from Prisma via the existing helpers.
 - The component now reflects the current RSVP state (accepted/pending/waitlist) instead of placeholder data.
 - Next: activate the approve/reject buttons by calling the join-request PATCH endpoint and optimistically updating the UI buckets so hosts can act from this screen.
+
+## 2026-02-12 21:43 EET — Join-request buttons now live
+- Upgraded `EventInsideExperience` to manage its own attendee + pending state, wire the approve/pass buttons to the `/api/join-requests/:id` PATCH endpoint, and surface inline loading states + toasts so hosts get instant feedback.
+- Extended the `/events/[id]` loader + component props to carry the pending guest's `userId`, ensuring we can optimistically reshuffle people between the confirmed/pending/waitlist buckets, and added a lightweight regression test run for the component.
+- Next: expose the same action plumbing for the chat card (open thread CTA) so accepted guests can jump straight into the event group chat once that API is ready.

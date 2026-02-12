@@ -50,6 +50,7 @@ const baseProps: EventInsideExperienceProps = {
   joinRequests: [
     {
       id: 'jr-1',
+      userId: 'a2',
       displayName: 'Sam',
       intro: 'Can bring board games',
       submittedAtISO: new Date().toISOString(),

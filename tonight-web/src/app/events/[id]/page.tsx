@@ -52,6 +52,7 @@ const mapPendingJoinRequests = (
     .filter((request) => request.status === "PENDING")
     .map((request) => ({
       id: request.id,
+      userId: request.user.id,
       displayName: request.user.displayName ?? request.user.email,
       intro: null,
       submittedAtISO: request.createdAt,
