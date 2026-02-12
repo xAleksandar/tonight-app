@@ -94,3 +94,9 @@ Each run should:
 - Extended the component Vitest suite to cover the new pagination affordance + ensured the targeted test run stays green.
 - Next: let hosts publish multi-line announcements from the event-inside screen (and automatically surface them in the guest feed) so they don't have to jump into chat to post updates.
 
+
+## 2026-02-13 01:46 EET — Host announcement composer + broadcast API
+- Added a `/api/events/[id]/host-activity` POST handler that lets the host post a single announcement which the server fans out to every accepted join request while skipping chat rate limits; responses include the delivered count for observability.
+- Threaded a new host-only "Broadcast to guests" composer into `EventInsideExperience`, including multi-line support, character limits, toast feedback, and wiring to the new API so hosts can publish updates without leaving the page.
+- Expanded the component Vitest suite with coverage for the announcement UI and hooked the shared chat helper with an optional `skipRateLimit` flag so automation can keep reusing the same pathway.
+- Next: push these announcements to guests in real time (websocket refresh of the host updates feed) so they appear without a manual reload.

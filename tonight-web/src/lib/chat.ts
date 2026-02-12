@@ -40,6 +40,10 @@ export type CreateChatMessageInput = ChatAccessInput & {
   content: string;
 };
 
+export type CreateChatMessageOptions = {
+  skipRateLimit?: boolean;
+};
+
 type JoinRequestAccessRecord = {
   id: string;
   status: JoinRequestStatus;
@@ -158,14 +162,17 @@ export const listMessagesForJoinRequest = async (
 };
 
 export const createMessageForJoinRequest = async (
-  input: CreateChatMessageInput
+  input: CreateChatMessageInput,
+  options?: CreateChatMessageOptions
 ): Promise<SerializedMessage> => {
-  // Rate limit check - MUST BE FIRST
-  if (!chatRateLimiter.canSendMessage(input.userId)) {
-    const secondsUntilReset = chatRateLimiter.getSecondsUntilReset(input.userId);
-    throw new ChatMessageValidationError(
-      `Message rate limit exceeded. Please wait ${secondsUntilReset} seconds before sending more messages.`
-    );
+  // Rate limit check - MUST BE FIRST (unless explicitly skipped)
+  if (!options?.skipRateLimit) {
+    if (!chatRateLimiter.canSendMessage(input.userId)) {
+      const secondsUntilReset = chatRateLimiter.getSecondsUntilReset(input.userId);
+      throw new ChatMessageValidationError(
+        `Message rate limit exceeded. Please wait ${secondsUntilReset} seconds before sending more messages.`
+      );
+    }
   }
 
   const context = await ensureChatAccess({

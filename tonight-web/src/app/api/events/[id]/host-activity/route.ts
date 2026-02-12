@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { JoinRequestStatus } from "@/generated/prisma/client";
+import { createMessageForJoinRequest, CHAT_MESSAGE_MAX_LENGTH, ChatMessageValidationError } from "@/lib/chat";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/middleware/auth";
 
@@ -77,4 +78,80 @@ export async function GET(request: Request, { params }: { params: { id?: string 
     hasMore,
     nextCursor: hasMore && cursorSource?.createdAt ? cursorSource.createdAt.toISOString() : null,
   });
+}
+
+export async function POST(request: Request, { params }: { params: { id?: string } }) {
+  const auth = await getCurrentUser();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const eventId = params?.id?.trim();
+  if (!eventId) {
+    return NextResponse.json({ error: "Missing event id" }, { status: 400 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const body = (payload ?? {}) as { message?: unknown };
+  const rawMessage = typeof body.message === "string" ? body.message : "";
+  const message = rawMessage.trim();
+  if (!message) {
+    return NextResponse.json({ error: "Announcement message is required" }, { status: 400 });
+  }
+
+  if (message.length > CHAT_MESSAGE_MAX_LENGTH) {
+    return NextResponse.json({ error: `Announcement must be under ${CHAT_MESSAGE_MAX_LENGTH} characters` }, { status: 400 });
+  }
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { hostId: true },
+  });
+
+  if (!event) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
+  }
+
+  if (event.hostId !== auth.userId) {
+    return NextResponse.json({ error: "Only the host can publish announcements" }, { status: 403 });
+  }
+
+  const acceptedJoinRequests = await prisma.joinRequest.findMany({
+    where: {
+      eventId,
+      status: JoinRequestStatus.ACCEPTED,
+    },
+    select: { id: true },
+  });
+
+  if (acceptedJoinRequests.length === 0) {
+    return NextResponse.json({ error: "No accepted guests to notify yet" }, { status: 400 });
+  }
+
+  try {
+    for (const joinRequest of acceptedJoinRequests) {
+      await createMessageForJoinRequest(
+        {
+          joinRequestId: joinRequest.id,
+          userId: auth.userId,
+          content: message,
+        },
+        { skipRateLimit: true }
+      );
+    }
+  } catch (error) {
+    const fallback = "Unable to publish announcement";
+    const status = error instanceof ChatMessageValidationError ? 400 : 500;
+    const messagePayload = error instanceof ChatMessageValidationError ? error.message : fallback;
+    console.error("Failed to publish host announcement", error);
+    return NextResponse.json({ error: messagePayload }, { status });
+  }
+
+  return NextResponse.json({ delivered: acceptedJoinRequests.length }, { status: 201 });
 }

@@ -100,6 +100,8 @@ const quickReplyTemplates: Array<{ label: string; message: string }> = [
   },
 ];
 
+const HOST_ANNOUNCEMENT_MAX_LENGTH = 1000;
+
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
@@ -122,6 +124,7 @@ export function EventInsideExperience({
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
+  const isHostViewer = viewerRole === "host";
   const isGuestViewer = viewerRole === "guest";
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
     () =>
@@ -144,6 +147,8 @@ export function EventInsideExperience({
   const [hostActivityEntries, setHostActivityEntries] = useState(initialHostActivityEntries);
   const [hostActivityPagination, setHostActivityPagination] = useState(chatPreview?.hostActivityFeedPagination);
   const [hostActivityLoading, setHostActivityLoading] = useState(false);
+  const [hostAnnouncementValue, setHostAnnouncementValue] = useState("");
+  const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -436,6 +441,46 @@ export function EventInsideExperience({
     }
   };
 
+  const handleHostAnnouncementSend = async () => {
+    if (!isHostViewer) {
+      showErrorToast("Announcement unavailable", "Only hosts can publish announcements.");
+      return;
+    }
+
+    const trimmed = hostAnnouncementValue.trim();
+    if (!trimmed) {
+      showErrorToast("Message required", "Type an announcement before publishing.");
+      return;
+    }
+
+    const fallback = "Unable to publish this announcement.";
+    setHostAnnouncementStatus("sending");
+
+    try {
+      const response = await fetch(`/api/events/${event.id}/host-activity`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: trimmed }),
+      });
+
+      if (!response.ok) {
+        const message = await readErrorPayload(response, fallback);
+        throw new Error(message);
+      }
+
+      showSuccessToast("Announcement published");
+      setHostAnnouncementValue("");
+    } catch (error) {
+      const message = (error as Error)?.message ?? fallback;
+      showErrorToast("Publish failed", message);
+    } finally {
+      setHostAnnouncementStatus("idle");
+    }
+  };
+
+
   const handleLoadMoreHostUpdates = async () => {
     if (!isGuestViewer || hostActivityLoading || !hostActivityPagination?.hasMore) {
       return;
@@ -718,6 +763,44 @@ export function EventInsideExperience({
                 <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
               ) : null}
             </div>
+            {isHostViewer ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Broadcast to guests</p>
+                <p className="mt-1 text-xs text-white/60">
+                  Share schedule changes or arrival info. Accepted guests see these inside their Host updates feed.
+                </p>
+                <textarea
+                  rows={3}
+                  value={hostAnnouncementValue}
+                  onChange={(event) => setHostAnnouncementValue(event.target.value)}
+                  placeholder="Post an announcement (multi-line supported)"
+                  maxLength={HOST_ANNOUNCEMENT_MAX_LENGTH}
+                  className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  disabled={hostAnnouncementStatus === "sending"}
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleHostAnnouncementSend}
+                    className="rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={hostAnnouncementStatus === "sending" || hostAnnouncementValue.trim().length === 0}
+                  >
+                    {hostAnnouncementStatus === "sending" ? "Publishing…" : "Publish announcement"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHostAnnouncementValue("")}
+                    className="text-xs font-semibold text-white/60 transition hover:text-white"
+                    disabled={hostAnnouncementStatus === "sending" || hostAnnouncementValue.length === 0}
+                  >
+                    Clear
+                  </button>
+                  <span className="ml-auto text-[11px] text-white/50">
+                    {hostAnnouncementValue.length}/{HOST_ANNOUNCEMENT_MAX_LENGTH}
+                  </span>
+                </div>
+              </div>
+            ) : null}
             {viewerRole === "guest" && guestComposerConfig ? (
               <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Message the host</p>

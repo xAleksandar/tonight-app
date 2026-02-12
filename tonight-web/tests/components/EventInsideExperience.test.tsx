@@ -244,6 +244,30 @@ describe('EventInsideExperience', () => {
     });
   });
 
+  it('lets hosts publish announcements to all guests', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...baseProps} />);
+
+    const textarea = screen.getByPlaceholderText(/post an announcement/i);
+    fireEvent.change(textarea, { target: { value: 'Doors open at 9:15 — grab a drink downstairs first.' } });
+
+    const publishButton = screen.getByRole('button', { name: /publish announcement/i });
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/events/evt-123/host-activity', expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      }));
+    });
+
+    await waitFor(() => {
+      expect(textarea).toHaveValue('');
+    });
+  });
+
   it('lets hosts send custom replies from the inline composer', async () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,
