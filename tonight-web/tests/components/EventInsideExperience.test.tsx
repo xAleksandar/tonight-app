@@ -400,5 +400,57 @@ describe('EventInsideExperience', () => {
     expect(scoped.getByText(/Running 10 minutes behind/i)).toBeInTheDocument();
   });
 
+  it('loads earlier host updates when the pagination affordance is tapped', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        latestHostActivityFeed: [
+          {
+            id: 'msg-1',
+            message: 'Doors open at 9',
+            postedAtISO: new Date().toISOString(),
+            authorName: 'Aleks',
+          },
+        ],
+        hostActivityFeedPagination: {
+          hasMore: true,
+          nextCursor: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        },
+        guestComposer: {
+          joinRequestId: 'jr-guest-feed',
+        },
+      },
+    };
 
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        updates: [
+          {
+            id: 'msg-older',
+            message: 'Reminder about parking — use lot B.',
+            postedAtISO: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            authorName: 'Aleks',
+          },
+        ],
+        hasMore: false,
+        nextCursor: null,
+      }),
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    const button = screen.getByRole('button', { name: /see earlier updates/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalled();
+    });
+
+    expect(await screen.findByText(/Reminder about parking/i)).toBeInTheDocument();
+  });
 });

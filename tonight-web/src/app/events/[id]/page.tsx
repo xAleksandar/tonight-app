@@ -210,15 +210,19 @@ const buildChatPreviewForAcceptedGuest = async ({
         senderId: hostId,
       },
       orderBy: { createdAt: "desc" },
-      take: HOST_ACTIVITY_FEED_LIMIT,
+      take: HOST_ACTIVITY_FEED_LIMIT + 1,
       select: { id: true, content: true, createdAt: true },
     }),
   ]);
 
+  const hostActivityHasMore = latestHostMessages.length > HOST_ACTIVITY_FEED_LIMIT;
+  const hostActivityCursorSource = hostActivityHasMore ? latestHostMessages[HOST_ACTIVITY_FEED_LIMIT] : undefined;
+  const trimmedHostMessages = hostActivityHasMore ? latestHostMessages.slice(0, HOST_ACTIVITY_FEED_LIMIT) : latestHostMessages;
+
   const lastMessageSnippet = lastMessage?.content ?? "No messages yet. Say hi once you're accepted.";
   const lastMessageAtISO = lastMessage?.createdAt.toISOString() ?? fallbackTimestampISO ?? null;
   const participantCount = acceptedGuestsCount + 1; // host + accepted guests
-  const hostActivityFeed = latestHostMessages.map((message) => ({
+  const hostActivityFeed = trimmedHostMessages.map((message) => ({
     id: message.id,
     message: message.content,
     postedAtISO: message.createdAt?.toISOString() ?? null,
@@ -237,6 +241,13 @@ const buildChatPreviewForAcceptedGuest = async ({
     },
     latestHostActivity: hostActivityFeed[0],
     latestHostActivityFeed: hostActivityFeed.length ? hostActivityFeed : undefined,
+    hostActivityFeedPagination:
+      hostActivityFeed.length || hostActivityHasMore
+        ? {
+            hasMore: hostActivityHasMore,
+            nextCursor: hostActivityCursorSource?.createdAt ? hostActivityCursorSource.createdAt.toISOString() : null,
+          }
+        : undefined,
   };
 };
 

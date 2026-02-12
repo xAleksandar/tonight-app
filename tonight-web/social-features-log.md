@@ -88,3 +88,9 @@ Each run should:
 - Extended the component Vitest suite to cover the new feed rendering so future iterations can't regress the multi-update view.
 - Next: add a "See earlier updates" affordance that pages older host announcements into the feed so guests can keep scrolling without opening the full chat.
 
+## 2026-02-13 01:24 EET — Host updates now paginate inline
+- Added `/api/events/[id]/host-activity` plus new pagination metadata in the event loader so accepted guests can page through host-authored chat history without opening `/chat`.
+- Updated `EventInsideExperience` to maintain guest-side host update state, render a "See earlier updates" button, fetch older batches, and keep the feed consistent while loading.
+- Extended the component Vitest suite to cover the new pagination affordance + ensured the targeted test run stays green.
+- Next: let hosts publish multi-line announcements from the event-inside screen (and automatically surface them in the guest feed) so they don't have to jump into chat to post updates.
+

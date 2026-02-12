@@ -72,6 +72,10 @@ export type EventInsideExperienceProps = {
       joinRequestId?: string | null;
       disabledReason?: string | null;
     };
+    hostActivityFeedPagination?: {
+      hasMore: boolean;
+      nextCursor?: string | null;
+    };
   };
 };
 
@@ -118,6 +122,28 @@ export function EventInsideExperience({
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
+  const isGuestViewer = viewerRole === "guest";
+  const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
+    () =>
+      isGuestViewer
+        ? chatPreview?.latestHostActivityFeed && chatPreview.latestHostActivityFeed.length > 0
+          ? chatPreview.latestHostActivityFeed
+          : chatPreview?.latestHostActivity
+            ? [
+                {
+                  id: "latest-host-activity",
+                  message: chatPreview.latestHostActivity.message,
+                  postedAtISO: chatPreview.latestHostActivity.postedAtISO,
+                  authorName: chatPreview.latestHostActivity.authorName ?? host.displayName,
+                },
+              ]
+            : []
+        : [],
+    [chatPreview?.latestHostActivity, chatPreview?.latestHostActivityFeed, host.displayName, isGuestViewer]
+  );
+  const [hostActivityEntries, setHostActivityEntries] = useState(initialHostActivityEntries);
+  const [hostActivityPagination, setHostActivityPagination] = useState(chatPreview?.hostActivityFeedPagination);
+  const [hostActivityLoading, setHostActivityLoading] = useState(false);
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -151,27 +177,17 @@ export function EventInsideExperience({
     setGuestComposerStatus("idle");
   }, [guestComposerConfig?.joinRequestId]);
 
+  useEffect(() => {
+    setHostActivityEntries(initialHostActivityEntries);
+    setHostActivityPagination(chatPreview?.hostActivityFeedPagination);
+  }, [initialHostActivityEntries, chatPreview?.hostActivityFeedPagination]);
+
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
-  const hostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> =
-    viewerRole === "guest"
-      ? chatPreview?.latestHostActivityFeed && chatPreview.latestHostActivityFeed.length > 0
-        ? chatPreview.latestHostActivityFeed
-        : chatPreview?.latestHostActivity
-          ? [
-              {
-                id: "latest-host-activity",
-                message: chatPreview.latestHostActivity.message,
-                postedAtISO: chatPreview.latestHostActivity.postedAtISO,
-                authorName: chatPreview.latestHostActivity.authorName ?? host.displayName,
-              },
-            ]
-          : []
-      : [];
 
   const handleMarkThreadAsRead = async (joinRequestId: string) => {
     const fallback = "Unable to mark this thread as read.";
@@ -420,6 +436,43 @@ export function EventInsideExperience({
     }
   };
 
+  const handleLoadMoreHostUpdates = async () => {
+    if (!isGuestViewer || hostActivityLoading || !hostActivityPagination?.hasMore) {
+      return;
+    }
+
+    setHostActivityLoading(true);
+    const fallback = "Unable to load more host updates.";
+    const before = hostActivityPagination?.nextCursor;
+    const query = before ? `?before=${encodeURIComponent(before)}` : "";
+
+    try {
+      const response = await fetch(`/api/events/${event.id}/host-activity${query}`);
+      if (!response.ok) {
+        const message = await readErrorPayload(response, fallback);
+        throw new Error(message);
+      }
+
+      const payload = (await response.json()) as {
+        updates?: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }>;
+        hasMore?: boolean;
+        nextCursor?: string | null;
+      };
+
+      setHostActivityEntries((prev) => [...prev, ...(payload.updates ?? [])]);
+      if (payload?.hasMore) {
+        setHostActivityPagination({ hasMore: true, nextCursor: payload.nextCursor ?? null });
+      } else {
+        setHostActivityPagination({ hasMore: false, nextCursor: null });
+      }
+    } catch (error) {
+      const message = (error as Error)?.message ?? fallback;
+      showErrorToast("Load failed", message);
+    } finally {
+      setHostActivityLoading(false);
+    }
+  };
+
   return (
     <section className="space-y-8">
       <header className="rounded-3xl border border-white/15 bg-white/5 p-6 text-white shadow-2xl shadow-primary/5 backdrop-blur">
@@ -499,6 +552,16 @@ export function EventInsideExperience({
                     </li>
                   ))}
                 </ul>
+                {hostActivityPagination?.hasMore ? (
+                  <button
+                    type="button"
+                    onClick={handleLoadMoreHostUpdates}
+                    className="mt-4 w-full rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={hostActivityLoading}
+                  >
+                    {hostActivityLoading ? "Loading…" : "See earlier updates"}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </Card>
