@@ -122,4 +122,19 @@ describe('EventInsideExperience', () => {
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute('href', '/chat/jr-1');
   });
+
+  it('shows a disabled chat explanation when no CTA href is present', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ctaLabel: 'No guest chats yet',
+        ctaDisabledReason: 'Approve at least one guest to unlock chat.',
+      },
+    };
+    render(<EventInsideExperience {...props} />);
+
+    const button = screen.getByRole('button', { name: /no guest chats yet/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+  });
 });

@@ -36,3 +36,8 @@ Each run should:
 - Thread the viewer's join-request id into a new chat-preview builder that queries the latest message, unread count (based on `messageRead` rows), and accepted guest tally so the CTA now links to `/chat/[joinRequestId]` with fresh metadata; pending viewers get a disabled-state reason instead.
 - Added a targeted Vitest run (`npx vitest run tests/components/EventInsideExperience.test.tsx`) to make sure the UI contract we just extended still passes.
 - Next: surface host-side chat summaries (latest pings + unread) so the inside screen can highlight when hosts need to re-engage the thread.
+
+## 2026-02-12 22:44 EET — Host chat summaries wired in
+- Added a host-specific chat preview builder that aggregates the latest guest DM across all accepted join requests, surfaces unread counts, and deep-links the CTA to the conversation that most recently pinged the host.
+- Backfilled graceful fallbacks (no accepted guests vs. no guest pings yet) plus a regression test that locks the disabled CTA explanation so hosts always know why the button is inactive.
+- Next: list the top unread guest threads (name + last line) under the chat card so hosts can jump directly into the right DM instead of guessing which guest needs attention.

@@ -126,6 +126,83 @@ const buildChatPreviewForPendingViewer = (status: JoinRequestStatus | undefined)
   };
 };
 
+const buildChatPreviewForHost = async ({
+  eventId,
+  hostId,
+}: {
+  eventId: string;
+  hostId: string;
+}): Promise<EventInsideExperienceProps["chatPreview"]> => {
+  const [latestGuestMessage, unreadCount, acceptedGuestCount] = await Promise.all([
+    prisma.message.findFirst({
+      where: {
+        joinRequest: {
+          eventId,
+          status: JoinRequestStatus.ACCEPTED,
+        },
+        senderId: {
+          not: hostId,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        content: true,
+        createdAt: true,
+        joinRequestId: true,
+      },
+    }),
+    prisma.message.count({
+      where: {
+        joinRequest: {
+          eventId,
+          status: JoinRequestStatus.ACCEPTED,
+        },
+        senderId: {
+          not: hostId,
+        },
+        readBy: {
+          none: {
+            userId: hostId,
+          },
+        },
+      },
+    }),
+    prisma.joinRequest.count({
+      where: {
+        eventId,
+        status: JoinRequestStatus.ACCEPTED,
+      },
+    }),
+  ]);
+
+  const participantCount = acceptedGuestCount > 0 ? acceptedGuestCount + 1 : null;
+
+  if (!acceptedGuestCount) {
+    return {
+      ctaLabel: "No guest chats yet",
+      ctaDisabledReason: "Approve at least one guest to unlock chat.",
+    };
+  }
+
+  if (!latestGuestMessage) {
+    return {
+      participantCount,
+      lastMessageSnippet: "No guest messages yet. You're caught up.",
+      ctaLabel: "Open guest chats",
+      ctaDisabledReason: "Guests can message you once they DM the host.",
+    };
+  }
+
+  return {
+    participantCount,
+    lastMessageSnippet: latestGuestMessage.content,
+    lastMessageAtISO: latestGuestMessage.createdAt.toISOString(),
+    unreadCount: unreadCount > 0 ? unreadCount : null,
+    ctaLabel: unreadCount > 0 ? "Reply to guests" : "Open latest chat",
+    ctaHref: `/chat/${latestGuestMessage.joinRequestId}`,
+  };
+};
+
 export default async function EventInsidePage({ params }: PageParams) {
   const eventId = normalizeEventId(params?.id);
   if (!eventId) {
@@ -172,7 +249,12 @@ export default async function EventInsidePage({ params }: PageParams) {
       : "pending";
 
   let chatPreview: EventInsideExperienceProps["chatPreview"] | undefined;
-  if (viewerRole === "guest" && viewerJoinRequest) {
+  if (viewerRole === "host") {
+    chatPreview = await buildChatPreviewForHost({
+      eventId,
+      hostId: eventRecord.hostId,
+    });
+  } else if (viewerRole === "guest" && viewerJoinRequest) {
     chatPreview = await buildChatPreviewForAcceptedGuest({
       joinRequestId: viewerJoinRequest.id,
       viewerId: authenticatedUser.userId,
