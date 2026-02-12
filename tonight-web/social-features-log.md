@@ -30,3 +30,9 @@ Each run should:
 - Expanded the `chatPreview` contract so hosts can pass a CTA label/href + helper copy, and swapped the disabled stub button for a real `next/link` that renders whenever a target thread is available.
 - Extended the JS DOM test harness (self shim) and added a regression test that ensures we emit a link when the CTA data is present, keeping the new behavior covered.
 - Next: feed real chat preview data from the `/events/[id]` loader (join-request derived thread URL + unread counts) so the button lights up for accepted guests.
+
+## 2026-02-12 22:27 EET — Event loader now emits live chat preview data
+- Let accepted guests through the `/events/[id]` page by deriving their viewer role from the join-requests list, while silently hiding host-only pending approvals unless you're the host.
+- Thread the viewer's join-request id into a new chat-preview builder that queries the latest message, unread count (based on `messageRead` rows), and accepted guest tally so the CTA now links to `/chat/[joinRequestId]` with fresh metadata; pending viewers get a disabled-state reason instead.
+- Added a targeted Vitest run (`npx vitest run tests/components/EventInsideExperience.test.tsx`) to make sure the UI contract we just extended still passes.
+- Next: surface host-side chat summaries (latest pings + unread) so the inside screen can highlight when hosts need to re-engage the thread.
