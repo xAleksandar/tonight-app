@@ -58,3 +58,9 @@ Each run should:
 - Wired a new “Mark as read” quick action for each pending guest DM that calls the existing chat mark-read API, shows feedback, and removes the entry once the API confirms.
 - Extended the component test suite to cover the new controls, including fetch stubbing + DOM cleanup adjustments so automation stays green.
 - Next: explore lightweight reply shortcuts (quick canned responses or inline composer) so hosts can answer DMs directly from the event screen without jumping into the dedicated chat view.
+
+## 2026-02-12 23:46 EET — Quick replies from event screen
+- Added a reusable quick-reply template set to the event chat rail so hosts can tap canned responses without loading the full chat view; buttons live inside each unread guest card.
+- Wired the actions to `/api/chat/:joinRequestId/messages` plus an automatic mark-read follow-up, updating local state/toasts so the "Guests needing replies" list clears immediately after sending.
+- Extended the EventInsideExperience test suite to cover the new reply flow and cleaned up fetch mocks between runs so vitest stays deterministic.
+- Next: graduate the chat rail to include a lightweight inline composer (freeform text + send) so hosts can type custom responses without leaving the inside screen.

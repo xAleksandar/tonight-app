@@ -103,6 +103,11 @@ describe('EventInsideExperience', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    if ('fetch' in globalThis) {
+      // Tests that mock fetch can leave it dangling; remove between runs.
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete (globalThis as any).fetch;
+    }
   });
 
   it('renders the event overview plus entrance checklist', () => {
@@ -196,6 +201,41 @@ describe('EventInsideExperience', () => {
     fireEvent.click(button);
 
     expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-1/mark-read', { method: 'POST' });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('lets hosts send quick replies without opening chat', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [
+          {
+            joinRequestId: 'jr-thread-quick',
+            displayName: 'Marco',
+            lastMessageSnippet: 'Can you remind me of the buzzer?',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 1,
+          },
+        ],
+      },
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    const quickReplyButton = screen.getByRole('button', { name: /on my way/i });
+    fireEvent.click(quickReplyButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-quick/messages', expect.objectContaining({ method: 'POST' }));
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-quick/mark-read', expect.objectContaining({ method: 'POST' }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();

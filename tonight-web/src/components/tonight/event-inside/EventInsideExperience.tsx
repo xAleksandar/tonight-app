@@ -66,6 +66,21 @@ const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: 
   pending: { label: "Awaiting host approval", tone: "bg-sky-500/10 text-sky-600" },
 };
 
+const quickReplyTemplates: Array<{ label: string; message: string }> = [
+  {
+    label: "On my way",
+    message: "Hey! Saw your ping — I'm on my way to the venue and will update you as soon as I'm there.",
+  },
+  {
+    label: "Details sent",
+    message: "Just dropped all the meetup details in chat. Let me know if anything's unclear!",
+  },
+  {
+    label: "Reply soon",
+    message: "Got your message and will circle back in a couple minutes. Appreciate the patience!",
+  },
+];
+
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
@@ -82,6 +97,8 @@ export function EventInsideExperience({
   const [requestActionState, setRequestActionState] = useState<Record<string, JoinRequestActionState | undefined>>({});
   const [hostUnreadThreads, setHostUnreadThreads] = useState<HostUnreadThread[]>(chatPreview?.hostUnreadThreads ?? []);
   const [markingThreadId, setMarkingThreadId] = useState<string | null>(null);
+
+  const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -199,6 +216,52 @@ export function EventInsideExperience({
     },
     []
   );
+
+  const handleQuickReplySend = async (joinRequestId: string, message: string) => {
+    const fallback = "Unable to send this quick reply.";
+    setQuickReplyState((prev) => ({
+      ...prev,
+      [joinRequestId]: "sending",
+    }));
+
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content: message }),
+      });
+
+      if (!response.ok) {
+        const messagePayload = await readErrorPayload(response, fallback);
+        throw new Error(messagePayload);
+      }
+
+      try {
+        const markResponse = await fetch(`/api/chat/${joinRequestId}/mark-read`, {
+          method: "POST",
+        });
+        if (!markResponse.ok) {
+          console.error("Unable to mark thread as read after quick reply", await markResponse.text());
+        }
+      } catch (markError) {
+        console.error("Quick reply mark-read failed", markError);
+      }
+
+      setHostUnreadThreads((prev) => prev.filter((thread) => thread.joinRequestId !== joinRequestId));
+      showSuccessToast("Reply sent");
+    } catch (error) {
+      const messagePayload = (error as Error)?.message ?? fallback;
+      showErrorToast("Reply failed", messagePayload);
+    } finally {
+      setQuickReplyState((prev) => {
+        const next = { ...prev };
+        delete next[joinRequestId];
+        return next;
+      });
+    }
+  };
 
   return (
     <section className="space-y-8">
@@ -437,6 +500,25 @@ export function EventInsideExperience({
                           ) : null}
                         </div>
                       </Link>
+                      <div className="rounded-xl bg-white/5 p-2 text-xs text-white/70">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Quick replies</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {quickReplyTemplates.map((template) => {
+                            const isSending = quickReplyState[thread.joinRequestId] === "sending";
+                            return (
+                              <button
+                                key={template.label}
+                                type="button"
+                                onClick={() => handleQuickReplySend(thread.joinRequestId, template.message)}
+                                className="rounded-lg border border-primary/30 px-3 py-1 text-[11px] font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={isSending}
+                              >
+                                {isSending ? "Sending…" : template.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleMarkThreadAsRead(thread.joinRequestId)}
