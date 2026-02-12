@@ -70,3 +70,9 @@ Each run should:
 - Consolidated the chat send flow through a shared helper that posts messages, fires the mark-read follow-up, and prunes the unread rail for both quick templates and custom responses, with new UI wiring + tests covering the composer.
 - Extended the component spec to render the textarea, send/clear controls, and tightened the Vitest suite to cover the fresh behavior (npx vitest run tests/components/EventInsideExperience.test.tsx).
 - Next: expose the same inline composer affordance for accepted guests (non-host view) so they can poke the event group chat without opening the dedicated chat screen, including permission gates + loader data.
+
+## 2026-02-13 00:24 EET — Guest inline composer wired up
+- Extended the event loader chat preview to ship a `guestComposer` payload (joinRequestId) for accepted guests and threaded that metadata through EventInsideExperience.
+- Added a guest-facing inline composer block so confirmed attendees can send freeform updates without jumping into `/chat`, reusing the existing send helper with toast feedback and permission gating.
+- Backfilled the component tests with coverage for the guest composer (render + send) and reran `npx vitest run tests/components/EventInsideExperience.test.tsx` to keep the contract locked.
+- Next: add a lightweight "latest chat activity" strip under the event card so guests can skim the most recent host updates (last message + relative timestamp) without opening the full chat.

@@ -212,6 +212,9 @@ const buildChatPreviewForAcceptedGuest = async ({
     participantCount,
     ctaLabel: "Open chat",
     ctaHref: `/chat/${joinRequestId}`,
+    guestComposer: {
+      joinRequestId,
+    },
   };
 };
 

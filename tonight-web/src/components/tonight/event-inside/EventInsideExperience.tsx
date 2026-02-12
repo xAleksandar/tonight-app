@@ -57,6 +57,10 @@ export type EventInsideExperienceProps = {
       lastMessageAtISO?: string | null;
       unreadCount?: number | null;
     }>;
+    guestComposer?: {
+      joinRequestId?: string | null;
+      disabledReason?: string | null;
+    };
   };
 };
 
@@ -100,6 +104,9 @@ export function EventInsideExperience({
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
+  const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
+  const [guestComposerValue, setGuestComposerValue] = useState("");
+  const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -127,6 +134,11 @@ export function EventInsideExperience({
       return mutated ? next : prev;
     });
   }, [hostUnreadThreads]);
+
+  useEffect(() => {
+    setGuestComposerValue("");
+    setGuestComposerStatus("idle");
+  }, [guestComposerConfig?.joinRequestId]);
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
@@ -351,6 +363,37 @@ export function EventInsideExperience({
     }
   };
 
+  const handleGuestComposerSend = async () => {
+    if (!guestComposerConfig?.joinRequestId) {
+      showErrorToast("Chat unavailable", "You cannot message this event right now.");
+      return;
+    }
+
+    const trimmed = guestComposerValue.trim();
+    if (!trimmed) {
+      showErrorToast("Message required", "Type a message before sending.");
+      return;
+    }
+
+    setGuestComposerStatus("sending");
+    const fallback = "Unable to send this message.";
+
+    try {
+      await sendMessageToThread({
+        joinRequestId: guestComposerConfig.joinRequestId,
+        message: trimmed,
+        fallback,
+      });
+      showSuccessToast("Message sent");
+      setGuestComposerValue("");
+    } catch (error) {
+      const messagePayload = (error as Error)?.message ?? fallback;
+      showErrorToast("Message failed", messagePayload);
+    } finally {
+      setGuestComposerStatus("idle");
+    }
+  };
+
   return (
     <section className="space-y-8">
       <header className="rounded-3xl border border-white/15 bg-white/5 p-6 text-white shadow-2xl shadow-primary/5 backdrop-blur">
@@ -567,6 +610,50 @@ export function EventInsideExperience({
                 <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
               ) : null}
             </div>
+            {viewerRole === "guest" && guestComposerConfig ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Message the host</p>
+                <p className="mt-1 text-xs text-white/60">Send a quick update without leaving this screen.</p>
+                <textarea
+                  rows={3}
+                  value={guestComposerValue}
+                  onChange={(event) => setGuestComposerValue(event.target.value)}
+                  placeholder="Share an update or ask a quick question"
+                  className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  disabled={
+                    guestComposerStatus === "sending" ||
+                    Boolean(guestComposerConfig.disabledReason) ||
+                    !guestComposerConfig.joinRequestId
+                  }
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGuestComposerSend}
+                    className="rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={
+                      guestComposerStatus === "sending" ||
+                      Boolean(guestComposerConfig.disabledReason) ||
+                      !guestComposerConfig.joinRequestId ||
+                      guestComposerValue.trim().length === 0
+                    }
+                  >
+                    {guestComposerStatus === "sending" ? "Sending…" : "Send message"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuestComposerValue("")}
+                    className="text-xs font-semibold text-white/60 transition hover:text-white"
+                    disabled={guestComposerStatus === "sending" || guestComposerValue.length === 0}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {guestComposerConfig.disabledReason ? (
+                  <p className="mt-2 text-xs text-white/60">{guestComposerConfig.disabledReason}</p>
+                ) : null}
+              </div>
+            ) : null}
             {hostUnreadThreads.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-primary/20 bg-black/30 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">Guests needing replies</p>

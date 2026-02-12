@@ -279,4 +279,57 @@ describe('EventInsideExperience', () => {
       expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
     });
   });
+
+  it('renders the guest inline composer when metadata is provided', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        guestComposer: {
+          joinRequestId: 'jr-guest-1',
+        },
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/message the host/i)).toBeInTheDocument();
+    const textarea = screen.getByPlaceholderText(/share an update/i);
+    expect(textarea).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send message/i })).toBeDisabled();
+  });
+
+  it('lets guests send a message from the inline composer', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        guestComposer: {
+          joinRequestId: 'jr-guest-send',
+        },
+      },
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: vi.fn() });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    const textarea = screen.getByPlaceholderText(/share an update/i);
+    fireEvent.change(textarea, { target: { value: 'See you at the venue in 10!' } });
+
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-guest-send/messages', expect.objectContaining({ method: 'POST' }));
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-guest-send/mark-read', expect.objectContaining({ method: 'POST' }));
+  });
 });
