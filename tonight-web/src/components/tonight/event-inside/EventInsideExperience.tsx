@@ -67,6 +67,7 @@ const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: 
 };
 
 type JoinRequestActionState = "approving" | "rejecting";
+type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
 export function EventInsideExperience({
   event,
@@ -79,6 +80,8 @@ export function EventInsideExperience({
   const [pendingRequests, setPendingRequests] = useState(joinRequests);
   const [roster, setRoster] = useState(attendees);
   const [requestActionState, setRequestActionState] = useState<Record<string, JoinRequestActionState | undefined>>({});
+  const [hostUnreadThreads, setHostUnreadThreads] = useState<HostUnreadThread[]>(chatPreview?.hostUnreadThreads ?? []);
+  const [markingThreadId, setMarkingThreadId] = useState<string | null>(null);
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -88,12 +91,39 @@ export function EventInsideExperience({
     setRoster(attendees);
   }, [attendees]);
 
+  useEffect(() => {
+    setHostUnreadThreads(chatPreview?.hostUnreadThreads ?? []);
+  }, [chatPreview?.hostUnreadThreads]);
+
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+
+  const handleMarkThreadAsRead = async (joinRequestId: string) => {
+    const fallback = "Unable to mark this thread as read.";
+    setMarkingThreadId(joinRequestId);
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/mark-read`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const message = await readErrorPayload(response, fallback);
+        throw new Error(message);
+      }
+
+      setHostUnreadThreads((prev) => prev.filter((thread) => thread.joinRequestId !== joinRequestId));
+      showSuccessToast("Marked as read");
+    } catch (error) {
+      const message = (error as Error)?.message ?? fallback;
+      showErrorToast("Action failed", message);
+    } finally {
+      setMarkingThreadId(null);
+    }
+  };
 
   const handleJoinRequestDecision = useCallback(
     async ({
@@ -386,12 +416,12 @@ export function EventInsideExperience({
                 <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
               ) : null}
             </div>
-            {chatPreview?.hostUnreadThreads && chatPreview.hostUnreadThreads.length > 0 ? (
+            {hostUnreadThreads.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-primary/20 bg-black/30 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">Guests needing replies</p>
                 <ul className="mt-3 space-y-2">
-                  {chatPreview.hostUnreadThreads.map((thread) => (
-                    <li key={thread.joinRequestId}>
+                  {hostUnreadThreads.map((thread) => (
+                    <li key={thread.joinRequestId} className="space-y-2">
                       <Link
                         href={`/chat/${thread.joinRequestId}`}
                         className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition hover:border-primary/40"
@@ -407,6 +437,14 @@ export function EventInsideExperience({
                           ) : null}
                         </div>
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleMarkThreadAsRead(thread.joinRequestId)}
+                        className="w-full rounded-xl border border-primary/30 px-3 py-2 text-xs font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={markingThreadId === thread.joinRequestId}
+                      >
+                        {markingThreadId === thread.joinRequestId ? "Marking…" : "Mark as read"}
+                      </button>
                     </li>
                   ))}
                 </ul>

@@ -52,3 +52,9 @@ Each run should:
 - Extended the `EventInsideExperience` UI to render a “Guests needing replies” rail with name, last line, relative timestamp, and unread badges that deep-link into each `/chat/[joinRequestId]` thread, plus tightened the component test suite to cover the new block.
 - Updated the host chat preview builder + tests so hosts always receive the unread list alongside their CTA, even when there are no new messages elsewhere.
 - Next: explore inline reply shortcuts (quick actions/mark-as-read) from the event-inside screen so hosts can triage DMs without bouncing between pages.
+
+## 2026-02-12 23:27 UTC+02:00 — Host unread threads can be cleared inline
+- Added stateful tracking for the host unread rail so we can remove guests as they get handled and keep the UI live without a full refresh.
+- Wired a new “Mark as read” quick action for each pending guest DM that calls the existing chat mark-read API, shows feedback, and removes the entry once the API confirms.
+- Extended the component test suite to cover the new controls, including fetch stubbing + DOM cleanup adjustments so automation stays green.
+- Next: explore lightweight reply shortcuts (quick canned responses or inline composer) so hosts can answer DMs directly from the event screen without jumping into the dedicated chat view.

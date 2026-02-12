@@ -1,14 +1,21 @@
 import { JSDOM } from 'jsdom';
 import React from 'react';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EventInsideExperience, type EventInsideExperienceProps } from '@/components/tonight/event-inside/EventInsideExperience';
+
+vi.mock('@/lib/toast', () => ({
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+}));
 
 type TestingLibrary = typeof import('@testing-library/react');
 
 let render: TestingLibrary['render'];
 let screen: TestingLibrary['screen'];
 let cleanup: TestingLibrary['cleanup'];
+let fireEvent: TestingLibrary['fireEvent'];
+let waitFor: TestingLibrary['waitFor'];
 
 let jsdomInstance: JSDOM | null = null;
 
@@ -76,6 +83,8 @@ beforeAll(async () => {
   render = testingLibrary.render;
   screen = testingLibrary.screen;
   cleanup = testingLibrary.cleanup;
+  fireEvent = testingLibrary.fireEvent;
+  waitFor = testingLibrary.waitFor;
 });
 
 afterAll(() => {
@@ -83,11 +92,7 @@ afterAll(() => {
     jsdomInstance.window.close();
     jsdomInstance = null;
   }
-  delete (globalThis as any).window;
-  delete (globalThis as any).self;
-  delete (globalThis as any).document;
-  delete (globalThis as any).navigator;
-  delete (globalThis as any).HTMLElement;
+  // Keep the globals around so async React work after tests doesn't explode.
 });
 
 describe('EventInsideExperience', () => {
@@ -97,6 +102,7 @@ describe('EventInsideExperience', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('renders the event overview plus entrance checklist', () => {
@@ -162,5 +168,37 @@ describe('EventInsideExperience', () => {
     expect(screen.getByText(/quick question/i)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Lena/i });
     expect(link).toHaveAttribute('href', '/chat/jr-thread-1');
+  });
+
+  it('lets hosts clear unread threads inline without opening chat', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [
+          {
+            joinRequestId: 'jr-thread-1',
+            displayName: 'Lena',
+            lastMessageSnippet: 'Need directions',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 1,
+          },
+        ],
+      },
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    const button = screen.getByRole('button', { name: /mark as read/i });
+    fireEvent.click(button);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-1/mark-read', { method: 'POST' });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
+    });
   });
 });
