@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { CheckCircle2, Clock3, MapPin, MessageCircle, Shield, Sparkles, Users } from "lucide-react";
 
@@ -46,6 +47,9 @@ export type EventInsideExperienceProps = {
     lastMessageAtISO?: string | null;
     unreadCount?: number | null;
     participantCount?: number | null;
+    ctaLabel?: string | null;
+    ctaHref?: string | null;
+    ctaDisabledReason?: string | null;
   };
 };
 
@@ -79,6 +83,10 @@ export function EventInsideExperience({
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
+  const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
+  const rawChatHref = chatPreview?.ctaHref ?? "";
+  const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
+  const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
 
   const handleJoinRequestDecision = useCallback(
     async ({
@@ -351,13 +359,25 @@ export function EventInsideExperience({
                   </span>
                 ) : null}
               </div>
-              <button
-                type="button"
-                className="mt-4 w-full rounded-xl bg-primary/60 px-4 py-2 text-sm font-semibold text-white opacity-70"
-                disabled
-              >
-                Open chat (coming soon)
-              </button>
+              {chatCtaHref ? (
+                <Link
+                  href={chatCtaHref}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  {chatCtaLabel}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="mt-4 w-full rounded-xl bg-primary/60 px-4 py-2 text-sm font-semibold text-white opacity-70"
+                  disabled
+                >
+                  {chatCtaLabel}
+                </button>
+              )}
+              {!chatCtaHref && chatCtaDisabledReason ? (
+                <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
+              ) : null}
             </div>
             <div className="mt-4 flex items-center gap-2 text-xs text-white/50">
               <Shield className="h-3.5 w-3.5" />

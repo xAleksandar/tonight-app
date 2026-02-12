@@ -21,6 +21,7 @@ const ensureDomGlobals = () => {
   const { window } = jsdomInstance;
   Object.defineProperties(globalThis, {
     window: { configurable: true, value: window, writable: true },
+    self: { configurable: true, value: window, writable: true },
     document: { configurable: true, value: window.document, writable: true },
     navigator: { configurable: true, value: window.navigator, writable: true },
     HTMLElement: { configurable: true, value: window.HTMLElement, writable: true },
@@ -61,6 +62,8 @@ const baseProps: EventInsideExperienceProps = {
     lastMessageAtISO: new Date().toISOString(),
     participantCount: 6,
     unreadCount: 2,
+    ctaLabel: 'Open chat',
+    ctaHref: '/chat/jr-1',
   },
   viewerRole: 'host',
 };
@@ -81,6 +84,7 @@ afterAll(() => {
     jsdomInstance = null;
   }
   delete (globalThis as any).window;
+  delete (globalThis as any).self;
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
@@ -109,5 +113,13 @@ describe('EventInsideExperience', () => {
     expect(screen.getByText(/Confirmed · 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Awaiting reply · 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Waitlist · 1/i)).toBeInTheDocument();
+  });
+
+  it('exposes an actionable chat link when a CTA href is provided', () => {
+    render(<EventInsideExperience {...baseProps} />);
+
+    const link = screen.getByRole('link', { name: /open chat/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/chat/jr-1');
   });
 });
