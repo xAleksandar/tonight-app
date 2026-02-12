@@ -137,4 +137,30 @@ describe('EventInsideExperience', () => {
     expect(button).toBeDisabled();
     expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
   });
+
+  it('lists unread guest threads for hosts when provided', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [
+          {
+            joinRequestId: 'jr-thread-1',
+            displayName: 'Lena',
+            lastMessageSnippet: 'Hey, quick question about the meetup.',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 2,
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/Guests needing replies/i)).toBeInTheDocument();
+    expect(screen.getByText('Lena')).toBeInTheDocument();
+    expect(screen.getByText(/quick question/i)).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /Lena/i });
+    expect(link).toHaveAttribute('href', '/chat/jr-thread-1');
+  });
 });

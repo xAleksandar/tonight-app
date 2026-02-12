@@ -50,6 +50,13 @@ export type EventInsideExperienceProps = {
     ctaLabel?: string | null;
     ctaHref?: string | null;
     ctaDisabledReason?: string | null;
+    hostUnreadThreads?: Array<{
+      joinRequestId: string;
+      displayName: string;
+      lastMessageSnippet: string;
+      lastMessageAtISO?: string | null;
+      unreadCount?: number | null;
+    }>;
   };
 };
 
@@ -379,6 +386,32 @@ export function EventInsideExperience({
                 <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
               ) : null}
             </div>
+            {chatPreview?.hostUnreadThreads && chatPreview.hostUnreadThreads.length > 0 ? (
+              <div className="mt-4 rounded-2xl border border-primary/20 bg-black/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">Guests needing replies</p>
+                <ul className="mt-3 space-y-2">
+                  {chatPreview.hostUnreadThreads.map((thread) => (
+                    <li key={thread.joinRequestId}>
+                      <Link
+                        href={`/chat/${thread.joinRequestId}`}
+                        className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition hover:border-primary/40"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-white">{thread.displayName}</p>
+                          <p className="text-xs text-white/70 line-clamp-2">{thread.lastMessageSnippet}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
+                          <span>{formatRelativeTime(thread.lastMessageAtISO)}</span>
+                          {thread.unreadCount ? (
+                            <span className="rounded-full bg-primary/30 px-2 py-0.5 text-primary">{thread.unreadCount} new</span>
+                          ) : null}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="mt-4 flex items-center gap-2 text-xs text-white/50">
               <Shield className="h-3.5 w-3.5" />
               <span>Hosts can remove disruptive guests. Reports escalate to the safety team.</span>

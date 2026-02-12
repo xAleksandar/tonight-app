@@ -13,6 +13,16 @@ interface PageParams {
   };
 }
 
+const HOST_UNREAD_THREAD_LIMIT = 3;
+
+type HostUnreadThreadSummary = {
+  joinRequestId: string;
+  displayName: string;
+  lastMessageSnippet: string;
+  lastMessageAtISO?: string | null;
+  unreadCount?: number | null;
+};
+
 const normalizeEventId = (value: string | string[] | undefined) => {
   if (typeof value === "string") {
     return value.trim();
@@ -60,6 +70,99 @@ const mapPendingJoinRequests = (
       submittedAtISO: request.createdAt,
       mutualFriends: null,
     }));
+};
+
+const buildHostUnreadThreadSummaries = async ({
+  eventId,
+  hostId,
+}: {
+  eventId: string;
+  hostId: string;
+}): Promise<HostUnreadThreadSummary[]> => {
+  const unreadThreadGroups = await prisma.message.groupBy({
+    where: {
+      joinRequest: {
+        eventId,
+        status: JoinRequestStatus.ACCEPTED,
+      },
+      senderId: {
+        not: hostId,
+      },
+      readBy: {
+        none: {
+          userId: hostId,
+        },
+      },
+    },
+    by: ["joinRequestId"],
+    _count: {
+      _all: true,
+    },
+    _max: {
+      createdAt: true,
+    },
+    orderBy: {
+      _max: {
+        createdAt: "desc",
+      },
+    },
+    take: HOST_UNREAD_THREAD_LIMIT,
+  });
+
+  if (unreadThreadGroups.length === 0) {
+    return [];
+  }
+
+  const summaries = await Promise.all(
+    unreadThreadGroups.map(async (thread) => {
+      const latestUnreadMessage = await prisma.message.findFirst({
+        where: {
+          joinRequestId: thread.joinRequestId,
+          senderId: {
+            not: hostId,
+          },
+          readBy: {
+            none: {
+              userId: hostId,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          content: true,
+          createdAt: true,
+          joinRequestId: true,
+          joinRequest: {
+            select: {
+              user: {
+                select: {
+                  displayName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!latestUnreadMessage) {
+        return null;
+      }
+
+      const displayName =
+        latestUnreadMessage.joinRequest.user.displayName ?? latestUnreadMessage.joinRequest.user.email ?? "Guest";
+
+      return {
+        joinRequestId: thread.joinRequestId,
+        displayName,
+        lastMessageSnippet: latestUnreadMessage.content,
+        lastMessageAtISO: latestUnreadMessage.createdAt?.toISOString() ?? null,
+        unreadCount: thread._count._all > 0 ? thread._count._all : null,
+      } satisfies HostUnreadThreadSummary;
+    })
+  );
+
+  return summaries.filter((entry): entry is HostUnreadThreadSummary => Boolean(entry));
 };
 
 const buildChatPreviewForAcceptedGuest = async ({
@@ -133,7 +236,7 @@ const buildChatPreviewForHost = async ({
   eventId: string;
   hostId: string;
 }): Promise<EventInsideExperienceProps["chatPreview"]> => {
-  const [latestGuestMessage, unreadCount, acceptedGuestCount] = await Promise.all([
+  const [latestGuestMessage, unreadCount, acceptedGuestCount, hostUnreadThreads] = await Promise.all([
     prisma.message.findFirst({
       where: {
         joinRequest: {
@@ -173,6 +276,7 @@ const buildChatPreviewForHost = async ({
         status: JoinRequestStatus.ACCEPTED,
       },
     }),
+    buildHostUnreadThreadSummaries({ eventId, hostId }),
   ]);
 
   const participantCount = acceptedGuestCount > 0 ? acceptedGuestCount + 1 : null;
@@ -190,6 +294,7 @@ const buildChatPreviewForHost = async ({
       lastMessageSnippet: "No guest messages yet. You're caught up.",
       ctaLabel: "Open guest chats",
       ctaDisabledReason: "Guests can message you once they DM the host.",
+      hostUnreadThreads: hostUnreadThreads.length ? hostUnreadThreads : undefined,
     };
   }
 
@@ -199,7 +304,8 @@ const buildChatPreviewForHost = async ({
     lastMessageAtISO: latestGuestMessage.createdAt.toISOString(),
     unreadCount: unreadCount > 0 ? unreadCount : null,
     ctaLabel: unreadCount > 0 ? "Reply to guests" : "Open latest chat",
-    ctaHref: `/chat/${latestGuestMessage.joinRequestId}`,
+    ctaHref: "/chat/" + latestGuestMessage.joinRequestId,
+    hostUnreadThreads: hostUnreadThreads.length ? hostUnreadThreads : undefined,
   };
 };
 
@@ -290,7 +396,7 @@ export default async function EventInsidePage({ params }: PageParams) {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-0">
       <EventInsideExperience {...experience} />
       <p className="text-center text-xs text-white/60">
-        Built on live event + join-request data. Next: surface host chat summaries.
+        Built on live event + join-request data. Next: explore inline host reply shortcuts.
       </p>
     </div>
   );

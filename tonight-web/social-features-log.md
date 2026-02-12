@@ -46,3 +46,9 @@ Each run should:
 - Added a dedicated select handler so discovery cards/map markers now push to `/events/[id]` when clicked, letting hosts/guests jump straight into the inside experience.
 - Kept the selection state update so the map/list highlighting still works while we navigate.
 - Next: continue with the logged chat backlog item (top unread guest threads beneath the chat card).
+
+## 2026-02-12 23:07 EET — Host unread guest threads surfaced
+- Added a Prisma helper that groups unread guest DMs per join request and feeds a `hostUnreadThreads` payload into the event-inside chat preview so we know who’s waiting on a response.
+- Extended the `EventInsideExperience` UI to render a “Guests needing replies” rail with name, last line, relative timestamp, and unread badges that deep-link into each `/chat/[joinRequestId]` thread, plus tightened the component test suite to cover the new block.
+- Updated the host chat preview builder + tests so hosts always receive the unread list alongside their CTA, even when there are no new messages elsewhere.
+- Next: explore inline reply shortcuts (quick actions/mark-as-read) from the event-inside screen so hosts can triage DMs without bouncing between pages.
