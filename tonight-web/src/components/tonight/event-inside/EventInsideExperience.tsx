@@ -99,6 +99,7 @@ export function EventInsideExperience({
   const [markingThreadId, setMarkingThreadId] = useState<string | null>(null);
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
+  const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -111,6 +112,21 @@ export function EventInsideExperience({
   useEffect(() => {
     setHostUnreadThreads(chatPreview?.hostUnreadThreads ?? []);
   }, [chatPreview?.hostUnreadThreads]);
+
+  useEffect(() => {
+    setInlineComposerState((prev) => {
+      const activeIds = new Set(hostUnreadThreads.map((thread) => thread.joinRequestId));
+      let mutated = false;
+      const next = { ...prev };
+      for (const key of Object.keys(prev)) {
+        if (!activeIds.has(key)) {
+          delete next[key];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostUnreadThreads]);
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
@@ -217,6 +233,42 @@ export function EventInsideExperience({
     []
   );
 
+  const sendMessageToThread = async ({
+    joinRequestId,
+    message,
+    fallback = "Unable to send this message.",
+  }: {
+    joinRequestId: string;
+    message: string;
+    fallback?: string;
+  }) => {
+    const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content: message }),
+    });
+
+    if (!response.ok) {
+      const messagePayload = await readErrorPayload(response, fallback);
+      throw new Error(messagePayload);
+    }
+
+    try {
+      const markResponse = await fetch(`/api/chat/${joinRequestId}/mark-read`, {
+        method: "POST",
+      });
+      if (!markResponse.ok) {
+        console.error("Unable to mark thread as read after sending message", await markResponse.text());
+      }
+    } catch (markError) {
+      console.error("Message mark-read follow-up failed", markError);
+    }
+
+    setHostUnreadThreads((prev) => prev.filter((thread) => thread.joinRequestId !== joinRequestId));
+  };
+
   const handleQuickReplySend = async (joinRequestId: string, message: string) => {
     const fallback = "Unable to send this quick reply.";
     setQuickReplyState((prev) => ({
@@ -225,31 +277,7 @@ export function EventInsideExperience({
     }));
 
     try {
-      const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content: message }),
-      });
-
-      if (!response.ok) {
-        const messagePayload = await readErrorPayload(response, fallback);
-        throw new Error(messagePayload);
-      }
-
-      try {
-        const markResponse = await fetch(`/api/chat/${joinRequestId}/mark-read`, {
-          method: "POST",
-        });
-        if (!markResponse.ok) {
-          console.error("Unable to mark thread as read after quick reply", await markResponse.text());
-        }
-      } catch (markError) {
-        console.error("Quick reply mark-read failed", markError);
-      }
-
-      setHostUnreadThreads((prev) => prev.filter((thread) => thread.joinRequestId !== joinRequestId));
+      await sendMessageToThread({ joinRequestId, message, fallback });
       showSuccessToast("Reply sent");
     } catch (error) {
       const messagePayload = (error as Error)?.message ?? fallback;
@@ -260,6 +288,66 @@ export function EventInsideExperience({
         delete next[joinRequestId];
         return next;
       });
+    }
+  };
+
+  const handleInlineComposerChange = (joinRequestId: string, value: string) => {
+    setInlineComposerState((prev) => ({
+      ...prev,
+      [joinRequestId]: {
+        value,
+        status: prev[joinRequestId]?.status,
+      },
+    }));
+  };
+
+  const handleInlineComposerClear = (joinRequestId: string) => {
+    setInlineComposerState((prev) => {
+      if (!prev[joinRequestId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[joinRequestId];
+      return next;
+    });
+  };
+
+  const handleInlineComposerSend = async (joinRequestId: string) => {
+    const entry = inlineComposerState[joinRequestId];
+    const rawValue = entry?.value ?? "";
+    const trimmed = rawValue.trim();
+    if (!trimmed) {
+      showErrorToast("Message required", "Type a message before sending.");
+      return;
+    }
+
+    setInlineComposerState((prev) => ({
+      ...prev,
+      [joinRequestId]: {
+        value: rawValue,
+        status: "sending",
+      },
+    }));
+
+    const fallback = "Unable to send this reply.";
+    try {
+      await sendMessageToThread({ joinRequestId, message: trimmed, fallback });
+      showSuccessToast("Reply sent");
+      setInlineComposerState((prev) => {
+        const next = { ...prev };
+        delete next[joinRequestId];
+        return next;
+      });
+    } catch (error) {
+      const messagePayload = (error as Error)?.message ?? fallback;
+      showErrorToast("Reply failed", messagePayload);
+      setInlineComposerState((prev) => ({
+        ...prev,
+        [joinRequestId]: {
+          value: rawValue,
+          status: undefined,
+        },
+      }));
     }
   };
 
@@ -483,52 +571,88 @@ export function EventInsideExperience({
               <div className="mt-4 rounded-2xl border border-primary/20 bg-black/30 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">Guests needing replies</p>
                 <ul className="mt-3 space-y-2">
-                  {hostUnreadThreads.map((thread) => (
-                    <li key={thread.joinRequestId} className="space-y-2">
-                      <Link
-                        href={`/chat/${thread.joinRequestId}`}
-                        className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition hover:border-primary/40"
-                      >
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-white">{thread.displayName}</p>
-                          <p className="text-xs text-white/70 line-clamp-2">{thread.lastMessageSnippet}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
-                          <span>{formatRelativeTime(thread.lastMessageAtISO)}</span>
-                          {thread.unreadCount ? (
-                            <span className="rounded-full bg-primary/30 px-2 py-0.5 text-primary">{thread.unreadCount} new</span>
-                          ) : null}
-                        </div>
-                      </Link>
-                      <div className="rounded-xl bg-white/5 p-2 text-xs text-white/70">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Quick replies</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {quickReplyTemplates.map((template) => {
-                            const isSending = quickReplyState[thread.joinRequestId] === "sending";
-                            return (
+                  {hostUnreadThreads.map((thread) => {
+                    const composerEntry = inlineComposerState[thread.joinRequestId];
+                    const composerValue = composerEntry?.value ?? "";
+                    const composerSending = composerEntry?.status === "sending";
+                    const composerSendDisabled = composerSending || composerValue.trim().length === 0;
+                    const quickReplyBusy = quickReplyState[thread.joinRequestId] === "sending";
+
+                    return (
+                      <li key={thread.joinRequestId} className="space-y-2">
+                        <Link
+                          href={`/chat/${thread.joinRequestId}`}
+                          className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition hover:border-primary/40"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-white">{thread.displayName}</p>
+                            <p className="text-xs text-white/70 line-clamp-2">{thread.lastMessageSnippet}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
+                            <span>{formatRelativeTime(thread.lastMessageAtISO)}</span>
+                            {thread.unreadCount ? (
+                              <span className="rounded-full bg-primary/30 px-2 py-0.5 text-primary">{thread.unreadCount} new</span>
+                            ) : null}
+                          </div>
+                        </Link>
+                        <div className="rounded-xl bg-white/5 p-2 text-xs text-white/70 space-y-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Quick replies</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {quickReplyTemplates.map((template) => (
+                                <button
+                                  key={template.label}
+                                  type="button"
+                                  onClick={() => handleQuickReplySend(thread.joinRequestId, template.message)}
+                                  className="rounded-lg border border-primary/30 px-3 py-1 text-[11px] font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={quickReplyBusy}
+                                >
+                                  {quickReplyBusy ? "Sending…" : template.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Custom reply</p>
+                            <textarea
+                              rows={2}
+                              value={composerValue}
+                              onChange={(event) => handleInlineComposerChange(thread.joinRequestId, event.target.value)}
+                              placeholder="Type a custom reply"
+                              className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                              disabled={composerSending}
+                            />
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
                               <button
-                                key={template.label}
                                 type="button"
-                                onClick={() => handleQuickReplySend(thread.joinRequestId, template.message)}
-                                className="rounded-lg border border-primary/30 px-3 py-1 text-[11px] font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={isSending}
+                                onClick={() => handleInlineComposerSend(thread.joinRequestId)}
+                                className="rounded-lg bg-primary/80 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={composerSendDisabled}
                               >
-                                {isSending ? "Sending…" : template.label}
+                                {composerSending ? "Sending…" : "Send reply"}
                               </button>
-                            );
-                          })}
+                              <button
+                                type="button"
+                                onClick={() => handleInlineComposerClear(thread.joinRequestId)}
+                                className="text-[11px] font-semibold text-white/60 transition hover:text-white"
+                                disabled={composerSending || composerValue.length === 0}
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleMarkThreadAsRead(thread.joinRequestId)}
-                        className="w-full rounded-xl border border-primary/30 px-3 py-2 text-xs font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={markingThreadId === thread.joinRequestId}
-                      >
-                        {markingThreadId === thread.joinRequestId ? "Marking…" : "Mark as read"}
-                      </button>
-                    </li>
-                  ))}
+                        <button
+                          type="button"
+                          onClick={() => handleMarkThreadAsRead(thread.joinRequestId)}
+                          className="w-full rounded-xl border border-primary/30 px-3 py-2 text-xs font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={markingThreadId === thread.joinRequestId}
+                        >
+                          {markingThreadId === thread.joinRequestId ? "Marking…" : "Mark as read"}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : null}

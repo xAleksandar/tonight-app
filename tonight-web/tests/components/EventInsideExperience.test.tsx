@@ -224,7 +224,7 @@ describe('EventInsideExperience', () => {
       },
     };
 
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: vi.fn() });
     (globalThis as any).fetch = fetchMock;
 
     render(<EventInsideExperience {...props} />);
@@ -236,6 +236,44 @@ describe('EventInsideExperience', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-quick/messages', expect.objectContaining({ method: 'POST' }));
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-quick/mark-read', expect.objectContaining({ method: 'POST' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('lets hosts send custom replies from the inline composer', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [
+          {
+            joinRequestId: 'jr-thread-inline',
+            displayName: 'Sonia',
+            lastMessageSnippet: 'Could you share the door code?',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 3,
+          },
+        ],
+      },
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: vi.fn() });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    const composer = screen.getByPlaceholderText(/type a custom reply/i);
+    fireEvent.change(composer, { target: { value: 'Here you go — dial 32 and I will buzz you up.' } });
+
+    const sendButton = screen.getByRole('button', { name: /send reply/i });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-inline/messages', expect.objectContaining({ method: 'POST' }));
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-thread-inline/mark-read', expect.objectContaining({ method: 'POST' }));
 
     await waitFor(() => {
       expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();

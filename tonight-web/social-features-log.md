@@ -64,3 +64,9 @@ Each run should:
 - Wired the actions to `/api/chat/:joinRequestId/messages` plus an automatic mark-read follow-up, updating local state/toasts so the "Guests needing replies" list clears immediately after sending.
 - Extended the EventInsideExperience test suite to cover the new reply flow and cleaned up fetch mocks between runs so vitest stays deterministic.
 - Next: graduate the chat rail to include a lightweight inline composer (freeform text + send) so hosts can type custom responses without leaving the inside screen.
+
+## 2026-02-13 00:06 EET — Inline host composer added
+- Added per-thread inline composer state so hosts can type custom replies directly from the EventInsideExperience without leaving the page, alongside the existing canned quick replies.
+- Consolidated the chat send flow through a shared helper that posts messages, fires the mark-read follow-up, and prunes the unread rail for both quick templates and custom responses, with new UI wiring + tests covering the composer.
+- Extended the component spec to render the textarea, send/clear controls, and tightened the Vitest suite to cover the fresh behavior (npx vitest run tests/components/EventInsideExperience.test.tsx).
+- Next: expose the same inline composer affordance for accepted guests (non-host view) so they can poke the event group chat without opening the dedicated chat screen, including permission gates + loader data.
