@@ -643,6 +643,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             userEmail={currentUser?.email ?? null}
             userPhotoUrl={currentUser?.photoUrl ?? null}
           />
+
           <MobileHero
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
@@ -680,6 +681,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     onAction={handleRefresh}
                   />
                 ) : null}
+
                 {locationStatus !== "ready" && locationStatus !== "locating" && (
                   <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 shadow-lg shadow-primary/10">
                     <div className="flex items-start gap-3">
