@@ -82,3 +82,9 @@ Each run should:
 - Expanded the EventInsideExperience spec + vitest coverage to lock the new props + UI so future runs can build on the feed safely.
 - Next: grow this into a mini activity feed (last 2-3 host updates with times) so guests can skim multiple updates inline.
 
+## 2026-02-13 01:03 EET — Guest mini activity feed for host updates
+- Expanded the `/events/[id]` loader to collect the three most recent host-authored chat messages per accepted guest, threading them through the chat preview payload along with the existing single-message fallback.
+- Updated `EventInsideExperience` to render a stacked "Host updates" panel for guests, including timestamp + author lines, while keeping the previous single-update style when only one message exists.
+- Extended the component Vitest suite to cover the new feed rendering so future iterations can't regress the multi-update view.
+- Next: add a "See earlier updates" affordance that pages older host announcements into the feed so guests can keep scrolling without opening the full chat.
+

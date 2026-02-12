@@ -14,6 +14,7 @@ interface PageParams {
 }
 
 const HOST_UNREAD_THREAD_LIMIT = 3;
+const HOST_ACTIVITY_FEED_LIMIT = 3;
 
 type HostUnreadThreadSummary = {
   joinRequestId: string;
@@ -180,7 +181,7 @@ const buildChatPreviewForAcceptedGuest = async ({
   hostDisplayName?: string | null;
   fallbackTimestampISO?: string;
 }): Promise<EventInsideExperienceProps["chatPreview"]> => {
-  const [lastMessage, unreadCount, acceptedGuestsCount, latestHostMessage] = await Promise.all([
+  const [lastMessage, unreadCount, acceptedGuestsCount, latestHostMessages] = await Promise.all([
     prisma.message.findFirst({
       where: { joinRequestId },
       orderBy: { createdAt: "desc" },
@@ -203,19 +204,26 @@ const buildChatPreviewForAcceptedGuest = async ({
         status: JoinRequestStatus.ACCEPTED,
       },
     }),
-    prisma.message.findFirst({
+    prisma.message.findMany({
       where: {
         joinRequestId,
         senderId: hostId,
       },
       orderBy: { createdAt: "desc" },
-      select: { content: true, createdAt: true },
+      take: HOST_ACTIVITY_FEED_LIMIT,
+      select: { id: true, content: true, createdAt: true },
     }),
   ]);
 
   const lastMessageSnippet = lastMessage?.content ?? "No messages yet. Say hi once you're accepted.";
   const lastMessageAtISO = lastMessage?.createdAt.toISOString() ?? fallbackTimestampISO ?? null;
   const participantCount = acceptedGuestsCount + 1; // host + accepted guests
+  const hostActivityFeed = latestHostMessages.map((message) => ({
+    id: message.id,
+    message: message.content,
+    postedAtISO: message.createdAt?.toISOString() ?? null,
+    authorName: hostDisplayName ?? "Host",
+  }));
 
   return {
     lastMessageSnippet,
@@ -227,13 +235,8 @@ const buildChatPreviewForAcceptedGuest = async ({
     guestComposer: {
       joinRequestId,
     },
-    latestHostActivity: latestHostMessage
-      ? {
-          message: latestHostMessage.content,
-          postedAtISO: latestHostMessage.createdAt?.toISOString() ?? null,
-          authorName: hostDisplayName ?? "Host",
-        }
-      : undefined,
+    latestHostActivity: hostActivityFeed[0],
+    latestHostActivityFeed: hostActivityFeed.length ? hostActivityFeed : undefined,
   };
 };
 

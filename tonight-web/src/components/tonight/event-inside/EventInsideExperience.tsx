@@ -55,6 +55,12 @@ export type EventInsideExperienceProps = {
       postedAtISO?: string | null;
       authorName?: string | null;
     };
+    latestHostActivityFeed?: Array<{
+      id: string;
+      message: string;
+      postedAtISO?: string | null;
+      authorName?: string | null;
+    }>;
     hostUnreadThreads?: Array<{
       joinRequestId: string;
       displayName: string;
@@ -151,6 +157,21 @@ export function EventInsideExperience({
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+  const hostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> =
+    viewerRole === "guest"
+      ? chatPreview?.latestHostActivityFeed && chatPreview.latestHostActivityFeed.length > 0
+        ? chatPreview.latestHostActivityFeed
+        : chatPreview?.latestHostActivity
+          ? [
+              {
+                id: "latest-host-activity",
+                message: chatPreview.latestHostActivity.message,
+                postedAtISO: chatPreview.latestHostActivity.postedAtISO,
+                authorName: chatPreview.latestHostActivity.authorName ?? host.displayName,
+              },
+            ]
+          : []
+      : [];
 
   const handleMarkThreadAsRead = async (joinRequestId: string) => {
     const fallback = "Unable to mark this thread as read.";
@@ -461,15 +482,23 @@ export function EventInsideExperience({
                 </ul>
               </div>
             ) : null}
-            {viewerRole === "guest" && chatPreview?.latestHostActivity ? (
+            {hostActivityEntries.length > 0 ? (
               <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Latest host update</p>
-                <p className="mt-2 text-sm text-white/80">{chatPreview.latestHostActivity.message}</p>
-                <p className="mt-2 text-xs text-white/50">
-                  {chatPreview.latestHostActivity.authorName ?? host.displayName}
-                  {" · "}
-                  {formatRelativeTime(chatPreview.latestHostActivity.postedAtISO)}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
+                  {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
                 </p>
+                <ul className="mt-3 space-y-3">
+                  {hostActivityEntries.map((activity) => (
+                    <li key={activity.id} className="rounded-xl border border-white/5 bg-white/5 p-3">
+                      <p className="text-sm text-white/80">{activity.message}</p>
+                      <p className="mt-2 text-xs text-white/50">
+                        {activity.authorName ?? host.displayName}
+                        {" · "}
+                        {formatRelativeTime(activity.postedAtISO)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : null}
           </Card>

@@ -363,4 +363,42 @@ describe('EventInsideExperience', () => {
     expect(within(updatePanel as HTMLElement).getByText(/Doors open at 9/i)).toBeInTheDocument();
   });
 
+  it('renders a mini host activity feed when multiple updates exist', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        latestHostActivityFeed: [
+          {
+            id: 'msg-1',
+            message: 'Doors open at 9',
+            postedAtISO: new Date().toISOString(),
+            authorName: 'Aleks',
+          },
+          {
+            id: 'msg-2',
+            message: 'Running 10 minutes behind but headed over now.',
+            postedAtISO: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+            authorName: 'Aleks',
+          },
+        ],
+        guestComposer: {
+          joinRequestId: 'jr-guest-feed',
+        },
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const panel = screen.getByText(/Host updates/i).closest('div');
+    expect(panel).not.toBeNull();
+    const scoped = within(panel as HTMLElement);
+    expect(scoped.getByText('Doors open at 9')).toBeInTheDocument();
+    expect(scoped.getByText(/Running 10 minutes behind/i)).toBeInTheDocument();
+  });
+
+
 });
