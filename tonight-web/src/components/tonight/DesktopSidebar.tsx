@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, Compass, MessageCircle, Plus, Sparkles, Users } from "lucide-react";
 
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
@@ -32,6 +32,7 @@ export function DesktopSidebar({
   const activeCategory = selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory] : null;
   const ActiveIcon = activeCategory?.icon ?? Sparkles;
   const pathname = usePathname();
+  const router = useRouter();
 
   const inferredPrimaryNav = useMemo<PrimaryNavTarget | null>(() => {
     if (!pathname) {
@@ -58,11 +59,18 @@ export function DesktopSidebar({
     onClick?: () => void;
   }> = [
     { id: "discover", label: "Discover", icon: Compass, onClick: onNavigateDiscover },
-    ...(typeof onNavigateMessages === "function"
-      ? [{ id: "messages" as const, label: "Messages", icon: MessageCircle, onClick: onNavigateMessages }]
-      : []),
+    { id: "messages", label: "Messages", icon: MessageCircle, onClick: onNavigateMessages },
     { id: "people", label: "People nearby", icon: Users, onClick: onNavigatePeople },
   ];
+
+  const fallbackNavigation = useMemo<Record<PrimaryNavTarget, () => void>>(
+    () => ({
+      discover: () => router.push("/"),
+      messages: () => router.push("/messages"),
+      people: () => router.push("/people"),
+    }),
+    [router]
+  );
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-white/10 bg-card/30 px-5 py-6 text-foreground backdrop-blur-2xl md:flex md:flex-col">
@@ -79,13 +87,14 @@ export function DesktopSidebar({
       <nav className="mt-8 space-y-1 text-sm" aria-label="Primary">
         {primaryNavItems.map((item) => {
           const Icon = item.icon;
+          const onClick = item.onClick ?? fallbackNavigation[item.id];
           const isActive = currentPrimaryNav === item.id;
-          const disabled = typeof item.onClick !== "function";
+          const disabled = typeof onClick !== "function";
           return (
             <button
               key={item.id}
               type="button"
-              onClick={disabled ? undefined : item.onClick}
+              onClick={disabled ? undefined : onClick}
               className={classNames(
                 "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition-all",
                 isActive
