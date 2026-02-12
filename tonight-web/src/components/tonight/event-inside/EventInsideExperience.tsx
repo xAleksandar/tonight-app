@@ -50,6 +50,11 @@ export type EventInsideExperienceProps = {
     ctaLabel?: string | null;
     ctaHref?: string | null;
     ctaDisabledReason?: string | null;
+    latestHostActivity?: {
+      message: string;
+      postedAtISO?: string | null;
+      authorName?: string | null;
+    };
     hostUnreadThreads?: Array<{
       joinRequestId: string;
       displayName: string;
@@ -454,6 +459,17 @@ export function EventInsideExperience({
                     <li key={note}>{note}</li>
                   ))}
                 </ul>
+              </div>
+            ) : null}
+            {viewerRole === "guest" && chatPreview?.latestHostActivity ? (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Latest host update</p>
+                <p className="mt-2 text-sm text-white/80">{chatPreview.latestHostActivity.message}</p>
+                <p className="mt-2 text-xs text-white/50">
+                  {chatPreview.latestHostActivity.authorName ?? host.displayName}
+                  {" · "}
+                  {formatRelativeTime(chatPreview.latestHostActivity.postedAtISO)}
+                </p>
               </div>
             ) : null}
           </Card>

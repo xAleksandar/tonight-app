@@ -169,14 +169,18 @@ const buildChatPreviewForAcceptedGuest = async ({
   joinRequestId,
   viewerId,
   eventId,
+  hostId,
+  hostDisplayName,
   fallbackTimestampISO,
 }: {
   joinRequestId: string;
   viewerId: string;
   eventId: string;
+  hostId: string;
+  hostDisplayName?: string | null;
   fallbackTimestampISO?: string;
 }): Promise<EventInsideExperienceProps["chatPreview"]> => {
-  const [lastMessage, unreadCount, acceptedGuestsCount] = await Promise.all([
+  const [lastMessage, unreadCount, acceptedGuestsCount, latestHostMessage] = await Promise.all([
     prisma.message.findFirst({
       where: { joinRequestId },
       orderBy: { createdAt: "desc" },
@@ -199,6 +203,14 @@ const buildChatPreviewForAcceptedGuest = async ({
         status: JoinRequestStatus.ACCEPTED,
       },
     }),
+    prisma.message.findFirst({
+      where: {
+        joinRequestId,
+        senderId: hostId,
+      },
+      orderBy: { createdAt: "desc" },
+      select: { content: true, createdAt: true },
+    }),
   ]);
 
   const lastMessageSnippet = lastMessage?.content ?? "No messages yet. Say hi once you're accepted.";
@@ -215,6 +227,13 @@ const buildChatPreviewForAcceptedGuest = async ({
     guestComposer: {
       joinRequestId,
     },
+    latestHostActivity: latestHostMessage
+      ? {
+          message: latestHostMessage.content,
+          postedAtISO: latestHostMessage.createdAt?.toISOString() ?? null,
+          authorName: hostDisplayName ?? "Host",
+        }
+      : undefined,
   };
 };
 
@@ -368,6 +387,8 @@ export default async function EventInsidePage({ params }: PageParams) {
       joinRequestId: viewerJoinRequest.id,
       viewerId: authenticatedUser.userId,
       eventId,
+      hostId: eventRecord.hostId,
+      hostDisplayName: eventRecord.hostDisplayName ?? eventRecord.hostEmail,
       fallbackTimestampISO: viewerJoinRequest.updatedAt,
     });
   } else if (viewerRole === "pending") {

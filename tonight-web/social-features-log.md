@@ -76,3 +76,9 @@ Each run should:
 - Added a guest-facing inline composer block so confirmed attendees can send freeform updates without jumping into `/chat`, reusing the existing send helper with toast feedback and permission gating.
 - Backfilled the component tests with coverage for the guest composer (render + send) and reran `npx vitest run tests/components/EventInsideExperience.test.tsx` to keep the contract locked.
 - Next: add a lightweight "latest chat activity" strip under the event card so guests can skim the most recent host updates (last message + relative timestamp) without opening the full chat.
+## 2026-02-13 00:45 EET — Guest latest host update strip
+- Added a `latestHostActivity` payload to the `/events/[id]` loader so accepted guests also receive the most recent host-authored chat message + timestamp.
+- Surfaced a new "Latest host update" panel under the Tonight's plan card that renders the message + relative time, giving guests context without opening `/chat`.
+- Expanded the EventInsideExperience spec + vitest coverage to lock the new props + UI so future runs can build on the feed safely.
+- Next: grow this into a mini activity feed (last 2-3 host updates with times) so guests can skim multiple updates inline.
+

@@ -16,6 +16,7 @@ let screen: TestingLibrary['screen'];
 let cleanup: TestingLibrary['cleanup'];
 let fireEvent: TestingLibrary['fireEvent'];
 let waitFor: TestingLibrary['waitFor'];
+let within: TestingLibrary['within'];
 
 let jsdomInstance: JSDOM | null = null;
 
@@ -85,6 +86,7 @@ beforeAll(async () => {
   cleanup = testingLibrary.cleanup;
   fireEvent = testingLibrary.fireEvent;
   waitFor = testingLibrary.waitFor;
+  within = testingLibrary.within;
 });
 
 afterAll(() => {
@@ -332,4 +334,33 @@ describe('EventInsideExperience', () => {
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/chat/jr-guest-send/mark-read', expect.objectContaining({ method: 'POST' }));
   });
+
+  it('surfaces the latest host update for guests when provided', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        latestHostActivity: {
+          message: 'Doors open at 9',
+          postedAtISO: new Date().toISOString(),
+          authorName: 'Aleks',
+        },
+        guestComposer: {
+          joinRequestId: 'jr-guest-latest',
+        },
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const latestUpdate = screen.getByText(/Latest host update/i);
+    expect(latestUpdate).toBeInTheDocument();
+    const updatePanel = latestUpdate.closest('div');
+    expect(updatePanel).not.toBeNull();
+    expect(within(updatePanel as HTMLElement).getByText(/Doors open at 9/i)).toBeInTheDocument();
+  });
+
 });
