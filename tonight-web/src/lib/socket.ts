@@ -6,6 +6,10 @@ import {
   JOIN_REQUEST_ROOM_PREFIX,
   JOIN_REQUEST_MESSAGE_EVENT,
   JOIN_REQUEST_JOIN_EVENT,
+  CHAT_TYPING_START_EVENT,
+  CHAT_TYPING_STOP_EVENT,
+  CHAT_TYPING_EVENT,
+  CHAT_TYPING_STOP_BROADCAST_EVENT,
   type SocketMessagePayload,
 } from '@/lib/socket-shared';
 
@@ -13,6 +17,8 @@ export type { SocketMessagePayload };
 
 type SocketData = {
   userId?: string;
+  displayName?: string;
+  email?: string;
 };
 
 type AuthenticatedSocket = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>;
@@ -92,6 +98,32 @@ class SocketService {
           const message = error instanceof Error ? error.message : 'Unable to join room';
           socket.emit('error', message);
         }
+      });
+
+      // Typing indicator events
+      socket.on(CHAT_TYPING_START_EVENT, ({ joinRequestId }: { joinRequestId: string }) => {
+        if (!socket.data?.userId) return;
+
+        const roomName = this.getRoomName(joinRequestId);
+
+        // Broadcast to other users in the room (not sender)
+        socket.to(roomName).emit(CHAT_TYPING_EVENT, {
+          joinRequestId,
+          userId: socket.data.userId,
+          displayName: socket.data.displayName || socket.data.email?.split('@')[0] || 'User'
+        });
+      });
+
+      socket.on(CHAT_TYPING_STOP_EVENT, ({ joinRequestId }: { joinRequestId: string }) => {
+        if (!socket.data?.userId) return;
+
+        const roomName = this.getRoomName(joinRequestId);
+
+        // Broadcast to other users in the room (not sender)
+        socket.to(roomName).emit(CHAT_TYPING_STOP_BROADCAST_EVENT, {
+          joinRequestId,
+          userId: socket.data.userId
+        });
       });
     });
   }

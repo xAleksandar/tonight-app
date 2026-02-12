@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { MessageCircle, X } from "lucide-react";
 
 import { ConversationList } from "@/components/chat/ConversationList";
-import { PLACEHOLDER_CONVERSATIONS, type ConversationPreview } from "@/components/chat/conversations";
+import type { ConversationPreview } from "@/components/chat/conversations";
 
 export type MessagesModalProps = {
   isOpen: boolean;
@@ -99,10 +99,7 @@ export function MessagesModal({
   }, [isOpen]);
 
   const items = useMemo(() => {
-    if (Array.isArray(conversations) && conversations.length) {
-      return conversations;
-    }
-    return PLACEHOLDER_CONVERSATIONS;
+    return conversations || [];
   }, [conversations]);
 
   if (!isOpen) {

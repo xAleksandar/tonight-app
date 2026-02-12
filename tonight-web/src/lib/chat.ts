@@ -1,6 +1,7 @@
 import { JoinRequestStatus, type Message, type JoinRequest } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { socketService } from '@/lib/socket';
+import { chatRateLimiter } from '@/lib/chat-rate-limiter';
 
 export class ChatError extends Error {
   constructor(message: string) {
@@ -159,6 +160,14 @@ export const listMessagesForJoinRequest = async (
 export const createMessageForJoinRequest = async (
   input: CreateChatMessageInput
 ): Promise<SerializedMessage> => {
+  // Rate limit check - MUST BE FIRST
+  if (!chatRateLimiter.canSendMessage(input.userId)) {
+    const secondsUntilReset = chatRateLimiter.getSecondsUntilReset(input.userId);
+    throw new ChatMessageValidationError(
+      `Message rate limit exceeded. Please wait ${secondsUntilReset} seconds before sending more messages.`
+    );
+  }
+
   const context = await ensureChatAccess({
     joinRequestId: input.joinRequestId,
     userId: input.userId,

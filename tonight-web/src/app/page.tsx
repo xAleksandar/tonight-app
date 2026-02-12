@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { MessagesModal } from "@/components/chat/MessagesModal";
-import { PLACEHOLDER_CONVERSATIONS } from "@/components/chat/conversations";
+import type { ConversationPreview } from "@/components/chat/conversations";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar, type MobileNavTarget } from "@/components/tonight/MobileActionBar";
@@ -27,6 +27,8 @@ import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
 import type { AuthUser } from "@/components/auth/AuthProvider";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useSocket } from "@/hooks/useSocket";
+import type { SocketMessagePayload } from "@/lib/socket-shared";
 
 const DEFAULT_RADIUS_KM = 10;
 const MIN_RADIUS_KM = 1;
@@ -278,12 +280,68 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [conversations, setConversations] = useState<ConversationPreview[]>([]);
 
-  const conversations = useMemo(() => PLACEHOLDER_CONVERSATIONS, []);
   const unreadMessageCount = useMemo(
     () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
     [conversations]
   );
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const response = await fetch('/api/conversations');
+      if (!response.ok) {
+        throw new Error('Failed to load conversations');
+      }
+      const data = await response.json();
+      setConversations(data.conversations || []);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      setConversations([]);
+    }
+  }, []);
+
+  // Real-time updates for conversation list
+  const handleMessageReceived = useCallback((payload: SocketMessagePayload) => {
+    setConversations(prev => {
+      const updated = prev.map(conv => {
+        if (conv.id === payload.joinRequestId) {
+          return {
+            ...conv,
+            messageSnippet: payload.content,
+            updatedAtLabel: 'Just now',
+            // Increment unread if message from other user
+            unreadCount: payload.senderId !== currentUser?.id
+              ? (conv.unreadCount ?? 0) + 1
+              : conv.unreadCount ?? 0
+          };
+        }
+        return conv;
+      });
+
+      // Move updated conversation to top
+      const updatedConvIndex = updated.findIndex(c => c.id === payload.joinRequestId);
+      if (updatedConvIndex > 0) {
+        const [updatedConv] = updated.splice(updatedConvIndex, 1);
+        updated.unshift(updatedConv);
+      }
+
+      return updated;
+    });
+  }, [currentUser?.id]);
+
+  // Connect to Socket.IO for real-time updates
+  useSocket({
+    token: null, // Token read from cookies automatically
+    autoConnect: true,
+    onMessage: handleMessageReceived
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchConversations();
+    }
+  }, [currentUser, fetchConversations]);
 
   useEffect(() => {
     if (explicitViewParam === "map" || explicitViewParam === "list") {

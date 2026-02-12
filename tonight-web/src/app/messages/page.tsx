@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users } from "lucide-react";
 
@@ -12,8 +12,10 @@ import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useSocket } from "@/hooks/useSocket";
 import type { CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
+import type { SocketMessagePayload } from "@/lib/socket-shared";
 
 export default function MessagesPage() {
   const { status, user } = useRequireAuth();
@@ -38,8 +40,67 @@ type ConversationFilter = "all" | "accepted" | "pending";
 function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const [conversations] = useState<ConversationPreview[]>(PLACEHOLDER_CONVERSATIONS);
+  const [conversations, setConversations] = useState<ConversationPreview[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ConversationFilter>("all");
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/conversations');
+
+      if (!response.ok) {
+        throw new Error('Failed to load conversations');
+      }
+
+      const data = await response.json();
+      setConversations(data.conversations);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load conversations');
+      console.error('Error fetching conversations:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchConversations();
+    }
+  }, [currentUser, fetchConversations]);
+
+  // Socket.IO connection for real-time updates
+  const handleMessage = useCallback((payload: SocketMessagePayload) => {
+    // Update conversation list when new message arrives
+    setConversations(prev => {
+      const updated = prev.map(conv => {
+        if (conv.id === payload.joinRequestId) {
+          return {
+            ...conv,
+            messageSnippet: payload.content,
+            updatedAtLabel: 'Just now',
+            // Increment unread if message from other user
+            unreadCount: payload.senderId !== currentUser?.id
+              ? (conv.unreadCount ?? 0) + 1
+              : (conv.unreadCount ?? 0)
+          };
+        }
+        return conv;
+      });
+
+      // Return updated list (ConversationList component will handle sorting if needed)
+      return updated;
+    });
+  }, [currentUser?.id]);
+
+  useSocket({
+    token: null, // Token will be read from cookies automatically
+    autoConnect: true,
+    onMessage: handleMessage
+  });
 
   const hasOnlyPlaceholders = useMemo(() => hasPlaceholderConversationData(conversations), [conversations]);
 
@@ -127,6 +188,83 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     () => ({ label: "Browse Discover", onAction: handleDiscover }),
     [handleDiscover]
   );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-dvh bg-gradient-to-b from-[#05070f] via-[#05060d] to-[#04040a] text-foreground">
+        <div className="flex min-h-dvh flex-col md:flex-row">
+          <DesktopSidebar
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            onCreate={handleCreate}
+            onNavigateDiscover={handleDiscover}
+            onNavigatePeople={handlePeople}
+            onNavigateMessages={handleMessages}
+            activePrimaryNav="messages"
+          />
+          <div className="flex flex-1 flex-col">
+            <DesktopHeader
+              title="Messages"
+              subtitle="Keep pace with the hosts and guests you've matched with"
+              onNavigateProfile={handleProfile}
+              onNavigateMessages={handleMessages}
+              userDisplayName={currentUser?.displayName ?? null}
+              userEmail={currentUser?.email ?? null}
+              userPhotoUrl={currentUser?.photoUrl ?? null}
+            />
+            <main className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading conversations...</p>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-dvh bg-gradient-to-b from-[#05070f] via-[#05060d] to-[#04040a] text-foreground">
+        <div className="flex min-h-dvh flex-col md:flex-row">
+          <DesktopSidebar
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            onCreate={handleCreate}
+            onNavigateDiscover={handleDiscover}
+            onNavigatePeople={handlePeople}
+            onNavigateMessages={handleMessages}
+            activePrimaryNav="messages"
+          />
+          <div className="flex flex-1 flex-col">
+            <DesktopHeader
+              title="Messages"
+              subtitle="Keep pace with the hosts and guests you've matched with"
+              onNavigateProfile={handleProfile}
+              onNavigateMessages={handleMessages}
+              userDisplayName={currentUser?.displayName ?? null}
+              userEmail={currentUser?.email ?? null}
+              userPhotoUrl={currentUser?.photoUrl ?? null}
+            />
+            <main className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-destructive mb-4">{error}</p>
+                <button
+                  onClick={fetchConversations}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                >
+                  Retry
+                </button>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#05070f] via-[#05060d] to-[#04040a] text-foreground">

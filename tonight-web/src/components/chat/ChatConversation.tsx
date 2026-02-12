@@ -123,9 +123,12 @@ export default function ChatConversation({
   const [socketNotice, setSocketNotice] = useState<string | null>(null);
   const [hasBlockedCounterpart, setHasBlockedCounterpart] = useState(false);
   const [queuedMessageCount, setQueuedMessageCount] = useState(0);
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const [isCurrentlyTyping, setIsCurrentlyTyping] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const counterpart = useMemo(() => {
     return context.requesterRole === 'host' ? context.participant : context.host;
@@ -191,6 +194,8 @@ export default function ChatConversation({
     connectionState,
     isConnected,
     joinRoom,
+    sendTypingStart,
+    sendTypingStop,
     nextRetryInMs,
     reconnectAttempt,
   } = useSocket({
@@ -210,6 +215,16 @@ export default function ChatConversation({
         setSocketNotice((previous) => previous ?? 'We lost the live connection. Messages will auto-resume soon.');
       }
     },
+    onTyping: (payload) => {
+      if (payload.joinRequestId === joinRequestId && payload.userId !== currentUserId) {
+        setIsOtherUserTyping(true);
+      }
+    },
+    onTypingStop: (payload) => {
+      if (payload.joinRequestId === joinRequestId && payload.userId !== currentUserId) {
+        setIsOtherUserTyping(false);
+      }
+    },
   });
 
   useEffect(() => {
@@ -218,6 +233,64 @@ export default function ChatConversation({
     }
     joinRoom(joinRequestId);
   }, [isConnected, joinRequestId, joinRoom]);
+
+  // Mark messages as read when chat opens and when connected
+  useEffect(() => {
+    const markAsRead = async () => {
+      try {
+        await fetch(`/api/chat/${joinRequestId}/mark-read`, {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Failed to mark messages as read:', error);
+      }
+    };
+
+    if (isConnected) {
+      markAsRead();
+    }
+  }, [joinRequestId, isConnected]);
+
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (isCurrentlyTyping) {
+        sendTypingStop(joinRequestId);
+      }
+    };
+  }, [isCurrentlyTyping, joinRequestId, sendTypingStop]);
+
+  // Handle input change with typing indicators
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setComposerValue(newValue);
+
+    // Start typing indicator
+    if (!isCurrentlyTyping && newValue.length > 0) {
+      setIsCurrentlyTyping(true);
+      sendTypingStart(joinRequestId);
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Stop typing indicator after 3 seconds of no input
+    if (newValue.length > 0) {
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsCurrentlyTyping(false);
+        sendTypingStop(joinRequestId);
+      }, 3000);
+    } else {
+      // Empty input - stop typing immediately
+      setIsCurrentlyTyping(false);
+      sendTypingStop(joinRequestId);
+    }
+  }, [isCurrentlyTyping, joinRequestId, sendTypingStart, sendTypingStop]);
 
   const queueMessageForSend = useCallback(
     (content: string) => {
@@ -335,6 +408,15 @@ export default function ChatConversation({
         return;
       }
 
+      // Stop typing indicator when sending
+      if (isCurrentlyTyping) {
+        setIsCurrentlyTyping(false);
+        sendTypingStop(joinRequestId);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+      }
+
       setSendError(null);
 
       if (!isConnected && connectionState !== 'error') {
@@ -371,7 +453,7 @@ export default function ChatConversation({
         setSendStatus('idle');
       }
     },
-    [appendMessage, composerValue, connectionState, hasBlockedCounterpart, isConnected, joinRequestId, queueMessageForSend, sendStatus]
+    [appendMessage, composerValue, connectionState, hasBlockedCounterpart, isConnected, isCurrentlyTyping, joinRequestId, queueMessageForSend, sendStatus, sendTypingStop]
   );
 
   const connectionLabel = (() => {
@@ -492,6 +574,11 @@ export default function ChatConversation({
             onRetry={() => fetchMessages().catch(() => {})}
             className="!px-0"
           />
+          {isOtherUserTyping && (
+            <div className="px-4 py-2 text-sm text-muted-foreground italic">
+              {counterpart.displayName || counterpart.email.split('@')[0]} is typing...
+            </div>
+          )}
         </div>
       </main>
 
@@ -530,7 +617,7 @@ export default function ChatConversation({
           <textarea
             id="chat-message"
             value={composerValue}
-            onChange={(event) => setComposerValue(event.target.value)}
+            onChange={handleInputChange}
             placeholder="Type a message"
             rows={1}
             disabled={hasBlockedCounterpart}

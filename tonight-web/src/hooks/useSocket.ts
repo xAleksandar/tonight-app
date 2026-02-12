@@ -7,7 +7,12 @@ import { io, type Socket } from 'socket.io-client';
 import {
   JOIN_REQUEST_JOIN_EVENT,
   JOIN_REQUEST_MESSAGE_EVENT,
+  CHAT_TYPING_START_EVENT,
+  CHAT_TYPING_STOP_EVENT,
+  CHAT_TYPING_EVENT,
+  CHAT_TYPING_STOP_BROADCAST_EVENT,
   type SocketMessagePayload,
+  type SocketTypingPayload,
 } from '@/lib/socket-shared';
 
 export type SocketConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
@@ -19,6 +24,8 @@ type EventHandlers = {
   onConnect?: () => void;
   onDisconnect?: (reason: string) => void;
   onError?: (error: Error) => void;
+  onTyping?: (payload: SocketTypingPayload) => void;
+  onTypingStop?: (payload: { joinRequestId: string; userId: string }) => void;
 };
 
 export type UseSocketOptions = EventHandlers & {
@@ -43,6 +50,8 @@ export type UseSocketResult = {
   disconnect: () => void;
   joinRoom: (joinRequestId: string) => void;
   sendMessage: (joinRequestId: string, payload: Omit<SocketMessagePayload, 'joinRequestId'>) => void;
+  sendTypingStart: (joinRequestId: string) => void;
+  sendTypingStop: (joinRequestId: string) => void;
   /** Current retry attempt counter (0 when connected or idle) */
   reconnectAttempt: number;
   /** Milliseconds remaining before the next automatic reconnect attempt. Null when not scheduled. */
@@ -84,6 +93,8 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     onConnect,
     onDisconnect,
     onError,
+    onTyping,
+    onTypingStop,
   } = options;
 
   const handlersRef = useRef<EventHandlers>({
@@ -91,11 +102,13 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     onConnect,
     onDisconnect,
     onError,
+    onTyping,
+    onTypingStop,
   });
 
   useEffect(() => {
-    handlersRef.current = { onMessage, onConnect, onDisconnect, onError };
-  }, [onMessage, onConnect, onDisconnect, onError]);
+    handlersRef.current = { onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop };
+  }, [onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop]);
 
   const socketRef = useRef<ClientSocket | null>(null);
   const joinedRoomsRef = useRef<Set<string>>(new Set());
@@ -260,6 +273,14 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       socket.on(JOIN_REQUEST_MESSAGE_EVENT, (payload: SocketMessagePayload) => {
         handlersRef.current.onMessage?.(payload);
       });
+
+      socket.on(CHAT_TYPING_EVENT, (payload: SocketTypingPayload) => {
+        handlersRef.current.onTyping?.(payload);
+      });
+
+      socket.on(CHAT_TYPING_STOP_BROADCAST_EVENT, (payload: { joinRequestId: string; userId: string }) => {
+        handlersRef.current.onTypingStop?.(payload);
+      });
     },
     [flushQueuedRoomJoins, resetReconnectTracking, scheduleReconnect, updateState]
   );
@@ -371,6 +392,16 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     });
   }, []);
 
+  const sendTypingStart = useCallback((joinRequestId: string) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit(CHAT_TYPING_START_EVENT, { joinRequestId });
+  }, []);
+
+  const sendTypingStop = useCallback((joinRequestId: string) => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit(CHAT_TYPING_STOP_EVENT, { joinRequestId });
+  }, []);
+
   useEffect(() => {
     if (autoConnect && token) {
       void publicConnect();
@@ -386,6 +417,8 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     disconnect,
     joinRoom,
     sendMessage,
+    sendTypingStart,
+    sendTypingStop,
     reconnectAttempt,
     nextRetryInMs,
   };

@@ -17,6 +17,7 @@ model User {
   events         Event[]        @relation("UserEvents")
   joinRequests   JoinRequest[]
   messages       Message[]      @relation("UserMessages")
+  messageReads   MessageRead[]  @relation("UserMessageReads")
   blockedUsers   BlockedUser[]  @relation("BlockerRelation")
   blockedBy      BlockedUser[]  @relation("BlockedRelation")
   reportsFiled   Report[]       @relation("ReporterRelation")
@@ -70,15 +71,29 @@ enum JoinRequestStatus {
 }
 
 model Message {
-  id            String      @id @default(cuid())
+  id            String        @id @default(cuid())
   content       String
   joinRequestId String
-  joinRequest   JoinRequest @relation(fields: [joinRequestId], references: [id])
+  joinRequest   JoinRequest   @relation(fields: [joinRequestId], references: [id])
   senderId      String
-  sender        User        @relation("UserMessages", fields: [senderId], references: [id])
-  createdAt     DateTime    @default(now())
+  sender        User          @relation("UserMessages", fields: [senderId], references: [id])
+  readBy        MessageRead[]
+  createdAt     DateTime      @default(now())
 
   @@index([joinRequestId])
+}
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("UserMessageReads", fields: [userId], references: [id])
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  readAt    DateTime @default(now())
+
+  @@unique([userId, messageId])
+  @@index([userId])
+  @@index([messageId])
 }
 
 model BlockedUser {
