@@ -948,13 +948,19 @@ describe('EventInsideExperience', () => {
       ],
     };
 
-    const fetchResponse = () => ({
-      ok: true,
-      json: async () => ({}),
-      text: async () => '',
+    const fetchMock = vi.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/messages')) {
+        return Promise.resolve({ ok: true, json: async () => ({}), text: async () => '' });
+      }
+      if (url.includes('/mark-read')) {
+        return Promise.resolve({ ok: true, text: async () => '' });
+      }
+      if (url.includes('/invite-logs')) {
+        return Promise.resolve({ ok: true, json: async () => ({ invitedAtISO: new Date().toISOString() }), text: async () => '' });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
     });
-
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(fetchResponse()));
     (globalThis as any).fetch = fetchMock;
 
     render(<EventInsideExperience {...props} />);
@@ -968,6 +974,13 @@ describe('EventInsideExperience', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/chat/jr-friend-1/messages',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/events/evt-123/invite-logs',
         expect.objectContaining({ method: 'POST' })
       );
     });
@@ -1002,6 +1015,27 @@ describe('EventInsideExperience', () => {
     expect(screen.getByLabelText(/select nora lights/i)).toBeDisabled();
   });
 
+  it('highlights when a friend was already invited to this event', () => {
+    const invitedAtISO = new Date().toISOString();
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      hostFriendInvites: [
+        {
+          joinRequestId: 'jr-friend-highlight',
+          userId: 'friend-highlight',
+          displayName: 'Nora Lights',
+          lastEventTitle: 'Jazz Loft Social',
+          lastInteractionAtISO: new Date().toISOString(),
+          currentEventInviteAtISO: invitedAtISO,
+        },
+      ],
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/already invited to secret rooftop club/i)).toBeInTheDocument();
+  });
+
   it('lets hosts multi-select friend invites and blast the active template', async () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,
@@ -1031,6 +1065,9 @@ describe('EventInsideExperience', () => {
       if (url.includes('/mark-read')) {
         return Promise.resolve({ ok: true, text: async () => '' });
       }
+      if (url.includes('/invite-logs')) {
+        return Promise.resolve({ ok: true, json: async () => ({ invitedAtISO: new Date().toISOString() }), text: async () => '' });
+      }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     (globalThis as any).fetch = fetchMock;
@@ -1055,6 +1092,13 @@ describe('EventInsideExperience', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/chat/jr-friend-2/messages',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/events/evt-123/invite-logs',
         expect.objectContaining({ method: 'POST' })
       );
     });

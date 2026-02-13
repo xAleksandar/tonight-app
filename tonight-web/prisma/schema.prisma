@@ -8,21 +8,23 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  email          String         @unique
-  displayName    String?
-  photoUrl       String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  events         Event[]        @relation("UserEvents")
-  joinRequests   JoinRequest[]
-  messages       Message[]      @relation("UserMessages")
-  messageReads   MessageRead[]  @relation("UserMessageReads")
-  blockedUsers   BlockedUser[]  @relation("BlockerRelation")
-  blockedBy      BlockedUser[]  @relation("BlockedRelation")
-  reportsFiled   Report[]       @relation("ReporterRelation")
-  reportsAgainst Report[]       @relation("ReportedUserRelation")
-  magicLinks     MagicLink[]
+  id                 String             @id @default(cuid())
+  email              String             @unique
+  displayName        String?
+  photoUrl           String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  events             Event[]            @relation("UserEvents")
+  joinRequests       JoinRequest[]
+  messages           Message[]          @relation("UserMessages")
+  messageReads       MessageRead[]      @relation("UserMessageReads")
+  blockedUsers       BlockedUser[]      @relation("BlockerRelation")
+  blockedBy          BlockedUser[]      @relation("BlockedRelation")
+  reportsFiled       Report[]           @relation("ReporterRelation")
+  reportsAgainst     Report[]           @relation("ReportedUserRelation")
+  magicLinks         MagicLink[]
+  eventInvitesSent   EventInviteLog[]   @relation("EventInviteLogInviters")
+  eventInvitesReceived EventInviteLog[] @relation("EventInviteLogInvitees")
 }
 
 model Event {
@@ -61,6 +63,7 @@ model JoinRequest {
   updatedAt              DateTime           @updatedAt
   lastSeenHostActivityAt DateTime?
   messages               Message[]
+  eventInviteLogs        EventInviteLog[]   @relation("EventInviteLogSources")
 
   @@unique([eventId, userId])
 }
@@ -136,4 +139,21 @@ model MagicLink {
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime @default(now())
+}
+
+model EventInviteLog {
+  id                  String       @id @default(cuid())
+  eventId             String
+  event               Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  inviterId           String
+  inviter             User         @relation("EventInviteLogInviters", fields: [inviterId], references: [id])
+  inviteeId           String
+  invitee             User         @relation("EventInviteLogInvitees", fields: [inviteeId], references: [id])
+  sourceJoinRequestId String?
+  sourceJoinRequest   JoinRequest? @relation("EventInviteLogSources", fields: [sourceJoinRequestId], references: [id])
+  invitedAt           DateTime     @default(now())
+
+  @@unique([eventId, inviteeId])
+  @@index([inviterId])
+  @@index([inviteeId])
 }

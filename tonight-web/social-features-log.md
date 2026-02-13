@@ -204,3 +204,9 @@ Each run should:
 - Threaded the guardrail data through `EventInsideExperience`: the UI now shows the last invite timestamp, disables selection/composers while a cooldown is active, and blocks both single + multi-send flows from double-pinging someone within 15 minutes.
 - Added guardrail-aware state so successful sends immediately start the cooldown locally, plus a regression test that covers the disabled state (Vitest still hangs in this sandbox when running `npx vitest run tests/components/EventInsideExperience.test.tsx`, documented for follow-up).
 - Next: Persist per-event invite logs (eventId + invitedAt) so we can distinguish “invited for this event today” vs. generic DM history and surface a clearer “Already invited to Tonight: Rooftop Club” badge.
+
+## 2026-02-13 09:12 EET — Event-specific friend invite logs
+- Added a dedicated `EventInviteLog` Prisma model + migration plus a `/api/events/[id]/invite-logs` endpoint so each host DM from the event screen records who was invited to that specific event.
+- Threaded the loader + EventInsideExperience through the new data: host friend tiles now show an “Already invited to this event” badge, and every DM/multi-send call logs the invite asynchronously so the UI immediately reflects it.
+- Extended the EventInsideExperience test suite to cover the new badge + API calls (Vitest run still hangs in this sandbox; killed after no output, see summary).
+- Next: use the event-specific invite log to tighten guardrails (auto-disable already invited friends from multi-send / selection or add a “Re-invite anyway” override once the event-specific cooldown expires).

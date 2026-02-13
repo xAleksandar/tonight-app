@@ -89,6 +89,7 @@ export type EventInsideExperienceProps = {
     lastInteractionAtISO?: string | null;
     lastInviteAtISO?: string | null;
     nextInviteAvailableAtISO?: string | null;
+    currentEventInviteAtISO?: string | null;
   }>;
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;
@@ -213,6 +214,7 @@ export function EventInsideExperience({
   const [hostFriendSelectionState, setHostFriendSelectionState] = useState<Record<string, boolean>>({});
   const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
   const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
+  const [hostFriendEventInviteState, setHostFriendEventInviteState] = useState<Record<string, string | null>>({});
 
   const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
 
@@ -376,6 +378,34 @@ export function EventInsideExperience({
       }
 
       return mutated ? next : prev;
+    });
+  }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendEventInviteState({});
+      return;
+    }
+
+    setHostFriendEventInviteState((prev) => {
+      const next: Record<string, string | null> = {};
+      for (const entry of hostFriendInviteEntries) {
+        const incoming = entry.currentEventInviteAtISO ?? null;
+        const previous = prev[entry.joinRequestId] ?? null;
+
+        if (incoming && previous) {
+          const incomingTime = parseIsoTimestamp(incoming)?.getTime() ?? 0;
+          const previousTime = parseIsoTimestamp(previous)?.getTime() ?? 0;
+          next[entry.joinRequestId] = incomingTime >= previousTime ? incoming : previous;
+        } else if (incoming) {
+          next[entry.joinRequestId] = incoming;
+        } else if (previous) {
+          next[entry.joinRequestId] = previous;
+        } else {
+          next[entry.joinRequestId] = null;
+        }
+      }
+      return next;
     });
   }, [hostFriendInviteEntries]);
 
@@ -565,6 +595,43 @@ export function EventInsideExperience({
       },
     }));
   }, []);
+
+  const logHostFriendEventInvite = useCallback(
+    async (joinRequestId: string) => {
+      const friend = hostFriendInviteEntries.find((entry) => entry.joinRequestId === joinRequestId);
+      if (!friend) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/events/${event.id}/invite-logs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: friend.userId,
+            sourceJoinRequestId: friend.joinRequestId,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("Unable to persist event invite log", await response.text());
+          return;
+        }
+
+        const payload = (await response.json()) as { invitedAtISO?: string | null };
+        const invitedAtISO = payload?.invitedAtISO ?? new Date().toISOString();
+        setHostFriendEventInviteState((prev) => ({
+          ...prev,
+          [friend.joinRequestId]: invitedAtISO,
+        }));
+      } catch (error) {
+        console.error("Failed to log event invite", error);
+      }
+    },
+    [event.id, hostFriendInviteEntries]
+  );
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
@@ -1106,6 +1173,7 @@ export function EventInsideExperience({
         successes.forEach((result) => {
           stampHostFriendInviteGuardrail(result.joinRequestId);
         });
+        await Promise.all(successes.map((result) => logHostFriendEventInvite(result.joinRequestId)));
       }
 
       if (failures.size > 0) {
@@ -1189,6 +1257,7 @@ export function EventInsideExperience({
 
     showSuccessToast("Invite sent");
     stampHostFriendInviteGuardrail(joinRequestId);
+    await logHostFriendEventInvite(joinRequestId);
     setHostFriendComposerState((prev) => {
       const next = { ...prev };
       delete next[joinRequestId];
@@ -1705,10 +1774,15 @@ export function EventInsideExperience({
                             ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
                             : "Recently active";
                           const inviteHistoryLabel = lastInviteAtISO ? `Invited ${formatRelativeTime(lastInviteAtISO)}` : null;
+                          const currentEventInviteAtISO =
+                            hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
                           const inviteCooldownLabel =
                             inviteGuardrailActive && nextInviteAvailableAtISO
                               ? `Give them a moment — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
                               : null;
+                          const alreadyInvitedLabel = currentEventInviteAtISO
+                            ? `Already invited to ${event.title} · ${formatRelativeTime(currentEventInviteAtISO)}`
+                            : null;
                           const isSelected = Boolean(hostFriendSelectionState[friend.joinRequestId]);
 
                           return (
@@ -1727,6 +1801,9 @@ export function EventInsideExperience({
                                   <p className="text-[11px] text-white/50">{lastActiveLabel}</p>
                                   {inviteHistoryLabel ? (
                                     <p className="text-[11px] text-white/50">{inviteHistoryLabel}</p>
+                                  ) : null}
+                                  {alreadyInvitedLabel ? (
+                                    <p className="text-[11px] font-semibold text-primary/80">{alreadyInvitedLabel}</p>
                                   ) : null}
                                   {inviteCooldownLabel ? (
                                     <p className="text-[11px] font-semibold text-amber-300">{inviteCooldownLabel}</p>

@@ -242,19 +242,34 @@ const buildHostFriendInviteCandidates = async ({
   }
 
   const joinRequestIds = suggestions.map((entry) => entry.joinRequestId);
-  const hostMessages = await prisma.message.findMany({
-    where: {
-      joinRequestId: { in: joinRequestIds },
-      senderId: hostId,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      joinRequestId: true,
-      createdAt: true,
-    },
-  });
+  const inviteeUserIds = suggestions.map((entry) => entry.userId);
+
+  const [hostMessages, eventInviteLogs] = await Promise.all([
+    prisma.message.findMany({
+      where: {
+        joinRequestId: { in: joinRequestIds },
+        senderId: hostId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        joinRequestId: true,
+        createdAt: true,
+      },
+    }),
+    prisma.eventInviteLog.findMany({
+      where: {
+        eventId: currentEventId,
+        inviteeId: { in: inviteeUserIds },
+      },
+      orderBy: { invitedAt: "desc" },
+      select: {
+        inviteeId: true,
+        invitedAt: true,
+      },
+    }),
+  ]);
 
   const lastInviteMap = new Map<string, Date>();
   for (const message of hostMessages) {
@@ -263,16 +278,26 @@ const buildHostFriendInviteCandidates = async ({
     }
   }
 
+  const currentEventInviteMap = new Map<string, Date>();
+  for (const invite of eventInviteLogs) {
+    const existing = currentEventInviteMap.get(invite.inviteeId);
+    if (!existing || (invite.invitedAt && invite.invitedAt > existing)) {
+      currentEventInviteMap.set(invite.inviteeId, invite.invitedAt);
+    }
+  }
+
   return suggestions.map((entry) => {
     const lastInviteAt = lastInviteMap.get(entry.joinRequestId);
     const nextInviteAvailableAt = lastInviteAt
       ? new Date(lastInviteAt.getTime() + HOST_FRIEND_INVITE_COOLDOWN_MS)
       : null;
+    const currentEventInviteAt = currentEventInviteMap.get(entry.userId);
 
     return {
       ...entry,
       lastInviteAtISO: lastInviteAt?.toISOString() ?? null,
       nextInviteAvailableAtISO: nextInviteAvailableAt?.toISOString() ?? null,
+      currentEventInviteAtISO: currentEventInviteAt?.toISOString() ?? null,
     };
   });
 };
