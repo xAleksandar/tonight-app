@@ -43,6 +43,8 @@ const mockReplace = vi.fn();
 let currentSearchParams = new URLSearchParams();
 const useRequireAuthMock = vi.fn(() => ({ status: 'authenticated' as const }));
 
+const mapEventsPropHistory: Array<Array<Record<string, unknown>>> = [];
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
   usePathname: () => '/',
@@ -54,9 +56,10 @@ vi.mock('@/hooks/useRequireAuth', () => ({
 }));
 
 vi.mock('@/components/EventMapView', () => {
-  const MockMap = ({ events }: { events: Array<Record<string, unknown>> }) => (
-    <div data-testid="event-map-view">Map with {events.length} events</div>
-  );
+  const MockMap = ({ events }: { events: Array<Record<string, unknown>> }) => {
+    mapEventsPropHistory.push(events);
+    return <div data-testid="event-map-view">Map with {events.length} events</div>;
+  };
   return {
     __esModule: true,
     default: MockMap,
@@ -91,6 +94,8 @@ const sampleEvents = [
       acceptedCount: 19,
       spotsRemaining: 1,
     },
+    viewerJoinRequestStatus: 'ACCEPTED',
+    hostUpdatesUnseenCount: 4,
   },
   {
     id: 'evt-social',
@@ -112,6 +117,8 @@ const sampleEvents = [
       acceptedCount: 10,
       spotsRemaining: 2,
     },
+    viewerJoinRequestStatus: 'PENDING',
+    hostUpdatesUnseenCount: 2,
   },
   {
     id: 'evt-music',
@@ -133,6 +140,8 @@ const sampleEvents = [
       acceptedCount: 25,
       spotsRemaining: 5,
     },
+    viewerJoinRequestStatus: 'ACCEPTED',
+    hostUpdatesUnseenCount: 0,
   },
 ];
 
@@ -237,6 +246,7 @@ afterAll(() => {
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  mapEventsPropHistory.length = 0;
   useRequireAuthMock.mockReturnValue({ status: 'authenticated' });
   currentSearchParams = new URLSearchParams();
   global.fetch = mockFetchSuccess() as unknown as typeof fetch;
@@ -274,10 +284,10 @@ describe('Authenticated home/discovery experience', () => {
 
     const heroCopies = await screen.findAllByText(/events near you/i);
     expect(heroCopies.length).toBeGreaterThan(0);
-    expect(screen.getByText('Live nearby meetups')).toBeInTheDocument();
+    expect(screen.getByText('Meetups in real life')).toBeInTheDocument();
     expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
     expect(screen.getByText('Downtown Coffee Crawl')).toBeInTheDocument();
-    expect(screen.getAllByText(/37\.7749, -122\.4194/)[0]).toBeInTheDocument();
+    expect(screen.getByText('Mission Rooftop')).toBeInTheDocument();
     expect(screen.getByText('Marco R.')).toBeInTheDocument();
     expect(screen.getByText('Elena K.')).toBeInTheDocument();
     expect(screen.getByText(/1 spot left/i)).toBeInTheDocument();
@@ -359,4 +369,20 @@ describe('Authenticated home/discovery experience', () => {
     await waitFor(() => expect(discoverButton).toHaveAttribute('aria-current', 'page'));
     expect(messagesButton).not.toHaveAttribute('aria-current');
   });
+  it('passes host update metadata through to the map view markers', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const mapButtons = screen.getAllByRole('button', { name: /^map$/i });
+    fireEvent.click(mapButtons[mapButtons.length - 1]);
+
+    const latestEvents = mapEventsPropHistory[mapEventsPropHistory.length - 1] ?? [];
+    const cinema = latestEvents.find((event) => event.id === 'evt-cinema');
+    const social = latestEvents.find((event) => event.id === 'evt-social');
+
+    expect(cinema).toMatchObject({ viewerJoinRequestStatus: 'ACCEPTED', hostUpdatesUnseenCount: 4 });
+    expect(social).toMatchObject({ viewerJoinRequestStatus: 'PENDING', hostUpdatesUnseenCount: 2 });
+  });
+
+
 });

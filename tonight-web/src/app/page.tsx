@@ -620,6 +620,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       location: { ...event.location },
       datetimeISO: event.datetime,
       distanceMeters: event.distanceMeters ?? undefined,
+      viewerJoinRequestStatus: event.viewerJoinRequestStatus ?? null,
+      hostUpdatesUnseenCount: typeof event.hostUpdatesUnseenCount === 'number' ? event.hostUpdatesUnseenCount : null,
     }));
   }, [visibleEvents]);
 

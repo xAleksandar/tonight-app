@@ -147,3 +147,10 @@ Each run should:
 - Updated the discovery list cards to showcase a subtle "new host updates" pill (only for accepted guests) and wired it into the existing art direction, complete with count clamping + accessibility copy.
 - Added a focused Vitest covering the new indicator so future UI tweaks keep the badge + gating logic intact.
 - Next: reflect the same unseen-count hint on the map pins / hover tooltips so guests notice announcements regardless of view mode.
+## 2026-02-13 05:08 EET — Map pins surface host update badges
+- Extended `EventMapView` markers + popups to read each viewer's unseen host-update count so accepted guests see a clamped pill on the pin plus a matching tooltip banner.
+- Threaded `viewerJoinRequestStatus` + `hostUpdatesUnseenCount` through the discovery map payload, reusing the same gating logic from the list cards and updating the UI tests to assert the new props.
+- Added DOM-side helpers/tests to keep the discovery hero spec in sync (sidebar copy + location label) while verifying the new map metadata path in `home-discovery.test.tsx`.
+- Tests: `npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
+- Next: surface a lightweight filter/toggle (“New host updates”) in discover so guests can temporarily highlight just the events with unseen announcements.
+
