@@ -161,3 +161,9 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
 - Next: persist the filter preference (query param + localStorage) so guests keep the highlight mode between sessions and when sharing deep links.
 
+## 2026-02-13 05:50 EET — Host-updates filter remembers your preference
+- Persisted the "New host updates" discovery toggle via the `hostUpdates=new` query param plus `localStorage`, so guests keep the highlight mode when they reload the page, return later, or open deep links someone shared.
+- Synced the toggle state back into the URL + storage whenever it changes (including auto-clearing only after a real fetch), and added UI tests to cover both the initialization paths and the query syncing behavior.
+- Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
+- Next: expose a tiny "Copy filtered link" affordance next to the toggle so guests can grab a discovery URL with the host-updates filter pre-enabled when they want to share it.
+

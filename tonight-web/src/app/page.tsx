@@ -34,6 +34,11 @@ const DEFAULT_RADIUS_KM = 10;
 const MIN_RADIUS_KM = 1;
 const MAX_RADIUS_KM = 50;
 const VIEW_MODE_STORAGE_KEY = "tonight:view-mode";
+const HOST_UPDATES_FILTER_STORAGE_KEY = "tonight:host-updates-filter";
+const HOST_UPDATES_FILTER_QUERY_KEY = "hostUpdates";
+const HOST_UPDATES_FILTER_QUERY_VALUE = "new";
+const HOST_UPDATES_FILTER_ENABLED = "on";
+const HOST_UPDATES_FILTER_DISABLED = "off";
 
 const MAP_HEIGHT_DESKTOP = 520;
 const MAP_HEIGHT_MOBILE = 360;
@@ -295,6 +300,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
+  const hostUpdatesQueryValueRef = useRef(searchParams?.get(HOST_UPDATES_FILTER_QUERY_KEY) ?? null);
+  const hostUpdatesPrefInitializedRef = useRef(false);
 
   const unreadMessageCount = useMemo(
     () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
@@ -394,6 +401,71 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       console.warn("Unable to persist view mode", error);
     }
   }, [viewMode]);
+
+  useEffect(() => {
+    const queryValue = searchParams?.get(HOST_UPDATES_FILTER_QUERY_KEY) ?? null;
+    const previousValue = hostUpdatesQueryValueRef.current;
+    hostUpdatesQueryValueRef.current = queryValue;
+
+    if (queryValue === HOST_UPDATES_FILTER_QUERY_VALUE) {
+      hostUpdatesPrefInitializedRef.current = true;
+      setShowOnlyHostUpdates(true);
+      return;
+    }
+
+    if (previousValue === HOST_UPDATES_FILTER_QUERY_VALUE && queryValue !== HOST_UPDATES_FILTER_QUERY_VALUE) {
+      hostUpdatesPrefInitializedRef.current = true;
+      setShowOnlyHostUpdates(false);
+      return;
+    }
+
+    if (!hostUpdatesPrefInitializedRef.current) {
+      if (typeof window === "undefined") {
+        hostUpdatesPrefInitializedRef.current = true;
+        return;
+      }
+      try {
+        const stored = window.localStorage.getItem(HOST_UPDATES_FILTER_STORAGE_KEY);
+        setShowOnlyHostUpdates(stored === HOST_UPDATES_FILTER_ENABLED);
+      } catch (error) {
+        console.warn("Unable to read host updates filter preference", error);
+        setShowOnlyHostUpdates(false);
+      }
+      hostUpdatesPrefInitializedRef.current = true;
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      window.localStorage.setItem(
+        HOST_UPDATES_FILTER_STORAGE_KEY,
+        showOnlyHostUpdates ? HOST_UPDATES_FILTER_ENABLED : HOST_UPDATES_FILTER_DISABLED
+      );
+    } catch (error) {
+      console.warn("Unable to persist host updates filter preference", error);
+    }
+  }, [showOnlyHostUpdates]);
+
+  useEffect(() => {
+    if (!pathname) {
+      return;
+    }
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    const queryActive = params.get(HOST_UPDATES_FILTER_QUERY_KEY) === HOST_UPDATES_FILTER_QUERY_VALUE;
+    if (queryActive === showOnlyHostUpdates) {
+      return;
+    }
+    if (showOnlyHostUpdates) {
+      params.set(HOST_UPDATES_FILTER_QUERY_KEY, HOST_UPDATES_FILTER_QUERY_VALUE);
+    } else {
+      params.delete(HOST_UPDATES_FILTER_QUERY_KEY);
+    }
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [pathname, router, searchParams, showOnlyHostUpdates]);
 
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
@@ -609,10 +681,13 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   }, [visibleEvents]);
 
   useEffect(() => {
+    if (eventsStatus !== "success") {
+      return;
+    }
     if (!hostUpdatesEligibleCount && showOnlyHostUpdates) {
       setShowOnlyHostUpdates(false);
     }
-  }, [hostUpdatesEligibleCount, showOnlyHostUpdates]);
+  }, [eventsStatus, hostUpdatesEligibleCount, showOnlyHostUpdates]);
 
   const handleRefresh = useCallback(() => {
     if (userLocation) {

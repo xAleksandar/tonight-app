@@ -384,5 +384,47 @@ describe('Authenticated home/discovery experience', () => {
     expect(social).toMatchObject({ viewerJoinRequestStatus: 'PENDING', hostUpdatesUnseenCount: 2 });
   });
 
+  it('initializes the host updates filter from the query string', async () => {
+    currentSearchParams = new URLSearchParams('hostUpdates=new');
+
+    render(<HomePage />);
+
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    expect(screen.getByRole('button', { name: /^Showing updates/i })).toBeInTheDocument();
+    expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
+    expect(screen.queryByText('Downtown Coffee Crawl')).not.toBeInTheDocument();
+    expect(screen.queryByText('Midnight Jazz Session')).not.toBeInTheDocument();
+  });
+
+  it('restores the host updates filter from localStorage when no query param exists', async () => {
+    window.localStorage.setItem('tonight:host-updates-filter', 'on');
+
+    render(<HomePage />);
+
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    expect(screen.getByRole('button', { name: /^Showing updates/i })).toBeInTheDocument();
+    expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
+    expect(screen.queryByText('Downtown Coffee Crawl')).not.toBeInTheDocument();
+  });
+
+  it('syncs host updates toggle changes into the URL query param', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const toggleButton = screen.getByRole('button', { name: /^New host updates/i });
+    fireEvent.click(toggleButton);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/?hostUpdates=new', { scroll: false }));
+    currentSearchParams = new URLSearchParams('hostUpdates=new');
+
+    const showingButton = screen.getByRole('button', { name: /^Showing updates/i });
+    fireEvent.click(showingButton);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/', { scroll: false }));
+    currentSearchParams = new URLSearchParams();
+  });
+
 
 });
