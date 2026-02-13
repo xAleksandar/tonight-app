@@ -135,7 +135,7 @@ export function EventInsideExperience({
   const isHostViewer = viewerRole === "host";
   const isGuestViewer = viewerRole === "guest";
   const hostActivityListRef = useRef<HTMLUListElement | null>(null);
-  const [hasRealtimeHostActivityNotice, setHasRealtimeHostActivityNotice] = useState(false);
+  const [hasHostActivityNotice, setHasHostActivityNotice] = useState(false);
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
     () =>
       isGuestViewer
@@ -157,10 +157,13 @@ export function EventInsideExperience({
   const [hostActivityEntries, setHostActivityEntries] = useState(initialHostActivityEntries);
   const [hostActivityPagination, setHostActivityPagination] = useState(chatPreview?.hostActivityFeedPagination);
   const [hostActivityLoading, setHostActivityLoading] = useState(false);
+  const [hostActivityLastSeenAt, setHostActivityLastSeenAt] = useState(chatPreview?.hostActivityLastSeenAt ?? null);
+  const [hostActivityCursorStatus, setHostActivityCursorStatus] = useState<"idle" | "saving">("idle");
   const [hostAnnouncementValue, setHostAnnouncementValue] = useState("");
   const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
   const guestJoinRequestId = guestComposerConfig?.joinRequestId?.trim() || null;
   const realtimeHostActivityEnabled = Boolean(socketToken && isGuestViewer && guestJoinRequestId);
+  const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -200,6 +203,72 @@ export function EventInsideExperience({
   }, [initialHostActivityEntries, chatPreview?.hostActivityFeedPagination]);
 
   useEffect(() => {
+    setHostActivityLastSeenAt(chatPreview?.hostActivityLastSeenAt ?? null);
+  }, [chatPreview?.hostActivityLastSeenAt]);
+
+  useEffect(() => {
+    if (!isGuestViewer) {
+      setHasHostActivityNotice((prev) => (prev ? false : prev));
+      return;
+    }
+
+    if (hostActivityCursorStatus === "saving") {
+      return;
+    }
+
+    if (!latestHostActivityTimestamp) {
+      setHasHostActivityNotice((prev) => (prev ? false : prev));
+      return;
+    }
+
+    const latestTime = parseIsoTimestamp(latestHostActivityTimestamp);
+    const seenTime = parseIsoTimestamp(hostActivityLastSeenAt);
+    if (!latestTime) {
+      return;
+    }
+
+    const shouldShow = !seenTime || latestTime > seenTime;
+    setHasHostActivityNotice((prev) => (prev === shouldShow ? prev : shouldShow));
+  }, [hostActivityCursorStatus, hostActivityLastSeenAt, isGuestViewer, latestHostActivityTimestamp]);
+
+  const acknowledgeHostActivityUpdates = useCallback(
+    async (timestamp?: string | null) => {
+      const targetTimestamp = timestamp ?? latestHostActivityTimestamp;
+      if (!isGuestViewer || hostActivityCursorStatus === "saving" || !targetTimestamp) {
+        return;
+      }
+
+      setHostActivityCursorStatus("saving");
+      try {
+        const response = await fetch(`/api/events/${event.id}/host-activity`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ lastSeenAt: targetTimestamp }),
+        });
+
+        if (!response.ok) {
+          const message = await readErrorPayload(response, "Unable to update host activity status.");
+          throw new Error(message);
+        }
+
+        const payload = (await response.json()) as { lastSeenAt?: string | null };
+        const nextTimestamp = payload.lastSeenAt ?? targetTimestamp;
+        setHostActivityLastSeenAt(nextTimestamp);
+        setHasHostActivityNotice(false);
+      } catch (error) {
+        const message = (error as Error)?.message ?? "Unable to update host activity status.";
+        showErrorToast("Update failed", message);
+        setHasHostActivityNotice(true);
+      } finally {
+        setHostActivityCursorStatus("idle");
+      }
+    },
+    [event.id, hostActivityCursorStatus, isGuestViewer, latestHostActivityTimestamp]
+  );
+
+  useEffect(() => {
     const listEl = hostActivityListRef.current;
     if (!listEl) {
       return;
@@ -207,17 +276,17 @@ export function EventInsideExperience({
 
     const handleScroll = () => {
       const scrolled = listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD;
-      if (!scrolled) {
-        setHasRealtimeHostActivityNotice(false);
+      if (!scrolled && hasHostActivityNotice) {
+        setHasHostActivityNotice(false);
+        void acknowledgeHostActivityUpdates(latestHostActivityTimestamp);
       }
     };
 
     listEl.addEventListener("scroll", handleScroll);
-    handleScroll();
     return () => {
       listEl.removeEventListener("scroll", handleScroll);
     };
-  }, [hostActivityEntries.length]);
+  }, [acknowledgeHostActivityUpdates, hasHostActivityNotice, hostActivityEntries.length, latestHostActivityTimestamp]);
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
@@ -243,7 +312,7 @@ export function EventInsideExperience({
     } else {
       listEl.scrollTop = 0;
     }
-    setHasRealtimeHostActivityNotice(false);
+    setHasHostActivityNotice(false);
   }, []);
 
   const handleRealtimeHostActivity = useCallback(
@@ -269,14 +338,23 @@ export function EventInsideExperience({
         const listEl = hostActivityListRef.current;
         const scrolledAway = listEl ? listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD : false;
         if (scrolledAway) {
-          setHasRealtimeHostActivityNotice(true);
+          setHasHostActivityNotice(true);
         } else {
           scrollHostActivityToTop();
+          void acknowledgeHostActivityUpdates(payload.createdAt ?? latestHostActivityTimestamp);
         }
         return [nextEntry, ...prev];
       });
     },
-    [guestJoinRequestId, host.displayName, host.email, host.id, realtimeHostActivityEnabled]
+    [
+      acknowledgeHostActivityUpdates,
+      guestJoinRequestId,
+      host.displayName,
+      host.email,
+      host.id,
+      latestHostActivityTimestamp,
+      realtimeHostActivityEnabled,
+    ]
   );
 
   const { isConnected, joinRoom } = useSocket({
@@ -683,15 +761,19 @@ export function EventInsideExperience({
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
                   {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
                 </p>
-                {hasRealtimeHostActivityNotice ? (
+                {hasHostActivityNotice ? (
                   <div className="mt-3 flex justify-center">
                     <button
                       type="button"
-                      onClick={scrollHostActivityToTop}
-                      className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60"
+                      onClick={() => {
+                        scrollHostActivityToTop();
+                        void acknowledgeHostActivityUpdates(latestHostActivityTimestamp);
+                      }}
+                      disabled={hostActivityCursorStatus === "saving"}
+                      className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60 disabled:opacity-60"
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                      New update · Jump to latest
+                      {hostActivityCursorStatus === "saving" ? "Marking seen…" : "New update · Jump to latest"}
                     </button>
                   </div>
                 ) : null}
@@ -1149,6 +1231,15 @@ const formatRelativeTime = (value?: string | null) => {
   }
   const deltaDays = Math.round(deltaHours / 24);
   return formatter.format(deltaDays, "day");
+};
+
+const parseIsoTimestamp = (value?: string | null): number | null => {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  const timestamp = date.getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
 };
 
 const readErrorPayload = async (response: Response, fallback: string) => {

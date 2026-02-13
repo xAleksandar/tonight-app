@@ -118,3 +118,9 @@ Each run should:
 - Documented the new data shape in `EventInsideExperience` props and reran the component Vitest suite to confirm nothing regressed.
 - Next: wire the guest host-updates rail to call the new PATCH endpoint whenever someone clears the realtime indicator (and use the stored cursor on load to immediately show "New update" if the latest post is newer).
 
+
+## 2026-02-13 03:28 EET — Host update cursor wired into UI
+- Replaced the guest host-update indicator state with a cursor-aware flow that compares the loader-provided `hostActivityLastSeenAt` with the latest announcement, shows the "New update" chip when needed, and drives it through the new PATCH endpoint.
+- Added an acknowledgement helper that stamps `lastSeenAt` whenever guests click the chip, auto-scroll back to the top, or receive realtime announcements while already at the top, including optimistic UI + toast handling and a "Marking seen…" state while the cursor saves.
+- Extended the Vitest suite to stub the PATCH call for the indicator tests so we assert both the scroll behavior and the API write, keeping the new cursor flow covered.
+- Next: render a "New since you last checked" divider inside the host-updates list using the stored cursor so guests can see which announcements are fresh even before scrolling.

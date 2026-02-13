@@ -573,6 +573,13 @@ describe('EventInsideExperience', () => {
       socketToken: 'jwt-token',
     };
 
+    const indicatorTimestamp = new Date().toISOString();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ lastSeenAt: indicatorTimestamp }),
+    });
+    (globalThis as any).fetch = fetchMock;
+
     render(<EventInsideExperience {...props} />);
 
     const list = screen.getByTestId('host-updates-list') as HTMLUListElement;
@@ -593,7 +600,7 @@ describe('EventInsideExperience', () => {
       joinRequestId: 'jr-guest-scroll',
       senderId: props.host.id,
       content: 'Fresh update while you were reading.',
-      createdAt: new Date().toISOString(),
+      createdAt: indicatorTimestamp,
     };
 
     await act(async () => {
@@ -607,6 +614,13 @@ describe('EventInsideExperience', () => {
 
     await waitFor(() => {
       expect((list as any).scrollTo).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/events/evt-123/host-activity',
+        expect.objectContaining({ method: 'PATCH' })
+      );
     });
   });
 
@@ -626,6 +640,13 @@ describe('EventInsideExperience', () => {
       socketToken: 'jwt-token',
     };
 
+    const realtimeTimestamp = new Date().toISOString();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ lastSeenAt: realtimeTimestamp }),
+    });
+    (globalThis as any).fetch = fetchMock;
+
     render(<EventInsideExperience {...props} />);
 
     const list = screen.getByTestId('host-updates-list') as HTMLUListElement;
@@ -641,7 +662,7 @@ describe('EventInsideExperience', () => {
       joinRequestId: 'jr-guest-autoscroll',
       senderId: props.host.id,
       content: 'Auto-scroll update',
-      createdAt: new Date().toISOString(),
+      createdAt: realtimeTimestamp,
     };
 
     await act(async () => {
@@ -651,6 +672,13 @@ describe('EventInsideExperience', () => {
     expect(list.scrollTop).toBe(0);
     expect((list as any).scrollTo).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /new update · jump to latest/i })).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/events/evt-123/host-activity',
+        expect.objectContaining({ method: 'PATCH' })
+      );
+    });
   });
 
 });
