@@ -124,3 +124,9 @@ Each run should:
 - Added an acknowledgement helper that stamps `lastSeenAt` whenever guests click the chip, auto-scroll back to the top, or receive realtime announcements while already at the top, including optimistic UI + toast handling and a "Marking seen…" state while the cursor saves.
 - Extended the Vitest suite to stub the PATCH call for the indicator tests so we assert both the scroll behavior and the API write, keeping the new cursor flow covered.
 - Next: render a "New since you last checked" divider inside the host-updates list using the stored cursor so guests can see which announcements are fresh even before scrolling.
+
+## 2026-02-13 03:42 EET — Guest feed shows unseen divider
+- Added a cursor-aware divider inside the Host updates list so guests immediately see which announcements arrived after their last visit, reusing the stored `hostActivityLastSeenAt` timestamp to place the marker inline.
+- Threaded the divider into the EventInsideExperience component and expanded the Vitest suite with a regression case that asserts the divider order between new and previously seen updates.
+- Next: tag the individual post rows above the divider with a subtle “New” pill so guests can skim multiple unseen updates without losing their place.
+

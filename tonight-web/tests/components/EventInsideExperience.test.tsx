@@ -414,6 +414,47 @@ describe('EventInsideExperience', () => {
     expect(within(updatePanel as HTMLElement).getByText(/Doors open at 9/i)).toBeInTheDocument();
   });
 
+  it('shows a divider for unseen host updates based on the stored cursor', () => {
+    const lastSeen = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        latestHostActivityFeed: [
+          {
+            id: 'msg-new',
+            message: 'Fresh announcement',
+            postedAtISO: new Date().toISOString(),
+            authorName: 'Aleks',
+          },
+          {
+            id: 'msg-old',
+            message: 'Earlier note',
+            postedAtISO: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+            authorName: 'Aleks',
+          },
+        ],
+        hostActivityLastSeenAt: lastSeen,
+        guestComposer: {
+          joinRequestId: 'jr-guest-divider',
+        },
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const list = screen.getByTestId('host-updates-list');
+    const scoped = within(list as HTMLUListElement);
+    const items = scoped.getAllByRole('listitem');
+    expect(scoped.getByText(/New since you last checked/i)).toBeInTheDocument();
+    expect(items[0]).toHaveTextContent(/Fresh announcement/i);
+    expect(items[1]).toHaveTextContent(/New since you last checked/i);
+    expect(items[2]).toHaveTextContent(/Earlier note/i);
+  });
+
   it('renders a mini host activity feed when multiple updates exist', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,

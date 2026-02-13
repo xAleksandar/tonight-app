@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { CheckCircle2, Clock3, MapPin, MessageCircle, Shield, Sparkles, Users } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
@@ -300,6 +300,40 @@ export function EventInsideExperience({
     "mt-3 space-y-3",
     hostActivityListShouldScroll ? "max-h-64 overflow-y-auto pr-1" : null
   );
+
+  const hostActivityDividerIndex = useMemo(() => {
+    if (!isGuestViewer || !hostActivityLastSeenAt || hostActivityEntries.length === 0) {
+      return null;
+    }
+
+    const lastSeenTimestamp = parseIsoTimestamp(hostActivityLastSeenAt);
+    if (!lastSeenTimestamp) {
+      return null;
+    }
+
+    let hasNewerEntries = false;
+    for (let index = 0; index < hostActivityEntries.length; index += 1) {
+      const entry = hostActivityEntries[index];
+      const entryTimestamp = parseIsoTimestamp(entry?.postedAtISO);
+
+      if (!entryTimestamp) {
+        continue;
+      }
+
+      if (entryTimestamp > lastSeenTimestamp) {
+        hasNewerEntries = true;
+        continue;
+      }
+
+      if (hasNewerEntries) {
+        return index;
+      }
+
+      return null;
+    }
+
+    return null;
+  }, [hostActivityEntries, hostActivityLastSeenAt, isGuestViewer]);
 
   const scrollHostActivityToTop = useCallback(() => {
     const listEl = hostActivityListRef.current;
@@ -782,15 +816,24 @@ export function EventInsideExperience({
                   data-testid="host-updates-list"
                   className={hostActivityListClasses}
                 >
-                  {hostActivityEntries.map((activity) => (
-                    <li key={activity.id} className="rounded-xl border border-white/5 bg-white/5 p-3">
-                      <p className="text-sm text-white/80">{activity.message}</p>
-                      <p className="mt-2 text-xs text-white/50">
-                        {activity.authorName ?? host.displayName}
-                        {" · "}
-                        {formatRelativeTime(activity.postedAtISO)}
-                      </p>
-                    </li>
+                  {hostActivityEntries.map((activity, index) => (
+                    <Fragment key={activity.id}>
+                      {hostActivityDividerIndex === index ? (
+                        <li className="relative flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+                          <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
+                          <span>New since you last checked</span>
+                          <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
+                        </li>
+                      ) : null}
+                      <li className="rounded-xl border border-white/5 bg-white/5 p-3">
+                        <p className="text-sm text-white/80">{activity.message}</p>
+                        <p className="mt-2 text-xs text-white/50">
+                          {activity.authorName ?? host.displayName}
+                          {" · "}
+                          {formatRelativeTime(activity.postedAtISO)}
+                        </p>
+                      </li>
+                    </Fragment>
                   ))}
                 </ul>
                 {hostActivityPagination?.hasMore ? (
