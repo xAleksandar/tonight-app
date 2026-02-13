@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   Clock,
+  Copy,
   List as ListIcon,
   Map as MapIcon,
   MapPin,
@@ -22,6 +23,7 @@ import { MobileActionBar, type MobileNavTarget } from "@/components/tonight/Mobi
 import { MiniMap } from "@/components/tonight/MiniMap";
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
@@ -202,6 +204,26 @@ const formatSpotsLabel = (value: number | null) => {
   return value === 1 ? '1 spot left' : `${value} spots left`;
 };
 
+const copyTextToClipboard = async (value: string) => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.top = '-1000px';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const successful = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!successful) {
+    throw new Error('execCommand copy failed');
+  }
+};
+
 export default function HomePage() {
   const { status: authStatus, user: authUser } = useRequireAuth();
 
@@ -224,6 +246,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const searchParamsString = searchParams?.toString() ?? "";
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const [messagesModalOpen, setMessagesModalOpen] = useState(false);
   const explicitViewParam = searchParams?.get("view");
@@ -302,6 +325,15 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const hostUpdatesQueryValueRef = useRef(searchParams?.get(HOST_UPDATES_FILTER_QUERY_KEY) ?? null);
   const hostUpdatesPrefInitializedRef = useRef(false);
+  const hostUpdatesShareUrl = useMemo(() => {
+    if (typeof window === 'undefined' || !pathname) {
+      return null;
+    }
+    const params = new URLSearchParams(searchParamsString);
+    params.set(HOST_UPDATES_FILTER_QUERY_KEY, HOST_UPDATES_FILTER_QUERY_VALUE);
+    const queryString = params.toString();
+    return `${window.location.origin}${pathname}${queryString ? `?${queryString}` : ''}`;
+  }, [pathname, searchParamsString]);
 
   const unreadMessageCount = useMemo(
     () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
@@ -824,6 +856,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     active={showOnlyHostUpdates}
                     availableCount={hostUpdatesEligibleCount}
                     onToggle={() => setShowOnlyHostUpdates((current) => !current)}
+                    shareUrl={hostUpdatesShareUrl}
                   />
                 )}
 
@@ -1398,10 +1431,43 @@ type HostUpdatesFilterToggleProps = {
   active: boolean;
   availableCount: number;
   onToggle: () => void;
+  shareUrl: string | null;
 };
 
-function HostUpdatesFilterToggle({ active, availableCount, onToggle }: HostUpdatesFilterToggleProps) {
+function HostUpdatesFilterToggle({ active, availableCount, onToggle, shareUrl }: HostUpdatesFilterToggleProps) {
   const disabled = availableCount === 0;
+  const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
+
+  useEffect(() => {
+    if (copyState !== "copied") {
+      return;
+    }
+    const timeout = window.setTimeout(() => setCopyState("idle"), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [copyState]);
+
+  useEffect(() => {
+    setCopyState("idle");
+  }, [shareUrl]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!shareUrl || disabled) {
+      return;
+    }
+    try {
+      setCopyState("copying");
+      await copyTextToClipboard(shareUrl);
+      setCopyState("copied");
+      showSuccessToast("Filtered link copied", "Sharing this link highlights events with fresh host updates.");
+    } catch (error) {
+      console.error("Failed to copy filtered host updates link", error);
+      setCopyState("idle");
+      showErrorToast("Couldn't copy link", "Copy it manually from the address bar instead.");
+    }
+  }, [disabled, shareUrl]);
+
+  const copyDisabled = disabled || !shareUrl || copyState === "copying";
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-3">
       <div>
@@ -1414,31 +1480,47 @@ function HostUpdatesFilterToggle({ active, availableCount, onToggle }: HostUpdat
               : "Highlight plans with unseen host announcements."}
         </p>
       </div>
-      <button
-        type="button"
-        onClick={() => {
-          if (!disabled) {
-            onToggle();
-          }
-        }}
-        disabled={disabled}
-        className={classNames(
-          "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition",
-          disabled
-            ? "cursor-not-allowed border-border/60 text-muted-foreground"
-            : active
-              ? "border-amber-300/60 bg-amber-400/10 text-amber-100"
-              : "border-border/70 text-muted-foreground hover:border-amber-300 hover:text-amber-50"
-        )}
-      >
-        <Sparkles className="h-3.5 w-3.5" aria-hidden />
-        {active ? "Showing updates" : "New host updates"}
-        {availableCount > 0 && (
-          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-50">
-            {availableCount > 99 ? "99+" : availableCount}
-          </span>
-        )}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (!disabled) {
+              onToggle();
+            }
+          }}
+          disabled={disabled}
+          className={classNames(
+            "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition",
+            disabled
+              ? "cursor-not-allowed border-border/60 text-muted-foreground"
+              : active
+                ? "border-amber-300/60 bg-amber-400/10 text-amber-100"
+                : "border-border/70 text-muted-foreground hover:border-amber-300 hover:text-amber-50"
+          )}
+        >
+          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+          {active ? "Showing updates" : "New host updates"}
+          {availableCount > 0 && (
+            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-50">
+              {availableCount > 99 ? "99+" : availableCount}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleCopyLink}
+          disabled={copyDisabled}
+          className={classNames(
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition",
+            copyDisabled
+              ? "cursor-not-allowed border-border/60 text-muted-foreground"
+              : "border-border/70 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Copy className="h-3.5 w-3.5" aria-hidden />
+          {copyState === "copied" ? "Link copied" : copyState === "copying" ? "Copying…" : "Copy filtered link"}
+        </button>
+      </div>
     </div>
   );
 }

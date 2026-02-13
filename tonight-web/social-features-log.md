@@ -167,3 +167,9 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
 - Next: expose a tiny "Copy filtered link" affordance next to the toggle so guests can grab a discovery URL with the host-updates filter pre-enabled when they want to share it.
 
+
+## 2026-02-13 06:06 EET — Copyable host-updates filter link
+- Added a "Copy filtered link" control next to the New host updates toggle so guests can grab a discovery URL with `hostUpdates=new` pre-applied, complete with optimistic UI badges + success/error toasts.
+- Threaded a share-url builder through the discovery page (preserving existing query params) plus a clipboard helper so we have a single fallback path when the modern clipboard API is unavailable.
+- Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
+- Next: Detect/support the Web Share API so mobile guests can share the same filtered link through native sheets (falling back to the copy button when the API isn’t available).
