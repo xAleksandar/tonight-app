@@ -70,6 +70,7 @@ const originalFetch = global.fetch;
 let originalMatchMedia: typeof window.matchMedia | undefined;
 let originalGeolocation: Geolocation | undefined;
 let jsdomInstance: JSDOM | null = null;
+let navigatorShareDescriptor: PropertyDescriptor | undefined;
 
 const locationCoords = { latitude: 37.7749, longitude: -122.4194 };
 
@@ -207,6 +208,7 @@ const installGeolocation = () => {
 
 beforeAll(async () => {
   ensureDomGlobals();
+  navigatorShareDescriptor = typeof navigator !== 'undefined' ? Object.getOwnPropertyDescriptor(navigator, 'share') ?? undefined : undefined;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   await import('@testing-library/jest-dom/vitest');
   const testingLibrary = await import('@testing-library/react');
@@ -241,6 +243,12 @@ afterAll(() => {
     delete (navigator as Partial<Navigator>).geolocation;
   }
 
+  if (navigatorShareDescriptor) {
+    Object.defineProperty(navigator, 'share', navigatorShareDescriptor);
+  } else {
+    delete (navigator as Partial<Navigator>).share;
+  }
+
   global.fetch = originalFetch;
 });
 
@@ -260,6 +268,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  if (typeof navigator !== 'undefined') {
+    if (navigatorShareDescriptor) {
+      Object.defineProperty(navigator, 'share', navigatorShareDescriptor);
+    } else {
+      delete (navigator as Partial<Navigator>).share;
+    }
+  }
 });
 
 describe('HomePage authentication states', () => {
@@ -424,6 +439,23 @@ describe('Authenticated home/discovery experience', () => {
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/', { scroll: false }));
     currentSearchParams = new URLSearchParams();
+  });
+
+  it('offers a native share link when the Web Share API is available', async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', { configurable: true, value: shareMock, writable: true });
+
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Share filtered link/i })).toBeInTheDocument());
+    const shareButton = screen.getByRole('button', { name: /Share filtered link/i });
+
+    fireEvent.click(shareButton);
+
+    await waitFor(() => expect(shareMock).toHaveBeenCalledTimes(1));
+    const payload = shareMock.mock.calls[0][0];
+    expect(payload).toMatchObject({ url: expect.stringContaining('hostUpdates=new') });
   });
 
 

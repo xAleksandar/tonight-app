@@ -9,6 +9,7 @@ import {
   List as ListIcon,
   Map as MapIcon,
   MapPin,
+  Share2,
   SlidersHorizontal,
   Sparkles,
   ChevronRight,
@@ -1437,6 +1438,8 @@ type HostUpdatesFilterToggleProps = {
 function HostUpdatesFilterToggle({ active, availableCount, onToggle, shareUrl }: HostUpdatesFilterToggleProps) {
   const disabled = availableCount === 0;
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
+  const [shareState, setShareState] = useState<"idle" | "sharing">("idle");
+  const [canUseWebShare, setCanUseWebShare] = useState(false);
 
   useEffect(() => {
     if (copyState !== "copied") {
@@ -1449,6 +1452,13 @@ function HostUpdatesFilterToggle({ active, availableCount, onToggle, shareUrl }:
   useEffect(() => {
     setCopyState("idle");
   }, [shareUrl]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined") {
+      return;
+    }
+    setCanUseWebShare(typeof navigator.share === "function");
+  }, []);
 
   const handleCopyLink = useCallback(async () => {
     if (!shareUrl || disabled) {
@@ -1466,7 +1476,34 @@ function HostUpdatesFilterToggle({ active, availableCount, onToggle, shareUrl }:
     }
   }, [disabled, shareUrl]);
 
+  const handleShareLink = useCallback(async () => {
+    if (!shareUrl || disabled || !canUseWebShare || typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      return;
+    }
+    try {
+      setShareState("sharing");
+      await navigator.share({
+        title: "Tonight — host updates near you",
+        text: "Here are the plans with fresh host announcements.",
+        url: shareUrl,
+      });
+      showSuccessToast("Share link ready", "Your filtered discovery link is in the native share sheet.");
+    } catch (error) {
+      const dismissed =
+        error instanceof DOMException
+          ? error.name === "AbortError"
+          : typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "AbortError";
+      if (!dismissed) {
+        console.error("Failed to share filtered host updates link", error);
+        showErrorToast("Couldn't open share sheet", "Copy the link instead.");
+      }
+    } finally {
+      setShareState("idle");
+    }
+  }, [canUseWebShare, disabled, shareUrl]);
+
   const copyDisabled = disabled || !shareUrl || copyState === "copying";
+  const shareDisabled = disabled || !shareUrl || !canUseWebShare || shareState === "sharing";
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-3">
@@ -1506,6 +1543,22 @@ function HostUpdatesFilterToggle({ active, availableCount, onToggle, shareUrl }:
             </span>
           )}
         </button>
+        {canUseWebShare && (
+          <button
+            type="button"
+            onClick={handleShareLink}
+            disabled={shareDisabled}
+            className={classNames(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition",
+              shareDisabled
+                ? "cursor-not-allowed border-border/60 text-muted-foreground"
+                : "border-border/70 text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Share2 className="h-3.5 w-3.5" aria-hidden />
+            {shareState === "sharing" ? "Sharing…" : "Share filtered link"}
+          </button>
+        )}
         <button
           type="button"
           onClick={handleCopyLink}

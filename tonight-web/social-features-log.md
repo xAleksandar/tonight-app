@@ -173,3 +173,10 @@ Each run should:
 - Threaded a share-url builder through the discovery page (preserving existing query params) plus a clipboard helper so we have a single fallback path when the modern clipboard API is unavailable.
 - Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
 - Next: Detect/support the Web Share API so mobile guests can share the same filtered link through native sheets (falling back to the copy button when the API isn’t available).
+
+## 2026-02-13 06:20 EET — Web Share support for host-updates filter
+- Detected the Web Share API in the discovery toggle, added a native “Share filtered link” action with toast feedback, and kept the existing clipboard path as the automatic fallback when share isn’t supported.
+- Threaded the new share state through the UI so the button disables during share-sheet handoff and logs non-abort failures for easier debugging.
+- Expanded the discovery UI tests to stub `navigator.share`, assert the new button renders only when supported, and ensure we pass the `hostUpdates=new` URL into the share payload.
+- Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`
+- Next: let hosts share individual event-inside invites via the same Web Share affordance (pre-filling the event deep link + context) so they can DM friends without leaving the screen.
