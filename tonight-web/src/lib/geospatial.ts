@@ -1,4 +1,4 @@
-import { Prisma, EventStatus } from '@/generated/prisma/client';
+import { Prisma, EventStatus, JoinRequestStatus } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { expirePastEvents } from '@/lib/event-expiration';
 
@@ -22,6 +22,8 @@ export type NearbyEventRecord = {
   latitude: number | string;
   longitude: number | string;
   acceptedCount: number | string;
+  viewerJoinRequestStatus: JoinRequestStatus | null;
+  viewerHostUpdatesUnseen: number | string | null;
 };
 
 const assertFiniteCoordinate = (value: number, label: 'latitude' | 'longitude'): number => {
@@ -89,7 +91,9 @@ export const findNearbyEvents = async (
       ST_Y(e."location"::geometry) AS "latitude",
       ST_X(e."location"::geometry) AS "longitude",
       ST_Distance(e."location", ${origin}) AS "distanceMeters",
-      COALESCE(accepted."acceptedCount", 0) AS "acceptedCount"
+      COALESCE(accepted."acceptedCount", 0) AS "acceptedCount",
+      viewer_request."status" AS "viewerJoinRequestStatus",
+      COALESCE(host_updates."unseenCount", 0) AS "viewerHostUpdatesUnseen"
     FROM "Event" e
     INNER JOIN "User" u ON u."id" = e."hostId"
     LEFT JOIN (
@@ -98,6 +102,20 @@ export const findNearbyEvents = async (
       WHERE "status" = 'ACCEPTED'
       GROUP BY "eventId"
     ) AS accepted ON accepted."eventId" = e."id"
+    LEFT JOIN "JoinRequest" AS viewer_request
+      ON viewer_request."eventId" = e."id"
+     AND viewer_request."userId" = ${userId}
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::integer AS "unseenCount"
+      FROM "Message" m
+      WHERE viewer_request."status" = 'ACCEPTED'
+        AND m."joinRequestId" = viewer_request."id"
+        AND m."senderId" = e."hostId"
+        AND (
+          viewer_request."lastSeenHostActivityAt" IS NULL
+          OR m."createdAt" > viewer_request."lastSeenHostActivityAt"
+        )
+    ) AS host_updates ON TRUE
     WHERE e."status" = 'ACTIVE'
       AND ST_DWithin(e."location", ${origin}, ${radius})
       AND NOT EXISTS (
@@ -124,6 +142,10 @@ export const findNearbyEvents = async (
         typeof event.acceptedCount === 'number'
           ? event.acceptedCount
           : Number(event.acceptedCount),
+      viewerHostUpdatesUnseen:
+        typeof event.viewerHostUpdatesUnseen === 'number'
+          ? event.viewerHostUpdatesUnseen
+          : Number(event.viewerHostUpdatesUnseen ?? 0),
     }))
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 };

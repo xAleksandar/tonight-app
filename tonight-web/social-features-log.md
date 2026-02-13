@@ -141,3 +141,9 @@ Each run should:
 - Refreshed the EventInsideExperience component + tests to use the shared host-updates list test id so future tweaks don't break the unseen badges.
 - Next: bubble the unseen host-update count into the discovery/event list cards so guests see pending announcements before opening the inside screen.
 
+
+## 2026-02-13 04:44 EET — Host update alerts reach discovery cards
+- Extended the nearby-events query + API serializer to carry each viewer's accepted-guest status and unseen host-update count so the discovery surface knows when announcements are waiting.
+- Updated the discovery list cards to showcase a subtle "new host updates" pill (only for accepted guests) and wired it into the existing art direction, complete with count clamping + accessibility copy.
+- Added a focused Vitest covering the new indicator so future UI tweaks keep the badge + gating logic intact.
+- Next: reflect the same unseen-count hint on the map pins / hover tooltips so guests notice announcements regardless of view mode.

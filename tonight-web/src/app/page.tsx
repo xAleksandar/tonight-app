@@ -40,6 +40,7 @@ const MAP_HEIGHT_MOBILE = 360;
 
 type ViewMode = "list" | "map";
 type PrimarySection = "discover" | "people" | "messages";
+type JoinRequestStatusValue = "PENDING" | "ACCEPTED" | "REJECTED";
 type NearbyEventPayload = {
   id: string;
   title: string;
@@ -67,6 +68,8 @@ type NearbyEventPayload = {
   hostPhotoUrl?: string | null;
   hostInitials?: string | null;
   spotsRemaining?: number | null;
+  viewerJoinRequestStatus?: JoinRequestStatusValue | null;
+  hostUpdatesUnseenCount?: number | null;
 };
 
 type NearbyEventsResponse = {
@@ -1128,7 +1131,7 @@ type DiscoveryListProps = {
   radiusSummary: string;
 };
 
-function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiusSummary }: DiscoveryListProps) {
+export function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiusSummary }: DiscoveryListProps) {
   if (!locationReady) {
     return <DiscoverySkeleton viewMode="list" />;
   }
@@ -1150,6 +1153,18 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
         const spotsLabel = formatSpotsLabel(event.spotsRemaining);
         const hasCoordinates =
           typeof event.location?.latitude === "number" && typeof event.location?.longitude === "number";
+        const viewerIsAcceptedGuest = event.viewerJoinRequestStatus === "ACCEPTED";
+        const hostUpdatesUnseen =
+          viewerIsAcceptedGuest && typeof event.hostUpdatesUnseenCount === "number" && event.hostUpdatesUnseenCount > 0
+            ? event.hostUpdatesUnseenCount
+            : null;
+        const hostUpdatesIndicator =
+          typeof hostUpdatesUnseen === "number" && hostUpdatesUnseen > 0
+            ? {
+                value: hostUpdatesUnseen > 99 ? "99+" : hostUpdatesUnseen.toString(),
+                plural: hostUpdatesUnseen > 1,
+              }
+            : null;
         return (
           <button
             key={event.id}
@@ -1188,7 +1203,20 @@ function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiu
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                <div className="flex flex-col items-end gap-2">
+                  {hostUpdatesIndicator ? (
+                    <span
+                      data-testid="host-updates-pill"
+                      className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
+                    >
+                      <Sparkles className="h-3 w-3" aria-hidden />
+                      <span>
+                        {hostUpdatesIndicator.value} {hostUpdatesIndicator.plural ? "new host updates" : "new host update"}
+                      </span>
+                    </span>
+                  ) : null}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                 {event.datetimeLabel && (
