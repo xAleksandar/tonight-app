@@ -158,6 +158,7 @@ export function EventInsideExperience({
   const [hostActivityPagination, setHostActivityPagination] = useState(chatPreview?.hostActivityFeedPagination);
   const [hostActivityLoading, setHostActivityLoading] = useState(false);
   const [hostActivityLastSeenAt, setHostActivityLastSeenAt] = useState(chatPreview?.hostActivityLastSeenAt ?? null);
+  const hostActivityLastSeenTimestamp = useMemo(() => parseIsoTimestamp(hostActivityLastSeenAt), [hostActivityLastSeenAt]);
   const [hostActivityCursorStatus, setHostActivityCursorStatus] = useState<"idle" | "saving">("idle");
   const [hostAnnouncementValue, setHostAnnouncementValue] = useState("");
   const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
@@ -222,14 +223,14 @@ export function EventInsideExperience({
     }
 
     const latestTime = parseIsoTimestamp(latestHostActivityTimestamp);
-    const seenTime = parseIsoTimestamp(hostActivityLastSeenAt);
+    const seenTime = hostActivityLastSeenTimestamp;
     if (!latestTime) {
       return;
     }
 
     const shouldShow = !seenTime || latestTime > seenTime;
     setHasHostActivityNotice((prev) => (prev === shouldShow ? prev : shouldShow));
-  }, [hostActivityCursorStatus, hostActivityLastSeenAt, isGuestViewer, latestHostActivityTimestamp]);
+  }, [hostActivityCursorStatus, hostActivityLastSeenTimestamp, isGuestViewer, latestHostActivityTimestamp]);
 
   const acknowledgeHostActivityUpdates = useCallback(
     async (timestamp?: string | null) => {
@@ -302,12 +303,7 @@ export function EventInsideExperience({
   );
 
   const hostActivityDividerIndex = useMemo(() => {
-    if (!isGuestViewer || !hostActivityLastSeenAt || hostActivityEntries.length === 0) {
-      return null;
-    }
-
-    const lastSeenTimestamp = parseIsoTimestamp(hostActivityLastSeenAt);
-    if (!lastSeenTimestamp) {
+    if (!isGuestViewer || !hostActivityEntries.length || !hostActivityLastSeenTimestamp) {
       return null;
     }
 
@@ -320,7 +316,7 @@ export function EventInsideExperience({
         continue;
       }
 
-      if (entryTimestamp > lastSeenTimestamp) {
+      if (entryTimestamp > hostActivityLastSeenTimestamp) {
         hasNewerEntries = true;
         continue;
       }
@@ -333,7 +329,7 @@ export function EventInsideExperience({
     }
 
     return null;
-  }, [hostActivityEntries, hostActivityLastSeenAt, isGuestViewer]);
+  }, [hostActivityEntries, hostActivityLastSeenTimestamp, isGuestViewer]);
 
   const scrollHostActivityToTop = useCallback(() => {
     const listEl = hostActivityListRef.current;
@@ -816,25 +812,42 @@ export function EventInsideExperience({
                   data-testid="host-updates-list"
                   className={hostActivityListClasses}
                 >
-                  {hostActivityEntries.map((activity, index) => (
-                    <Fragment key={activity.id}>
-                      {hostActivityDividerIndex === index ? (
-                        <li className="relative flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                          <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
-                          <span>New since you last checked</span>
-                          <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
+                  {hostActivityEntries.map((activity, index) => {
+                    const entryTimestamp = parseIsoTimestamp(activity?.postedAtISO);
+                    const isNewEntry = Boolean(
+                      isGuestViewer && (!hostActivityLastSeenTimestamp || (entryTimestamp && entryTimestamp > hostActivityLastSeenTimestamp))
+                    );
+
+                    return (
+                      <Fragment key={activity.id}>
+                        {hostActivityDividerIndex === index ? (
+                          <li className="relative flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+                            <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
+                            <span>New since you last checked</span>
+                            <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
+                          </li>
+                        ) : null}
+                        <li className="rounded-xl border border-white/5 bg-white/5 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm text-white/80">{activity.message}</p>
+                            {isNewEntry ? (
+                              <span
+                                data-testid="host-update-new-pill"
+                                className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                              >
+                                New
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-2 text-xs text-white/50">
+                            {activity.authorName ?? host.displayName}
+                            {" · "}
+                            {formatRelativeTime(activity.postedAtISO)}
+                          </p>
                         </li>
-                      ) : null}
-                      <li className="rounded-xl border border-white/5 bg-white/5 p-3">
-                        <p className="text-sm text-white/80">{activity.message}</p>
-                        <p className="mt-2 text-xs text-white/50">
-                          {activity.authorName ?? host.displayName}
-                          {" · "}
-                          {formatRelativeTime(activity.postedAtISO)}
-                        </p>
-                      </li>
-                    </Fragment>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </ul>
                 {hostActivityPagination?.hasMore ? (
                   <button

@@ -455,6 +455,43 @@ describe('EventInsideExperience', () => {
     expect(items[2]).toHaveTextContent(/Earlier note/i);
   });
 
+  it('labels unseen host updates with a New pill', () => {
+    const lastSeen = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        latestHostActivityFeed: [
+          {
+            id: 'msg-new',
+            message: 'Fresh announcement',
+            postedAtISO: new Date().toISOString(),
+            authorName: 'Aleks',
+          },
+          {
+            id: 'msg-old',
+            message: 'Earlier note',
+            postedAtISO: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+            authorName: 'Aleks',
+          },
+        ],
+        hostActivityLastSeenAt: lastSeen,
+        guestComposer: {
+          joinRequestId: 'jr-guest-pill',
+        },
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const pills = screen.getAllByTestId('host-update-new-pill');
+    expect(pills).toHaveLength(1);
+    expect(pills[0].closest('li')).toHaveTextContent(/Fresh announcement/i);
+  });
+
   it('renders a mini host activity feed when multiple updates exist', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,

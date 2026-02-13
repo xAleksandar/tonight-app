@@ -130,3 +130,8 @@ Each run should:
 - Threaded the divider into the EventInsideExperience component and expanded the Vitest suite with a regression case that asserts the divider order between new and previously seen updates.
 - Next: tag the individual post rows above the divider with a subtle “New” pill so guests can skim multiple unseen updates without losing their place.
 
+## 2026-02-13 04:04 EET — Unseen host posts get a “New” pill
+- Added a timestamp-aware badge inside each host update so any announcement newer than the guest’s stored cursor carries a subtle “New” pill, even when the divider isn’t visible.
+- Memoized the last-seen timestamp to simplify comparisons and extended the EventInsideExperience tests with coverage for the new badge.
+- Next: surface the unseen-count in the Host updates header (and CTA chip) so guests know how many fresh posts await before scrolling.
+
