@@ -51,15 +51,16 @@ enum EventStatus {
 }
 
 model JoinRequest {
-  id         String             @id @default(cuid())
-  status     JoinRequestStatus  @default(PENDING)
-  eventId    String
-  event      Event              @relation(fields: [eventId], references: [id])
-  userId     String
-  user       User               @relation(fields: [userId], references: [id])
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
-  messages   Message[]
+  id                     String             @id @default(cuid())
+  status                 JoinRequestStatus  @default(PENDING)
+  eventId                String
+  event                  Event              @relation(fields: [eventId], references: [id])
+  userId                 String
+  user                   User               @relation(fields: [userId], references: [id])
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  lastSeenHostActivityAt DateTime?
+  messages               Message[]
 
   @@unique([eventId, userId])
 }

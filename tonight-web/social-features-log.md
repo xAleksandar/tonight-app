@@ -112,3 +112,9 @@ Each run should:
 - Extended the EventInsideExperience spec to expose the new affordance, ensuring future runs keep the guest announcement UX consistent.
 - Next: persist a per-guest "last seen host update" cursor (loader + API) so returning guests get the same indicator when new posts arrived while they were away.
 
+## 2026-02-13 02:44 EET — Host update cursor persisted server-side
+- Added a nullable `lastSeenHostActivityAt` column (Prisma schema + migration) and surfaced it through the event loader/chat preview contract so each guest carries their last host-update timestamp.
+- Introduced a `PATCH /api/events/[id]/host-activity` endpoint that lets accepted guests stamp their latest seen cursor, ensuring we can store it without opening the full chat UI; the GET route + EventInside props now expose the value for upcoming UI work.
+- Documented the new data shape in `EventInsideExperience` props and reran the component Vitest suite to confirm nothing regressed.
+- Next: wire the guest host-updates rail to call the new PATCH endpoint whenever someone clears the realtime indicator (and use the stored cursor on load to immediately show "New update" if the latest post is newer).
+

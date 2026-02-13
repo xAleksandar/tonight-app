@@ -78,6 +78,7 @@ export type EventInsideExperienceProps = {
       hasMore: boolean;
       nextCursor?: string | null;
     };
+    hostActivityLastSeenAt?: string | null;
   };
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;

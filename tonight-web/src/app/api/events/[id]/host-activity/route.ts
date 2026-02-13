@@ -80,6 +80,55 @@ export async function GET(request: Request, { params }: { params: { id?: string 
   });
 }
 
+export async function PATCH(request: Request, { params }: { params: { id?: string } }) {
+  const auth = await getCurrentUser();
+  if (!auth) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const eventId = params?.id?.trim();
+  if (!eventId) {
+    return NextResponse.json({ error: "Missing event id" }, { status: 400 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const body = (payload ?? {}) as { lastSeenAt?: unknown };
+  const rawTimestamp = typeof body.lastSeenAt === "string" ? body.lastSeenAt : undefined;
+  const timestamp = rawTimestamp ? new Date(rawTimestamp) : new Date();
+  if (Number.isNaN(timestamp.getTime())) {
+    return NextResponse.json({ error: "Invalid timestamp" }, { status: 400 });
+  }
+
+  const joinRequest = await prisma.joinRequest.findFirst({
+    where: {
+      eventId,
+      userId: auth.userId,
+      status: JoinRequestStatus.ACCEPTED,
+    },
+    select: { id: true },
+  });
+
+  if (!joinRequest) {
+    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  }
+
+  const updated = await prisma.joinRequest.update({
+    where: { id: joinRequest.id },
+    data: { lastSeenHostActivityAt: timestamp },
+    select: { lastSeenHostActivityAt: true },
+  });
+
+  return NextResponse.json({
+    lastSeenAt: updated.lastSeenHostActivityAt?.toISOString() ?? null,
+  });
+}
+
 export async function POST(request: Request, { params }: { params: { id?: string } }) {
   const auth = await getCurrentUser();
   if (!auth) {
