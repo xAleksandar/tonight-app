@@ -896,7 +896,9 @@ describe('EventInsideExperience', () => {
 
     expect(screen.getByText(/invite tonight friends/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/search by name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/invite template/i)).toBeInTheDocument();
     expect(screen.getByText('Nora Lights')).toBeInTheDocument();
+    expect(screen.getByLabelText(/select nora lights/i)).toBeInTheDocument();
   });
 
   it('filters host friend invites based on the search query', () => {
@@ -972,6 +974,68 @@ describe('EventInsideExperience', () => {
 
     await waitFor(() => {
       expect(textarea).toHaveValue('');
+    });
+  });
+
+  it('lets hosts multi-select friend invites and blast the active template', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      hostFriendInvites: [
+        {
+          joinRequestId: 'jr-friend-1',
+          userId: 'friend-1',
+          displayName: 'Nora Lights',
+          lastEventTitle: 'Jazz Loft Social',
+          lastInteractionAtISO: new Date().toISOString(),
+        },
+        {
+          joinRequestId: 'jr-friend-2',
+          userId: 'friend-2',
+          displayName: 'Leo Summers',
+          lastEventTitle: 'Gallery Hop',
+          lastInteractionAtISO: new Date().toISOString(),
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/messages')) {
+        return Promise.resolve({ ok: true, json: async () => ({}), text: async () => '' });
+      }
+      if (url.includes('/mark-read')) {
+        return Promise.resolve({ ok: true, text: async () => '' });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    fireEvent.click(screen.getByLabelText(/select nora lights/i));
+    fireEvent.click(screen.getByLabelText(/select leo summers/i));
+
+    expect(screen.getByText(/multi-send ready/i)).toBeInTheDocument();
+
+    const sendButton = screen.getByRole('button', { name: /send template to 2 friends/i });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chat/jr-friend-1/messages',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chat/jr-friend-2/messages',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/multi-send ready/i)).not.toBeInTheDocument();
     });
   });
 

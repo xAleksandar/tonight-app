@@ -193,3 +193,8 @@ Each run should:
 - Extended the component spec with coverage for the friend rail (rendering, filtering, and sending flows) so regressions get caught alongside the new data plumbing.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx` (currently hanging on this sandbox—see notes in summary).
 - Next: pipe these inline invites into a Tonight-friends picker so hosts can multi-select people and dispatch a single blast (prep work: shared invite templates + batching helper).
+
+## 2026-02-13 08:12 EET — Host friend picker supports multi-send blasts
+- Added selection state + a “Multi-send ready” rail so hosts can queue multiple friends, see how many are targeted, and fire the active template to everyone at once without retyping.
+- Hooked the picker into the batching helper so template messages personalize per friend, clear successful selections, and surface partial failures; expanded the component tests with coverage for the new selection flow (Vitest command continues to hang in this sandbox even with `CI=1`, documented for review).
+- Next: surface invite history/guardrails (last invite timestamp + disable state) so hosts don’t double-message the same friend from the picker.

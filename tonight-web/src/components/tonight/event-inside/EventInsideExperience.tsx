@@ -117,8 +117,71 @@ const HOST_ANNOUNCEMENT_MAX_LENGTH = 1000;
 
 const HOST_ACTIVITY_SCROLL_THRESHOLD = 16;
 
+type HostFriendInviteTemplateId = "save-spot" | "last-minute" | "vibe-match";
+
+type HostFriendInviteTemplateDefinition = {
+  id: HostFriendInviteTemplateId;
+  label: string;
+  helperCopy: string;
+  buildSegments: (context: HostFriendInviteTemplateBuildContext) => Array<string | null | undefined>;
+};
+
+type HostFriendInviteTemplateBuildContext = {
+  firstName: string;
+  eventTitle: string;
+  eventMomentLabel?: string | null;
+  eventLocationLabel?: string | null;
+  eventShareUrl: string;
+};
+
+type HostFriendInviteTemplateOption = {
+  id: HostFriendInviteTemplateId;
+  label: string;
+  helperCopy: string;
+  buildMessage: (displayName: string) => string;
+};
+
+const HOST_FRIEND_INVITE_TEMPLATE_DEFINITIONS: HostFriendInviteTemplateDefinition[] = [
+  {
+    id: "save-spot",
+    label: "Save you a spot",
+    helperCopy: "Great for personal invites when you want to reserve a seat for someone specific.",
+    buildSegments: ({ firstName, eventTitle, eventMomentLabel, eventLocationLabel, eventShareUrl }) => [
+      `Hey ${firstName}!`,
+      `I'm hosting \"${eventTitle}\" tonight.`,
+      eventMomentLabel ? `It starts ${eventMomentLabel}.` : null,
+      eventLocationLabel ? `We're meeting near ${eventLocationLabel}.` : null,
+      `Want me to save you a spot? Request access on Tonight: ${eventShareUrl}`,
+    ],
+  },
+  {
+    id: "last-minute",
+    label: "Last-minute seat",
+    helperCopy: "Use when a spot opens close to doors and you need a fast reply.",
+    buildSegments: ({ firstName, eventTitle, eventMomentLabel, eventShareUrl }) => [
+      `Quick ping for you, ${firstName}.`,
+      `A spot just opened for \"${eventTitle}\"${eventMomentLabel ? ` (${eventMomentLabel})` : ""}.`,
+      `If you're free, tap this Tonight link and I'll fast-pass you: ${eventShareUrl}`,
+    ],
+  },
+  {
+    id: "vibe-match",
+    label: "This vibe is yours",
+    helperCopy: "Sell the vibe when you know they'd mesh with the crowd.",
+    buildSegments: ({ firstName, eventTitle, eventMomentLabel, eventLocationLabel, eventShareUrl }) => [
+      `${firstName}, this night's vibe is totally you.`,
+      `We're calling it \"${eventTitle}\"${eventMomentLabel ? ` (${eventMomentLabel})` : ""}${eventLocationLabel ? ` near ${eventLocationLabel}` : ""}.`,
+      `Jump in via Tonight so I can add you: ${eventShareUrl}`,
+    ],
+  },
+];
+
+const DEFAULT_HOST_FRIEND_TEMPLATE_ID: HostFriendInviteTemplateId = "save-spot";
+
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
+
+type HostFriendInviteDispatchResult = { joinRequestId: string; status: "sent" | "failed"; error?: string };
 
 export function EventInsideExperience({
   event,
@@ -141,6 +204,13 @@ export function EventInsideExperience({
   const [eventShareSupported, setEventShareSupported] = useState(false);
   const [hostFriendSearchValue, setHostFriendSearchValue] = useState("");
   const [hostFriendComposerState, setHostFriendComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
+  const [hostFriendSelectionState, setHostFriendSelectionState] = useState<Record<string, boolean>>({});
+  const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
+
+  const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
+
+  const hostFriendTemplateSelectId = "host-friend-template-select";
+  const hostFriendSearchInputId = "host-friend-search-input";
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
@@ -231,6 +301,26 @@ export function EventInsideExperience({
     }
 
     setHostFriendComposerState((prev) => {
+      const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+      let mutated = false;
+      const next = { ...prev };
+      for (const key of Object.keys(prev)) {
+        if (!activeIds.has(key)) {
+          delete next[key];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendSelectionState({});
+      return;
+    }
+
+    setHostFriendSelectionState((prev) => {
       const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
       let mutated = false;
       const next = { ...prev };
@@ -340,6 +430,30 @@ export function EventInsideExperience({
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
   const eventMomentLabel = useMemo(() => formatEventShareMoment(event.startDateISO), [event.startDateISO]);
   const resolvedEventShareUrl = eventShareUrl ?? `https://tonight.app/events/${event.id}`;
+  const hostFriendInviteTemplateOptions = useMemo(
+    () =>
+      buildHostFriendInviteTemplates({
+        eventTitle: event.title,
+        eventMomentLabel,
+        eventLocationLabel: event.locationName ?? null,
+        eventShareUrl: resolvedEventShareUrl,
+      }),
+    [event.locationName, event.title, eventMomentLabel, resolvedEventShareUrl]
+  );
+  const activeHostFriendTemplate = hostFriendInviteTemplateOptions.find((option) => option.id === hostFriendTemplateId) ?? hostFriendInviteTemplateOptions[0] ?? null;
+  const hostFriendTemplateHelperCopy = activeHostFriendTemplate?.helperCopy ?? "Templates adapt to your event details.";
+  const hostFriendTemplateOptionsAvailable = hostFriendInviteTemplateOptions.length > 0;
+  useEffect(() => {
+    if (!hostFriendTemplateOptionsAvailable) {
+      return;
+    }
+
+    const templateExists = hostFriendInviteTemplateOptions.some((option) => option.id === hostFriendTemplateId);
+    if (!templateExists) {
+      setHostFriendTemplateId(hostFriendInviteTemplateOptions[0].id);
+    }
+  }, [hostFriendInviteTemplateOptions, hostFriendTemplateId, hostFriendTemplateOptionsAvailable]);
+
   const filteredHostFriendInvites = useMemo(() => {
     if (!hostFriendInviteEntries.length) {
       return [];
@@ -356,6 +470,13 @@ export function EventInsideExperience({
   const hostFriendInviteEmptyCopy = hostFriendSearchActive
     ? "No friends match this search yet."
     : "We’ll surface your recent Tonight friends here as they RSVP to your events.";
+  const hostFriendSelectedEntries = useMemo(
+    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
+    [hostFriendInviteEntries, hostFriendSelectionState]
+  );
+  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
+  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
+  const hostFriendSelectionCtaLabel = hostFriendSelectedCount === 1 ? "Send template to 1 friend" : `Send template to ${hostFriendSelectedCount} friends`;
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
@@ -679,6 +800,29 @@ export function EventInsideExperience({
     setHostUnreadThreads((prev) => prev.filter((thread) => thread.joinRequestId !== joinRequestId));
   };
 
+  const dispatchHostFriendInvites = async (
+    invites: Array<{ joinRequestId: string; message: string; fallback?: string }>
+  ): Promise<HostFriendInviteDispatchResult[]> => {
+    const results: HostFriendInviteDispatchResult[] = [];
+    for (const invite of invites) {
+      try {
+        await sendMessageToThread({
+          joinRequestId: invite.joinRequestId,
+          message: invite.message,
+          fallback: invite.fallback ?? "Unable to send this invite.",
+        });
+        results.push({ joinRequestId: invite.joinRequestId, status: "sent" });
+      } catch (error) {
+        results.push({
+          joinRequestId: invite.joinRequestId,
+          status: "failed",
+          error: (error as Error)?.message ?? invite.fallback ?? "Unable to send this invite.",
+        });
+      }
+    }
+    return results;
+  };
+
   const handleQuickReplySend = async (joinRequestId: string, message: string) => {
     const fallback = "Unable to send this quick reply.";
     setQuickReplyState((prev) => ({
@@ -761,21 +905,24 @@ export function EventInsideExperience({
     }
   };
 
-  const buildHostFriendInviteTemplate = useCallback(
-    (displayName: string) => {
-      const firstName = displayName?.split(" ")[0] ?? "friend";
-      const segments = [`Hey ${firstName}!`, `I'm hosting "${event.title}" tonight.`];
-      if (eventMomentLabel) {
-        segments.push(`It starts ${eventMomentLabel}.`);
+  const buildHostFriendInviteTemplateMessage = useCallback(
+    (displayName: string, templateId?: HostFriendInviteTemplateId) => {
+      if (hostFriendInviteTemplateOptions.length === 0) {
+        return buildFallbackHostFriendInviteTemplate({
+          displayName,
+          eventTitle: event.title,
+          eventMomentLabel,
+          eventLocationLabel: event.locationName ?? null,
+          eventShareUrl: resolvedEventShareUrl,
+        });
       }
-      const locationLabel = event.locationName?.trim();
-      if (locationLabel) {
-        segments.push(`We're meeting near ${locationLabel}.`);
-      }
-      segments.push(`Can I save you a spot? ${resolvedEventShareUrl}`);
-      return segments.join(" ");
+
+      const targetId = templateId ?? hostFriendTemplateId;
+      const template =
+        hostFriendInviteTemplateOptions.find((option) => option.id === targetId) ?? hostFriendInviteTemplateOptions[0];
+      return template.buildMessage(displayName);
     },
-    [event.locationName, event.title, eventMomentLabel, resolvedEventShareUrl]
+    [event.locationName, event.title, eventMomentLabel, hostFriendInviteTemplateOptions, hostFriendTemplateId, resolvedEventShareUrl]
   );
 
   const handleHostFriendComposerChange = (joinRequestId: string, value: string) => {
@@ -799,15 +946,90 @@ export function EventInsideExperience({
     });
   };
 
-  const handleHostFriendUseTemplate = (joinRequestId: string, displayName: string) => {
-    const template = buildHostFriendInviteTemplate(displayName);
+  const handleHostFriendUseTemplate = (
+    joinRequestId: string,
+    displayName: string,
+    templateId?: HostFriendInviteTemplateId
+  ) => {
+    const templateValue = buildHostFriendInviteTemplateMessage(displayName, templateId);
     setHostFriendComposerState((prev) => ({
       ...prev,
       [joinRequestId]: {
-        value: template,
+        value: templateValue,
         status: prev[joinRequestId]?.status,
       },
     }));
+  };
+
+  const handleHostFriendSelectionToggle = (joinRequestId: string) => {
+    setHostFriendSelectionState((prev) => {
+      const next = { ...prev };
+      if (next[joinRequestId]) {
+        delete next[joinRequestId];
+      } else {
+        next[joinRequestId] = true;
+      }
+      return next;
+    });
+  };
+
+  const handleHostFriendSelectionClear = () => {
+    setHostFriendSelectionState((prev) => {
+      if (Object.keys(prev).length === 0) {
+        return prev;
+      }
+      return {};
+    });
+  };
+
+  const handleHostFriendSelectionSend = async () => {
+    if (!hostFriendSelectedEntries.length) {
+      showErrorToast("No friends selected", "Pick at least one friend before sending.");
+      return;
+    }
+
+    setHostFriendSelectionStatus("sending");
+    const invites = hostFriendSelectedEntries.map((friend) => ({
+      joinRequestId: friend.joinRequestId,
+      message: buildHostFriendInviteTemplateMessage(friend.displayName),
+      fallback: `Unable to send an invite to ${friend.displayName}.`,
+    }));
+
+    try {
+      const results = await dispatchHostFriendInvites(invites);
+      const failures = new Set(results.filter((result) => result.status === "failed").map((result) => result.joinRequestId));
+      const successes = results.filter((result) => result.status === "sent");
+
+      if (successes.length > 0) {
+        const label = successes.length === 1 ? "Invite sent" : "Invites sent";
+        const helper =
+          successes.length === 1 ? "Template delivered to 1 friend." : `Template delivered to ${successes.length} friends.`;
+        showSuccessToast(label, helper);
+      }
+
+      if (failures.size > 0) {
+        const firstFailure = results.find((result) => failures.has(result.joinRequestId));
+        const failedLabel = failures.size === results.length ? "Invites failed" : "Some invites failed";
+        const failedMessage = firstFailure?.error ?? "Unable to send some invites.";
+        showErrorToast(failedLabel, failedMessage);
+      }
+
+      setHostFriendSelectionState((prev) => {
+        if (!successes.length) {
+          return prev;
+        }
+        const next = { ...prev };
+        for (const result of successes) {
+          delete next[result.joinRequestId];
+        }
+        return next;
+      });
+    } catch (error) {
+      const message = (error as Error)?.message ?? "Unable to send these invites.";
+      showErrorToast("Invites failed", message);
+    } finally {
+      setHostFriendSelectionStatus("idle");
+    }
   };
 
   const handleHostFriendInviteSend = async (joinRequestId: string) => {
@@ -829,14 +1051,9 @@ export function EventInsideExperience({
     }));
 
     const fallback = "Unable to send this invite.";
+    let results: HostFriendInviteDispatchResult[] = [];
     try {
-      await sendMessageToThread({ joinRequestId, message: trimmed, fallback });
-      showSuccessToast("Invite sent");
-      setHostFriendComposerState((prev) => {
-        const next = { ...prev };
-        delete next[joinRequestId];
-        return next;
-      });
+      results = await dispatchHostFriendInvites([{ joinRequestId, message: trimmed, fallback }]);
     } catch (error) {
       const messagePayload = (error as Error)?.message ?? fallback;
       showErrorToast("Invite failed", messagePayload);
@@ -847,7 +1064,28 @@ export function EventInsideExperience({
           status: undefined,
         },
       }));
+      return;
     }
+
+    const result = results[0];
+    if (!result || result.status === "failed") {
+      showErrorToast("Invite failed", result?.error ?? fallback);
+      setHostFriendComposerState((prev) => ({
+        ...prev,
+        [joinRequestId]: {
+          value: rawValue,
+          status: undefined,
+        },
+      }));
+      return;
+    }
+
+    showSuccessToast("Invite sent");
+    setHostFriendComposerState((prev) => {
+      const next = { ...prev };
+      delete next[joinRequestId];
+      return next;
+    });
   };
 
   const handleGuestComposerSend = async () => {
@@ -1248,21 +1486,100 @@ export function EventInsideExperience({
 
                 {hostFriendInviteEntries.length ? (
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Invite Tonight friends</p>
                         <p className="mt-1 text-xs text-white/60">Pick a past guest and DM them without leaving this page.</p>
                       </div>
-                      <div className="w-full sm:w-60">
-                        <input
-                          type="search"
-                          value={hostFriendSearchValue}
-                          onChange={(event) => setHostFriendSearchValue(event.target.value)}
-                          placeholder="Search by name"
-                          className="w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        />
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        <div className="w-full sm:w-56">
+                          <label
+                            htmlFor={hostFriendSearchInputId}
+                            className="text-[11px] font-semibold uppercase tracking-wide text-white/60"
+                          >
+                            Search friends
+                          </label>
+                          <input
+                            id={hostFriendSearchInputId}
+                            type="search"
+                            value={hostFriendSearchValue}
+                            onChange={(event) => setHostFriendSearchValue(event.target.value)}
+                            placeholder="Search by name"
+                            className="mt-1 w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        </div>
+                        {hostFriendTemplateOptionsAvailable ? (
+                          <div className="w-full sm:w-56">
+                            <label
+                              htmlFor={hostFriendTemplateSelectId}
+                              className="text-[11px] font-semibold uppercase tracking-wide text-white/60"
+                            >
+                              Invite template
+                            </label>
+                            <select
+                              id={hostFriendTemplateSelectId}
+                              value={hostFriendTemplateId}
+                              onChange={(event) => setHostFriendTemplateId(event.target.value as HostFriendInviteTemplateId)}
+                              className="mt-1 w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                            >
+                              {hostFriendInviteTemplateOptions.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
+                    {hostFriendTemplateOptionsAvailable ? (
+                      <p className="mt-2 text-[11px] text-white/60">{hostFriendTemplateHelperCopy}</p>
+                    ) : null}
+                    {hostFriendSelectionActive ? (
+                      <div className="mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">Multi-send ready</p>
+                          <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                            {hostFriendSelectedCount}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-white/70">
+                          We’ll send the {activeHostFriendTemplate?.label ?? "default"} template to each friend with their name auto-filled.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {hostFriendSelectedEntries.map((friend) => (
+                            <button
+                              key={friend.joinRequestId}
+                              type="button"
+                              onClick={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
+                              className="group inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/80 transition hover:border-white/40"
+                              disabled={hostFriendSelectionStatus === "sending"}
+                            >
+                              {friend.displayName}
+                              <span aria-hidden className="text-white/50 transition group-hover:text-white">×</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleHostFriendSelectionSend}
+                            className="rounded-full bg-primary/80 px-4 py-1.5 text-xs font-semibold text-black transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={hostFriendSelectionStatus === "sending"}
+                          >
+                            {hostFriendSelectionStatus === "sending" ? "Sending…" : hostFriendSelectionCtaLabel}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleHostFriendSelectionClear}
+                            className="text-[11px] font-semibold text-white/70 transition hover:text-white"
+                            disabled={hostFriendSelectionStatus === "sending"}
+                          >
+                            Clear selection
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                     {filteredHostFriendInvites.length === 0 ? (
                       <p className="mt-4 text-xs text-white/60">{hostFriendInviteEmptyCopy}</p>
                     ) : (
@@ -1275,6 +1592,7 @@ export function EventInsideExperience({
                           const lastActiveLabel = friend.lastInteractionAtISO
                             ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
                             : "Recently active";
+                          const isSelected = Boolean(hostFriendSelectionState[friend.joinRequestId]);
 
                           return (
                             <li key={friend.joinRequestId} className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -1291,14 +1609,29 @@ export function EventInsideExperience({
                                   ) : null}
                                   <p className="text-[11px] text-white/50">{lastActiveLabel}</p>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName)}
-                                  className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
-                                  disabled={composerBusy}
-                                >
-                                  Use template
-                                </button>
+                                <div className="flex flex-col items-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName, hostFriendTemplateId)
+                                    }
+                                    className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
+                                    disabled={composerBusy}
+                                  >
+                                    Use template
+                                  </button>
+                                  <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/60">
+                                    <input
+                                      type="checkbox"
+                                      className="h-3.5 w-3.5 rounded border border-white/30 bg-black/40 text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                                      checked={isSelected}
+                                      onChange={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
+                                      aria-label={`Select ${friend.displayName}`}
+                                      disabled={hostFriendSelectionStatus === "sending"}
+                                    />
+                                    <span>{isSelected ? "Selected" : "Select"}</span>
+                                  </label>
+                                </div>
                               </div>
                               <textarea
                                 rows={2}
@@ -1639,6 +1972,71 @@ function buildEventInviteShareText(event: EventInsideExperienceProps["event"]) {
   }
   parts.push('Request access on Tonight.');
   return parts.join(' ');
+}
+
+function buildHostFriendInviteTemplates({
+  eventTitle,
+  eventMomentLabel,
+  eventLocationLabel,
+  eventShareUrl,
+}: {
+  eventTitle: string;
+  eventMomentLabel?: string | null;
+  eventLocationLabel?: string | null;
+  eventShareUrl: string;
+}): HostFriendInviteTemplateOption[] {
+  return HOST_FRIEND_INVITE_TEMPLATE_DEFINITIONS.map((definition) => ({
+    id: definition.id,
+    label: definition.label,
+    helperCopy: definition.helperCopy,
+    buildMessage: (displayName: string) =>
+      joinInviteSegments(
+        definition.buildSegments({
+          firstName: extractFirstName(displayName),
+          eventTitle,
+          eventMomentLabel,
+          eventLocationLabel,
+          eventShareUrl,
+        })
+      ),
+  }));
+}
+
+function buildFallbackHostFriendInviteTemplate({
+  displayName,
+  eventTitle,
+  eventMomentLabel,
+  eventLocationLabel,
+  eventShareUrl,
+}: {
+  displayName: string;
+  eventTitle: string;
+  eventMomentLabel?: string | null;
+  eventLocationLabel?: string | null;
+  eventShareUrl: string;
+}) {
+  return joinInviteSegments([
+    `Hey ${extractFirstName(displayName)}!`,
+    `I'm hosting "${eventTitle}" soon.`,
+    eventMomentLabel ? `It starts ${eventMomentLabel}.` : null,
+    eventLocationLabel ? `We're near ${eventLocationLabel}.` : null,
+    `Pop in via Tonight so I can add you: ${eventShareUrl}`,
+  ]);
+}
+
+function extractFirstName(displayName?: string | null) {
+  if (!displayName) {
+    return "friend";
+  }
+  const trimmed = displayName.trim();
+  if (!trimmed) {
+    return "friend";
+  }
+  return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
+function joinInviteSegments(segments: Array<string | null | undefined>) {
+  return segments.filter((segment) => typeof segment === "string" && segment.trim().length > 0).join(" ");
 }
 
 function formatEventShareMoment(value?: string | null) {
