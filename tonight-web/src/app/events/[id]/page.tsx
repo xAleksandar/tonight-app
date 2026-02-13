@@ -16,6 +16,7 @@ interface PageParams {
 const HOST_UNREAD_THREAD_LIMIT = 3;
 const HOST_ACTIVITY_FEED_LIMIT = 3;
 const HOST_FRIEND_INVITE_LIMIT = 6;
+const HOST_FRIEND_INVITE_COOLDOWN_MS = 15 * 60 * 1000;
 
 type HostUnreadThreadSummary = {
   joinRequestId: string;
@@ -236,7 +237,44 @@ const buildHostFriendInviteCandidates = async ({
     }
   }
 
-  return suggestions;
+  if (!suggestions.length) {
+    return [];
+  }
+
+  const joinRequestIds = suggestions.map((entry) => entry.joinRequestId);
+  const hostMessages = await prisma.message.findMany({
+    where: {
+      joinRequestId: { in: joinRequestIds },
+      senderId: hostId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      joinRequestId: true,
+      createdAt: true,
+    },
+  });
+
+  const lastInviteMap = new Map<string, Date>();
+  for (const message of hostMessages) {
+    if (!lastInviteMap.has(message.joinRequestId)) {
+      lastInviteMap.set(message.joinRequestId, message.createdAt);
+    }
+  }
+
+  return suggestions.map((entry) => {
+    const lastInviteAt = lastInviteMap.get(entry.joinRequestId);
+    const nextInviteAvailableAt = lastInviteAt
+      ? new Date(lastInviteAt.getTime() + HOST_FRIEND_INVITE_COOLDOWN_MS)
+      : null;
+
+    return {
+      ...entry,
+      lastInviteAtISO: lastInviteAt?.toISOString() ?? null,
+      nextInviteAvailableAtISO: nextInviteAvailableAt?.toISOString() ?? null,
+    };
+  });
 };
 
 const buildChatPreviewForAcceptedGuest = async ({

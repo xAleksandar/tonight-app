@@ -977,6 +977,31 @@ describe('EventInsideExperience', () => {
     });
   });
 
+  it('disables host friend invites during the cooldown guardrail', () => {
+    const lastInvite = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const nextInvite = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      hostFriendInvites: [
+        {
+          joinRequestId: 'jr-friend-guardrail',
+          userId: 'friend-guardrail',
+          displayName: 'Nora Lights',
+          lastEventTitle: 'Jazz Loft Social',
+          lastInteractionAtISO: new Date().toISOString(),
+          lastInviteAtISO: lastInvite,
+          nextInviteAvailableAtISO: nextInvite,
+        },
+      ],
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/give them a moment/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send dm/i })).toBeDisabled();
+    expect(screen.getByLabelText(/select nora lights/i)).toBeDisabled();
+  });
+
   it('lets hosts multi-select friend invites and blast the active template', async () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,

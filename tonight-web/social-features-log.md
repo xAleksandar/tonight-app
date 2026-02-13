@@ -198,3 +198,9 @@ Each run should:
 - Added selection state + a “Multi-send ready” rail so hosts can queue multiple friends, see how many are targeted, and fire the active template to everyone at once without retyping.
 - Hooked the picker into the batching helper so template messages personalize per friend, clear successful selections, and surface partial failures; expanded the component tests with coverage for the new selection flow (Vitest command continues to hang in this sandbox even with `CI=1`, documented for review).
 - Next: surface invite history/guardrails (last invite timestamp + disable state) so hosts don’t double-message the same friend from the picker.
+
+## 2026-02-13 08:32 EET — Friend invite guardrails + history
+- Backfilled backend invite metadata by scanning each suggestion’s past host DMs, exposing `lastInviteAt` + a derived cooldown window so the picker knows when a friend was last pinged.
+- Threaded the guardrail data through `EventInsideExperience`: the UI now shows the last invite timestamp, disables selection/composers while a cooldown is active, and blocks both single + multi-send flows from double-pinging someone within 15 minutes.
+- Added guardrail-aware state so successful sends immediately start the cooldown locally, plus a regression test that covers the disabled state (Vitest still hangs in this sandbox when running `npx vitest run tests/components/EventInsideExperience.test.tsx`, documented for follow-up).
+- Next: Persist per-event invite logs (eventId + invitedAt) so we can distinguish “invited for this event today” vs. generic DM history and surface a clearer “Already invited to Tonight: Rooftop Club” badge.

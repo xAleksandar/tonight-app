@@ -87,6 +87,8 @@ export type EventInsideExperienceProps = {
     avatarUrl?: string | null;
     lastEventTitle?: string | null;
     lastInteractionAtISO?: string | null;
+    lastInviteAtISO?: string | null;
+    nextInviteAvailableAtISO?: string | null;
   }>;
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;
@@ -116,6 +118,8 @@ const quickReplyTemplates: Array<{ label: string; message: string }> = [
 const HOST_ANNOUNCEMENT_MAX_LENGTH = 1000;
 
 const HOST_ACTIVITY_SCROLL_THRESHOLD = 16;
+
+const HOST_FRIEND_INVITE_COOLDOWN_MS = 15 * 60 * 1000;
 
 type HostFriendInviteTemplateId = "save-spot" | "last-minute" | "vibe-match";
 
@@ -183,6 +187,8 @@ type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chat
 
 type HostFriendInviteDispatchResult = { joinRequestId: string; status: "sent" | "failed"; error?: string };
 
+type HostFriendInviteGuardrailState = Record<string, { lastInviteAtISO: string | null; nextInviteAvailableAtISO: string | null }>;
+
 export function EventInsideExperience({
   event,
   host,
@@ -206,6 +212,7 @@ export function EventInsideExperience({
   const [hostFriendComposerState, setHostFriendComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
   const [hostFriendSelectionState, setHostFriendSelectionState] = useState<Record<string, boolean>>({});
   const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
+  const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
 
   const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
 
@@ -333,6 +340,62 @@ export function EventInsideExperience({
       return mutated ? next : prev;
     });
   }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendInviteGuardrails({});
+      return;
+    }
+
+    setHostFriendInviteGuardrails((prev) => {
+      const next: HostFriendInviteGuardrailState = { ...prev };
+      const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+      let mutated = false;
+
+      for (const key of Object.keys(next)) {
+        if (!activeIds.has(key)) {
+          delete next[key];
+          mutated = true;
+        }
+      }
+
+      for (const entry of hostFriendInviteEntries) {
+        const incoming = {
+          lastInviteAtISO: entry.lastInviteAtISO ?? null,
+          nextInviteAvailableAtISO: entry.nextInviteAvailableAtISO ?? null,
+        };
+        const existing = next[entry.joinRequestId];
+        if (
+          !existing ||
+          existing.lastInviteAtISO !== incoming.lastInviteAtISO ||
+          existing.nextInviteAvailableAtISO !== incoming.nextInviteAvailableAtISO
+        ) {
+          next[entry.joinRequestId] = incoming;
+          mutated = true;
+        }
+      }
+
+      return mutated ? next : prev;
+    });
+  }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
+    if (!Object.keys(hostFriendInviteGuardrails).length) {
+      return;
+    }
+
+    setHostFriendSelectionState((prev) => {
+      let mutated = false;
+      const next = { ...prev };
+      for (const joinRequestId of Object.keys(prev)) {
+        if (isInviteGuardrailActive(hostFriendInviteGuardrails[joinRequestId]?.nextInviteAvailableAtISO)) {
+          delete next[joinRequestId];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendInviteGuardrails]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location) {
@@ -477,6 +540,31 @@ export function EventInsideExperience({
   const hostFriendSelectedCount = hostFriendSelectedEntries.length;
   const hostFriendSelectionActive = hostFriendSelectedCount > 0;
   const hostFriendSelectionCtaLabel = hostFriendSelectedCount === 1 ? "Send template to 1 friend" : `Send template to ${hostFriendSelectedCount} friends`;
+  const getHostFriendGuardrailFor = useCallback(
+    (joinRequestId: string) => {
+      const stateEntry = hostFriendInviteGuardrails[joinRequestId];
+      if (stateEntry) {
+        return stateEntry;
+      }
+      const fallback = hostFriendInviteEntries.find((entry) => entry.joinRequestId === joinRequestId);
+      return {
+        lastInviteAtISO: fallback?.lastInviteAtISO ?? null,
+        nextInviteAvailableAtISO: fallback?.nextInviteAvailableAtISO ?? null,
+      };
+    },
+    [hostFriendInviteEntries, hostFriendInviteGuardrails]
+  );
+  const stampHostFriendInviteGuardrail = useCallback((joinRequestId: string, lastInviteSourceISO?: string) => {
+    const baseTimestamp = lastInviteSourceISO ? new Date(lastInviteSourceISO) : new Date();
+    const nextTimestamp = new Date(baseTimestamp.getTime() + HOST_FRIEND_INVITE_COOLDOWN_MS);
+    setHostFriendInviteGuardrails((prev) => ({
+      ...prev,
+      [joinRequestId]: {
+        lastInviteAtISO: baseTimestamp.toISOString(),
+        nextInviteAvailableAtISO: nextTimestamp.toISOString(),
+      },
+    }));
+  }, []);
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
@@ -988,8 +1076,18 @@ export function EventInsideExperience({
       return;
     }
 
+    const eligibleEntries = hostFriendSelectedEntries.filter((friend) => {
+      const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
+      return !isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO);
+    });
+
+    if (!eligibleEntries.length) {
+      showErrorToast("Invite cooling down", "Everyone you selected was invited recently. Give them a moment before re-sending.");
+      return;
+    }
+
     setHostFriendSelectionStatus("sending");
-    const invites = hostFriendSelectedEntries.map((friend) => ({
+    const invites = eligibleEntries.map((friend) => ({
       joinRequestId: friend.joinRequestId,
       message: buildHostFriendInviteTemplateMessage(friend.displayName),
       fallback: `Unable to send an invite to ${friend.displayName}.`,
@@ -1005,6 +1103,9 @@ export function EventInsideExperience({
         const helper =
           successes.length === 1 ? "Template delivered to 1 friend." : `Template delivered to ${successes.length} friends.`;
         showSuccessToast(label, helper);
+        successes.forEach((result) => {
+          stampHostFriendInviteGuardrail(result.joinRequestId);
+        });
       }
 
       if (failures.size > 0) {
@@ -1033,6 +1134,12 @@ export function EventInsideExperience({
   };
 
   const handleHostFriendInviteSend = async (joinRequestId: string) => {
+    const guardrail = getHostFriendGuardrailFor(joinRequestId);
+    if (isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO)) {
+      showErrorToast("Invite cooling down", "Give them a moment before sending another DM.");
+      return;
+    }
+
     const entry = hostFriendComposerState[joinRequestId];
     const rawValue = entry?.value ?? "";
     const trimmed = rawValue.trim();
@@ -1081,6 +1188,7 @@ export function EventInsideExperience({
     }
 
     showSuccessToast("Invite sent");
+    stampHostFriendInviteGuardrail(joinRequestId);
     setHostFriendComposerState((prev) => {
       const next = { ...prev };
       delete next[joinRequestId];
@@ -1588,10 +1696,19 @@ export function EventInsideExperience({
                           const composerEntry = hostFriendComposerState[friend.joinRequestId];
                           const composerValue = composerEntry?.value ?? "";
                           const composerBusy = composerEntry?.status === "sending";
-                          const sendDisabled = composerBusy || composerValue.trim().length === 0;
+                          const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
+                          const lastInviteAtISO = guardrail.lastInviteAtISO;
+                          const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO;
+                          const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
+                          const sendDisabled = composerBusy || composerValue.trim().length === 0 || inviteGuardrailActive;
                           const lastActiveLabel = friend.lastInteractionAtISO
                             ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
                             : "Recently active";
+                          const inviteHistoryLabel = lastInviteAtISO ? `Invited ${formatRelativeTime(lastInviteAtISO)}` : null;
+                          const inviteCooldownLabel =
+                            inviteGuardrailActive && nextInviteAvailableAtISO
+                              ? `Give them a moment — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
+                              : null;
                           const isSelected = Boolean(hostFriendSelectionState[friend.joinRequestId]);
 
                           return (
@@ -1608,6 +1725,12 @@ export function EventInsideExperience({
                                     <p className="text-xs text-white/60">Last joined: {friend.lastEventTitle}</p>
                                   ) : null}
                                   <p className="text-[11px] text-white/50">{lastActiveLabel}</p>
+                                  {inviteHistoryLabel ? (
+                                    <p className="text-[11px] text-white/50">{inviteHistoryLabel}</p>
+                                  ) : null}
+                                  {inviteCooldownLabel ? (
+                                    <p className="text-[11px] font-semibold text-amber-300">{inviteCooldownLabel}</p>
+                                  ) : null}
                                 </div>
                                 <div className="flex flex-col items-end gap-2">
                                   <button
@@ -1616,7 +1739,7 @@ export function EventInsideExperience({
                                       handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName, hostFriendTemplateId)
                                     }
                                     className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
-                                    disabled={composerBusy}
+                                    disabled={composerBusy || inviteGuardrailActive}
                                   >
                                     Use template
                                   </button>
@@ -1627,7 +1750,7 @@ export function EventInsideExperience({
                                       checked={isSelected}
                                       onChange={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
                                       aria-label={`Select ${friend.displayName}`}
-                                      disabled={hostFriendSelectionStatus === "sending"}
+                                      disabled={hostFriendSelectionStatus === "sending" || inviteGuardrailActive}
                                     />
                                     <span>{isSelected ? "Selected" : "Select"}</span>
                                   </label>
@@ -1639,7 +1762,7 @@ export function EventInsideExperience({
                                 onChange={(event) => handleHostFriendComposerChange(friend.joinRequestId, event.target.value)}
                                 placeholder={`Tell ${friend.displayName.split(' ')[0] ?? friend.displayName} why this night fits them`}
                                 className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                disabled={composerBusy}
+                                disabled={composerBusy || inviteGuardrailActive}
                               />
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <button
@@ -1921,6 +2044,11 @@ const SectionHeading = ({
     </div>
   </div>
 );
+
+const isInviteGuardrailActive = (value?: string | null) => {
+  const timestamp = parseIsoTimestamp(value);
+  return typeof timestamp === "number" && timestamp > Date.now();
+};
 
 const groupAttendees = (
   attendees: EventInsideExperienceProps["attendees"]
