@@ -180,3 +180,9 @@ Each run should:
 - Expanded the discovery UI tests to stub `navigator.share`, assert the new button renders only when supported, and ensure we pass the `hostUpdates=new` URL into the share payload.
 - Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`
 - Next: let hosts share individual event-inside invites via the same Web Share affordance (pre-filling the event deep link + context) so they can DM friends without leaving the screen.
+
+## 2026-02-13 06:46 EET — Host invite sharing block
+- Added a host-only "Share event invite" panel inside EventInsideExperience that detects the Web Share API, opens the native sheet with the event title/time/location prefilled, and falls back to a clipboard copy button when share isn't supported.
+- Introduced clipboard + share helpers, surfaced the generated deep link inside the UI, and expanded the component test suite with new cases covering both the copy fallback and the Web Share path (vitest).
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
+- Next: let hosts target Tonight friends directly from the same panel (friend picker + inline DM send) so they can nudge trusted guests without hopping to another page.

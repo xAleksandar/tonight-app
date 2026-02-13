@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
-import { CheckCircle2, Clock3, MapPin, MessageCircle, Shield, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Sparkles, Users } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
@@ -126,6 +126,10 @@ export function EventInsideExperience({
   const [requestActionState, setRequestActionState] = useState<Record<string, JoinRequestActionState | undefined>>({});
   const [hostUnreadThreads, setHostUnreadThreads] = useState<HostUnreadThread[]>(chatPreview?.hostUnreadThreads ?? []);
   const [markingThreadId, setMarkingThreadId] = useState<string | null>(null);
+  const [eventShareUrl, setEventShareUrl] = useState<string | null>(null);
+  const [eventShareCopyState, setEventShareCopyState] = useState<"idle" | "copying" | "copied">("idle");
+  const [eventShareShareState, setEventShareShareState] = useState<"idle" | "sharing">("idle");
+  const [eventShareSupported, setEventShareSupported] = useState(false);
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
@@ -165,6 +169,7 @@ export function EventInsideExperience({
   const guestJoinRequestId = guestComposerConfig?.joinRequestId?.trim() || null;
   const realtimeHostActivityEnabled = Boolean(socketToken && isGuestViewer && guestJoinRequestId);
   const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
+  const eventInviteShareText = useMemo(() => buildEventInviteShareText(event), [event]);
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -206,6 +211,16 @@ export function EventInsideExperience({
   useEffect(() => {
     setHostActivityLastSeenAt(chatPreview?.hostActivityLastSeenAt ?? null);
   }, [chatPreview?.hostActivityLastSeenAt]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location) {
+      const origin = window.location.origin && window.location.origin !== "null" ? window.location.origin : "https://tonight.app";
+      setEventShareUrl(`${origin}/events/${event.id}`);
+    } else {
+      setEventShareUrl(`https://tonight.app/events/${event.id}`);
+    }
+    setEventShareSupported(typeof navigator !== "undefined" && typeof navigator.share === "function");
+  }, [event.id]);
 
   useEffect(() => {
     if (!isGuestViewer) {
@@ -414,6 +429,57 @@ export function EventInsideExperience({
       realtimeHostActivityEnabled,
     ]
   );
+
+  const handleCopyEventInvite = useCallback(async () => {
+    if (!eventShareUrl) {
+      showErrorToast("Copy failed", "Invite link is still loading. Try again in a second.");
+      return;
+    }
+
+    try {
+      setEventShareCopyState("copying");
+      await copyTextToClipboard(eventShareUrl);
+      setEventShareCopyState("copied");
+      showSuccessToast("Invite link copied", "Send it anywhere to start approvals.");
+    } catch (error) {
+      setEventShareCopyState("idle");
+      const message = (error as Error)?.message ?? "Grab the link from your browser bar instead.";
+      showErrorToast("Copy failed", message);
+    }
+  }, [eventShareUrl]);
+
+  const handleShareEventInvite = useCallback(async () => {
+    if (!eventShareUrl) {
+      showErrorToast("Share unavailable", "Invite link is still loading. Try again in a moment.");
+      return;
+    }
+
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      await handleCopyEventInvite();
+      return;
+    }
+
+    try {
+      setEventShareShareState("sharing");
+      await navigator.share({
+        title: event.title,
+        text: eventInviteShareText,
+        url: eventShareUrl,
+      });
+      showSuccessToast("Share sheet ready", "Pick any app to send this invite.");
+    } catch (error) {
+      const dismissed =
+        error instanceof DOMException
+          ? error.name === "AbortError"
+          : typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "AbortError";
+      if (!dismissed) {
+        const message = (error as Error)?.message ?? "Copy the link instead.";
+        showErrorToast("Share failed", message);
+      }
+    } finally {
+      setEventShareShareState("idle");
+    }
+  }, [event.title, eventInviteShareText, eventShareUrl, handleCopyEventInvite]);
 
   const { isConnected, joinRoom } = useSocket({
     token: realtimeHostActivityEnabled ? socketToken ?? undefined : undefined,
@@ -1007,6 +1073,39 @@ export function EventInsideExperience({
             <p className="mt-4 text-xs text-white/50">
               Actions update the live join-requests API, so every tap stays in sync with the host tools page.
             </p>
+            {isHostViewer ? (
+              <div className="mt-5 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">Share event invite</p>
+                <p className="mt-1 text-xs text-white/70">Send the deep link with context without leaving this page.</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {eventShareSupported ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleShareEventInvite();
+                      }}
+                      disabled={!eventShareUrl || eventShareShareState === "sharing"}
+                      className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary/90 transition hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Share2 className="h-3.5 w-3.5" aria-hidden />
+                      {eventShareShareState === "sharing" ? "Sharing…" : "Share event invite"}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleCopyEventInvite();
+                    }}
+                    disabled={!eventShareUrl || eventShareCopyState === "copying"}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Copy className="h-3.5 w-3.5" aria-hidden />
+                    {eventShareCopyState === "copying" ? "Copying…" : eventShareCopyState === "copied" ? "Link copied" : "Copy invite link"}
+                  </button>
+                </div>
+                <p className="mt-2 break-all text-[11px] text-white/60">{eventShareUrl ?? "Preparing invite link…"}</p>
+              </div>
+            ) : null}
           </Card>
 
           <Card>
@@ -1299,6 +1398,37 @@ const buildStats = (
   ];
 };
 
+function buildEventInviteShareText(event: EventInsideExperienceProps["event"]) {
+  const parts: string[] = [`Join me at "${event.title}"`];
+  const when = formatEventShareMoment(event.startDateISO);
+  if (when) {
+    parts.push(`on ${when}`);
+  }
+  const locationLabel = event.locationName?.trim();
+  if (locationLabel) {
+    parts.push(`near ${locationLabel}`);
+  }
+  parts.push('Request access on Tonight.');
+  return parts.join(' ');
+}
+
+function formatEventShareMoment(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return null;
   const date = new Date(value);
@@ -1335,6 +1465,31 @@ const parseIsoTimestamp = (value?: string | null): number | null => {
   const timestamp = date.getTime();
   return Number.isNaN(timestamp) ? null : timestamp;
 };
+
+async function copyTextToClipboard(value: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  if (typeof document === 'undefined') {
+    throw new Error('Clipboard is unavailable in this environment.');
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.top = '-1000px';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const successful = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!successful) {
+    throw new Error('Unable to copy to clipboard.');
+  }
+}
 
 const readErrorPayload = async (response: Response, fallback: string) => {
   try {

@@ -125,6 +125,12 @@ afterAll(() => {
 describe('EventInsideExperience', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
   afterEach(() => {
@@ -132,6 +138,8 @@ describe('EventInsideExperience', () => {
     joinRoomMock.mockClear();
     lastSocketOptions = null;
     vi.restoreAllMocks();
+    delete (navigator as any).share;
+    delete (navigator as any).clipboard;
     if ('fetch' in globalThis) {
       // Tests that mock fetch can leave it dangling; remove between runs.
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -176,6 +184,58 @@ describe('EventInsideExperience', () => {
     const button = screen.getByRole('button', { name: /no guest chats yet/i });
     expect(button).toBeDisabled();
     expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+  });
+
+  it('shows a disabled chat explanation when no CTA href is present', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ctaLabel: 'No guest chats yet',
+        ctaDisabledReason: 'Approve at least one guest to unlock chat.',
+      },
+    };
+    render(<EventInsideExperience {...props} />);
+
+    const button = screen.getByRole('button', { name: /no guest chats yet/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+  });
+
+  it('lets hosts copy the event invite link when Web Share is unavailable', async () => {
+    render(<EventInsideExperience {...baseProps} />);
+
+    const copyButton = await screen.findByRole('button', { name: /copy invite link/i });
+    await waitFor(() => expect(copyButton).toBeEnabled());
+    fireEvent.click(copyButton);
+
+    const clipboardMock = (navigator as any).clipboard.writeText as ReturnType<typeof vi.fn>;
+    await waitFor(() => {
+      expect(clipboardMock).toHaveBeenCalledWith('https://tonight.app/events/evt-123');
+    });
+    expect(screen.queryByRole('button', { name: /share event invite/i })).not.toBeInTheDocument();
+  });
+
+  it('shares invites via the Web Share API when available', async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.navigator, 'share', {
+      configurable: true,
+      value: shareMock,
+    });
+
+    render(<EventInsideExperience {...baseProps} />);
+
+    const shareButton = await screen.findByRole('button', { name: /share event invite/i });
+    await waitFor(() => expect(shareButton).toBeEnabled());
+    fireEvent.click(shareButton);
+
+    await waitFor(() => {
+      expect(shareMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: baseProps.event.title,
+          url: 'https://tonight.app/events/evt-123',
+        })
+      );
+    });
   });
 
   it('lists unread guest threads for hosts when provided', () => {
