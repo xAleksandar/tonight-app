@@ -15,6 +15,7 @@ interface PageParams {
 
 const HOST_UNREAD_THREAD_LIMIT = 3;
 const HOST_ACTIVITY_FEED_LIMIT = 3;
+const HOST_FRIEND_INVITE_LIMIT = 6;
 
 type HostUnreadThreadSummary = {
   joinRequestId: string;
@@ -164,6 +165,78 @@ const buildHostUnreadThreadSummaries = async ({
   );
 
   return summaries.filter((entry): entry is HostUnreadThreadSummary => Boolean(entry));
+};
+
+const buildHostFriendInviteCandidates = async ({
+  hostId,
+  currentEventId,
+  excludeUserIds,
+}: {
+  hostId: string;
+  currentEventId: string;
+  excludeUserIds: string[];
+}): Promise<EventInsideExperienceProps["hostFriendInvites"]> => {
+  const recentGuests = await prisma.joinRequest.findMany({
+    where: {
+      status: JoinRequestStatus.ACCEPTED,
+      userId: excludeUserIds.length ? { notIn: excludeUserIds } : undefined,
+      event: {
+        hostId,
+        id: {
+          not: currentEventId,
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    take: HOST_FRIEND_INVITE_LIMIT * 4,
+    select: {
+      id: true,
+      userId: true,
+      updatedAt: true,
+      user: {
+        select: {
+          displayName: true,
+          email: true,
+          photoUrl: true,
+        },
+      },
+      event: {
+        select: {
+          title: true,
+        },
+      },
+    },
+  });
+
+  if (!recentGuests.length) {
+    return [];
+  }
+
+  const seenUsers = new Set<string>();
+  const suggestions: NonNullable<EventInsideExperienceProps["hostFriendInvites"]> = [];
+
+  for (const request of recentGuests) {
+    if (seenUsers.has(request.userId)) {
+      continue;
+    }
+    seenUsers.add(request.userId);
+    suggestions.push({
+      joinRequestId: request.id,
+      userId: request.userId,
+      displayName: request.user.displayName ?? request.user.email ?? "Guest",
+      avatarUrl: request.user.photoUrl,
+      lastEventTitle: request.event.title,
+      lastInteractionAtISO: request.updatedAt?.toISOString() ?? null,
+    });
+
+    if (suggestions.length >= HOST_FRIEND_INVITE_LIMIT) {
+      break;
+    }
+  }
+
+  return suggestions;
 };
 
 const buildChatPreviewForAcceptedGuest = async ({
@@ -386,6 +459,16 @@ export default async function EventInsidePage({ params }: PageParams) {
 
   const attendees = mapJoinRequestsToAttendees(joinRequests);
   const pendingRequests = isHostViewer ? mapPendingJoinRequests(joinRequests) : [];
+  const attendeeUserIds = attendees.map((attendee) => attendee.id);
+
+  let hostFriendInvites: EventInsideExperienceProps["hostFriendInvites"];
+  if (isHostViewer) {
+    hostFriendInvites = await buildHostFriendInviteCandidates({
+      hostId: eventRecord.hostId,
+      currentEventId: eventRecord.id,
+      excludeUserIds: attendeeUserIds,
+    });
+  }
 
   const viewerRole: EventInsideExperienceProps["viewerRole"] = isHostViewer
     ? "host"
@@ -432,6 +515,7 @@ export default async function EventInsidePage({ params }: PageParams) {
     joinRequests: pendingRequests,
     viewerRole,
     chatPreview,
+    hostFriendInvites,
     socketToken: authenticatedUser.token,
   };
 

@@ -878,4 +878,101 @@ describe('EventInsideExperience', () => {
     });
   });
 
+  it('renders host friend invite suggestions with search affordance', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      hostFriendInvites: [
+        {
+          joinRequestId: 'jr-friend-1',
+          userId: 'friend-1',
+          displayName: 'Nora Lights',
+          lastEventTitle: 'Jazz Loft Social',
+          lastInteractionAtISO: new Date().toISOString(),
+        },
+      ],
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/invite tonight friends/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search by name/i)).toBeInTheDocument();
+    expect(screen.getByText('Nora Lights')).toBeInTheDocument();
+  });
+
+  it('filters host friend invites based on the search query', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      hostFriendInvites: [
+        {
+          joinRequestId: 'jr-friend-1',
+          userId: 'friend-1',
+          displayName: 'Nora Lights',
+          lastEventTitle: 'Jazz Loft Social',
+          lastInteractionAtISO: new Date().toISOString(),
+        },
+        {
+          joinRequestId: 'jr-friend-2',
+          userId: 'friend-2',
+          displayName: 'Leo Summers',
+          lastEventTitle: 'Gallery Hop',
+          lastInteractionAtISO: new Date().toISOString(),
+        },
+      ],
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const searchInput = screen.getByPlaceholderText(/search by name/i);
+    fireEvent.change(searchInput, { target: { value: 'leo' } });
+
+    expect(screen.queryByText('Nora Lights')).not.toBeInTheDocument();
+    expect(screen.getByText('Leo Summers')).toBeInTheDocument();
+
+    fireEvent.change(searchInput, { target: { value: 'zzz' } });
+    expect(screen.getByText(/no friends match this search/i)).toBeInTheDocument();
+  });
+
+  it('sends a host friend invite via inline DM composer', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      hostFriendInvites: [
+        {
+          joinRequestId: 'jr-friend-1',
+          userId: 'friend-1',
+          displayName: 'Nora Lights',
+          lastEventTitle: 'Jazz Loft Social',
+          lastInteractionAtISO: new Date().toISOString(),
+        },
+      ],
+    };
+
+    const fetchResponse = () => ({
+      ok: true,
+      json: async () => ({}),
+      text: async () => '',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(fetchResponse()));
+    (globalThis as any).fetch = fetchMock;
+
+    render(<EventInsideExperience {...props} />);
+
+    const textarea = screen.getByPlaceholderText(/tell nora/i) as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Hey! Swing by tonight, seats are limited.' } });
+
+    const sendButton = screen.getByRole('button', { name: /send dm/i });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/chat/jr-friend-1/messages',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    await waitFor(() => {
+      expect(textarea).toHaveValue('');
+    });
+  });
+
 });

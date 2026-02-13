@@ -186,3 +186,10 @@ Each run should:
 - Introduced clipboard + share helpers, surfaced the generated deep link inside the UI, and expanded the component test suite with new cases covering both the copy fallback and the Web Share path (vitest).
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
 - Next: let hosts target Tonight friends directly from the same panel (friend picker + inline DM send) so they can nudge trusted guests without hopping to another page.
+
+## 2026-02-13 07:26 EET — Host friend picker + inline DMs
+- Let the event-inside loader surface a curated list of recent accepted guests who aren’t already on the current roster, complete with last event + activity metadata.
+- Added the “Invite Tonight friends” rail to the host toolbox so they can search past guests, drop in a contextual template, and DM them directly without opening the standalone chat view (reuses the existing chat message + mark-read helpers).
+- Extended the component spec with coverage for the friend rail (rendering, filtering, and sending flows) so regressions get caught alongside the new data plumbing.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx` (currently hanging on this sandbox—see notes in summary).
+- Next: pipe these inline invites into a Tonight-friends picker so hosts can multi-select people and dispatch a single blast (prep work: shared invite templates + batching helper).

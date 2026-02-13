@@ -80,6 +80,14 @@ export type EventInsideExperienceProps = {
     };
     hostActivityLastSeenAt?: string | null;
   };
+  hostFriendInvites?: Array<{
+    joinRequestId: string;
+    userId: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    lastEventTitle?: string | null;
+    lastInteractionAtISO?: string | null;
+  }>;
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;
 };
@@ -119,6 +127,7 @@ export function EventInsideExperience({
   joinRequests,
   viewerRole,
   chatPreview,
+  hostFriendInvites,
   socketToken,
 }: EventInsideExperienceProps) {
   const [pendingRequests, setPendingRequests] = useState(joinRequests);
@@ -130,6 +139,8 @@ export function EventInsideExperience({
   const [eventShareCopyState, setEventShareCopyState] = useState<"idle" | "copying" | "copied">("idle");
   const [eventShareShareState, setEventShareShareState] = useState<"idle" | "sharing">("idle");
   const [eventShareSupported, setEventShareSupported] = useState(false);
+  const [hostFriendSearchValue, setHostFriendSearchValue] = useState("");
+  const [hostFriendComposerState, setHostFriendComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
@@ -138,6 +149,7 @@ export function EventInsideExperience({
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
   const isHostViewer = viewerRole === "host";
   const isGuestViewer = viewerRole === "guest";
+  const hostFriendInviteEntries = isHostViewer ? hostFriendInvites ?? [] : [];
   const hostActivityListRef = useRef<HTMLUListElement | null>(null);
   const [hasHostActivityNotice, setHasHostActivityNotice] = useState(false);
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
@@ -211,6 +223,26 @@ export function EventInsideExperience({
   useEffect(() => {
     setHostActivityLastSeenAt(chatPreview?.hostActivityLastSeenAt ?? null);
   }, [chatPreview?.hostActivityLastSeenAt]);
+
+  useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendComposerState({});
+      return;
+    }
+
+    setHostFriendComposerState((prev) => {
+      const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+      let mutated = false;
+      const next = { ...prev };
+      for (const key of Object.keys(prev)) {
+        if (!activeIds.has(key)) {
+          delete next[key];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendInviteEntries]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location) {
@@ -306,6 +338,24 @@ export function EventInsideExperience({
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
+  const eventMomentLabel = useMemo(() => formatEventShareMoment(event.startDateISO), [event.startDateISO]);
+  const resolvedEventShareUrl = eventShareUrl ?? `https://tonight.app/events/${event.id}`;
+  const filteredHostFriendInvites = useMemo(() => {
+    if (!hostFriendInviteEntries.length) {
+      return [];
+    }
+
+    const query = hostFriendSearchValue.trim().toLowerCase();
+    if (!query) {
+      return hostFriendInviteEntries;
+    }
+
+    return hostFriendInviteEntries.filter((friend) => friend.displayName.toLowerCase().includes(query));
+  }, [hostFriendInviteEntries, hostFriendSearchValue]);
+  const hostFriendSearchActive = hostFriendSearchValue.trim().length > 0;
+  const hostFriendInviteEmptyCopy = hostFriendSearchActive
+    ? "No friends match this search yet."
+    : "We’ll surface your recent Tonight friends here as they RSVP to your events.";
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
@@ -711,6 +761,95 @@ export function EventInsideExperience({
     }
   };
 
+  const buildHostFriendInviteTemplate = useCallback(
+    (displayName: string) => {
+      const firstName = displayName?.split(" ")[0] ?? "friend";
+      const segments = [`Hey ${firstName}!`, `I'm hosting "${event.title}" tonight.`];
+      if (eventMomentLabel) {
+        segments.push(`It starts ${eventMomentLabel}.`);
+      }
+      const locationLabel = event.locationName?.trim();
+      if (locationLabel) {
+        segments.push(`We're meeting near ${locationLabel}.`);
+      }
+      segments.push(`Can I save you a spot? ${resolvedEventShareUrl}`);
+      return segments.join(" ");
+    },
+    [event.locationName, event.title, eventMomentLabel, resolvedEventShareUrl]
+  );
+
+  const handleHostFriendComposerChange = (joinRequestId: string, value: string) => {
+    setHostFriendComposerState((prev) => ({
+      ...prev,
+      [joinRequestId]: {
+        value,
+        status: prev[joinRequestId]?.status,
+      },
+    }));
+  };
+
+  const handleHostFriendComposerClear = (joinRequestId: string) => {
+    setHostFriendComposerState((prev) => {
+      if (!prev[joinRequestId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[joinRequestId];
+      return next;
+    });
+  };
+
+  const handleHostFriendUseTemplate = (joinRequestId: string, displayName: string) => {
+    const template = buildHostFriendInviteTemplate(displayName);
+    setHostFriendComposerState((prev) => ({
+      ...prev,
+      [joinRequestId]: {
+        value: template,
+        status: prev[joinRequestId]?.status,
+      },
+    }));
+  };
+
+  const handleHostFriendInviteSend = async (joinRequestId: string) => {
+    const entry = hostFriendComposerState[joinRequestId];
+    const rawValue = entry?.value ?? "";
+    const trimmed = rawValue.trim();
+
+    if (!trimmed) {
+      showErrorToast("Message required", "Personalize the invite before sending.");
+      return;
+    }
+
+    setHostFriendComposerState((prev) => ({
+      ...prev,
+      [joinRequestId]: {
+        value: rawValue,
+        status: "sending",
+      },
+    }));
+
+    const fallback = "Unable to send this invite.";
+    try {
+      await sendMessageToThread({ joinRequestId, message: trimmed, fallback });
+      showSuccessToast("Invite sent");
+      setHostFriendComposerState((prev) => {
+        const next = { ...prev };
+        delete next[joinRequestId];
+        return next;
+      });
+    } catch (error) {
+      const messagePayload = (error as Error)?.message ?? fallback;
+      showErrorToast("Invite failed", messagePayload);
+      setHostFriendComposerState((prev) => ({
+        ...prev,
+        [joinRequestId]: {
+          value: rawValue,
+          status: undefined,
+        },
+      }));
+    }
+  };
+
   const handleGuestComposerSend = async () => {
     if (!guestComposerConfig?.joinRequestId) {
       showErrorToast("Chat unavailable", "You cannot message this event right now.");
@@ -1074,36 +1213,126 @@ export function EventInsideExperience({
               Actions update the live join-requests API, so every tap stays in sync with the host tools page.
             </p>
             {isHostViewer ? (
-              <div className="mt-5 rounded-2xl border border-primary/25 bg-primary/5 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">Share event invite</p>
-                <p className="mt-1 text-xs text-white/70">Send the deep link with context without leaving this page.</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {eventShareSupported ? (
+              <div className="mt-5 space-y-5">
+                <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">Share event invite</p>
+                  <p className="mt-1 text-xs text-white/70">Send the deep link with context without leaving this page.</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {eventShareSupported ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleShareEventInvite();
+                        }}
+                        disabled={!eventShareUrl || eventShareShareState === "sharing"}
+                        className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary/90 transition hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Share2 className="h-3.5 w-3.5" aria-hidden />
+                        {eventShareShareState === "sharing" ? "Sharing…" : "Share event invite"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => {
-                        void handleShareEventInvite();
+                        void handleCopyEventInvite();
                       }}
-                      disabled={!eventShareUrl || eventShareShareState === "sharing"}
-                      className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary/90 transition hover:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={!eventShareUrl || eventShareCopyState === "copying"}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <Share2 className="h-3.5 w-3.5" aria-hidden />
-                      {eventShareShareState === "sharing" ? "Sharing…" : "Share event invite"}
+                      <Copy className="h-3.5 w-3.5" aria-hidden />
+                      {eventShareCopyState === "copying" ? "Copying…" : eventShareCopyState === "copied" ? "Link copied" : "Copy invite link"}
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleCopyEventInvite();
-                    }}
-                    disabled={!eventShareUrl || eventShareCopyState === "copying"}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Copy className="h-3.5 w-3.5" aria-hidden />
-                    {eventShareCopyState === "copying" ? "Copying…" : eventShareCopyState === "copied" ? "Link copied" : "Copy invite link"}
-                  </button>
+                  </div>
+                  <p className="mt-2 break-all text-[11px] text-white/60">{eventShareUrl ?? "Preparing invite link…"}</p>
                 </div>
-                <p className="mt-2 break-all text-[11px] text-white/60">{eventShareUrl ?? "Preparing invite link…"}</p>
+
+                {hostFriendInviteEntries.length ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Invite Tonight friends</p>
+                        <p className="mt-1 text-xs text-white/60">Pick a past guest and DM them without leaving this page.</p>
+                      </div>
+                      <div className="w-full sm:w-60">
+                        <input
+                          type="search"
+                          value={hostFriendSearchValue}
+                          onChange={(event) => setHostFriendSearchValue(event.target.value)}
+                          placeholder="Search by name"
+                          className="w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                      </div>
+                    </div>
+                    {filteredHostFriendInvites.length === 0 ? (
+                      <p className="mt-4 text-xs text-white/60">{hostFriendInviteEmptyCopy}</p>
+                    ) : (
+                      <ul className="mt-4 space-y-3">
+                        {filteredHostFriendInvites.map((friend) => {
+                          const composerEntry = hostFriendComposerState[friend.joinRequestId];
+                          const composerValue = composerEntry?.value ?? "";
+                          const composerBusy = composerEntry?.status === "sending";
+                          const sendDisabled = composerBusy || composerValue.trim().length === 0;
+                          const lastActiveLabel = friend.lastInteractionAtISO
+                            ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
+                            : "Recently active";
+
+                          return (
+                            <li key={friend.joinRequestId} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                              <div className="flex flex-wrap items-start gap-3">
+                                <UserAvatar
+                                  displayName={friend.displayName}
+                                  photoUrl={friend.avatarUrl ?? undefined}
+                                  size="sm"
+                                />
+                                <div className="min-w-[160px] flex-1">
+                                  <p className="text-sm font-semibold text-white">{friend.displayName}</p>
+                                  {friend.lastEventTitle ? (
+                                    <p className="text-xs text-white/60">Last joined: {friend.lastEventTitle}</p>
+                                  ) : null}
+                                  <p className="text-[11px] text-white/50">{lastActiveLabel}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName)}
+                                  className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
+                                  disabled={composerBusy}
+                                >
+                                  Use template
+                                </button>
+                              </div>
+                              <textarea
+                                rows={2}
+                                value={composerValue}
+                                onChange={(event) => handleHostFriendComposerChange(friend.joinRequestId, event.target.value)}
+                                placeholder={`Tell ${friend.displayName.split(' ')[0] ?? friend.displayName} why this night fits them`}
+                                className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                disabled={composerBusy}
+                              />
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleHostFriendInviteSend(friend.joinRequestId)}
+                                  className="rounded-xl bg-primary/80 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={sendDisabled}
+                                >
+                                  {composerBusy ? "Sending…" : "Send DM"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleHostFriendComposerClear(friend.joinRequestId)}
+                                  className="text-[11px] font-semibold text-white/60 transition hover:text-white"
+                                  disabled={composerBusy || composerValue.length === 0}
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </Card>
