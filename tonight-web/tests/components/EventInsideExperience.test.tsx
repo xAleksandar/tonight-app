@@ -409,9 +409,9 @@ describe('EventInsideExperience', () => {
 
     const latestUpdate = screen.getByText(/Latest host update/i);
     expect(latestUpdate).toBeInTheDocument();
-    const updatePanel = latestUpdate.closest('div');
-    expect(updatePanel).not.toBeNull();
-    expect(within(updatePanel as HTMLElement).getByText(/Doors open at 9/i)).toBeInTheDocument();
+
+    const list = screen.getByTestId('host-updates-list');
+    expect(within(list as HTMLUListElement).getByText(/Doors open at 9/i)).toBeInTheDocument();
   });
 
   it('shows a divider for unseen host updates based on the stored cursor', () => {
@@ -492,6 +492,66 @@ describe('EventInsideExperience', () => {
     expect(pills[0].closest('li')).toHaveTextContent(/Fresh announcement/i);
   });
 
+  it('surfaces unseen host update counts in the header and CTA chip', async () => {
+    const lastSeen = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: undefined,
+        latestHostActivityFeed: [
+          {
+            id: 'msg-seen',
+            message: 'Earlier heads-up',
+            postedAtISO: lastSeen,
+            authorName: 'Aleks',
+          },
+        ],
+        hostActivityLastSeenAt: lastSeen,
+        guestComposer: {
+          joinRequestId: 'jr-guest-unseen',
+        },
+      },
+      socketToken: 'jwt-token',
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const list = screen.getByTestId('host-updates-list') as HTMLUListElement;
+    Object.defineProperty(list, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(({ top }) => {
+        list.scrollTop = typeof top === 'number' ? top : 0;
+      }),
+    });
+    list.scrollTop = 200;
+
+    await act(async () => {
+      fireEvent.scroll(list);
+    });
+
+    const payload = {
+      id: 'announcement-unseen',
+      joinRequestId: 'jr-guest-unseen',
+      senderId: props.host.id,
+      content: 'Fresh host announcement',
+      createdAt: new Date().toISOString(),
+    };
+
+    await act(async () => {
+      lastSocketOptions?.onMessage?.(payload);
+    });
+
+    const pill = await screen.findByTestId('host-updates-unseen-count');
+    expect(pill).toHaveTextContent(/1 new/i);
+
+    const indicator = await screen.findByRole('button', { name: /jump to latest/i });
+    expect(indicator).toHaveTextContent(/1 new update/i);
+  });
+
+
   it('renders a mini host activity feed when multiple updates exist', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,
@@ -522,9 +582,8 @@ describe('EventInsideExperience', () => {
 
     render(<EventInsideExperience {...props} />);
 
-    const panel = screen.getByText(/Host updates/i).closest('div');
-    expect(panel).not.toBeNull();
-    const scoped = within(panel as HTMLElement);
+    const list = screen.getByTestId('host-updates-list');
+    const scoped = within(list as HTMLUListElement);
     expect(scoped.getByText('Doors open at 9')).toBeInTheDocument();
     expect(scoped.getByText(/Running 10 minutes behind/i)).toBeInTheDocument();
   });
@@ -685,7 +744,7 @@ describe('EventInsideExperience', () => {
       lastSocketOptions?.onMessage?.(payload);
     });
 
-    const indicator = await screen.findByRole('button', { name: /new update · jump to latest/i });
+    const indicator = await screen.findByRole('button', { name: /jump to latest/i });
     expect(indicator).toBeInTheDocument();
 
     fireEvent.click(indicator);
@@ -749,7 +808,7 @@ describe('EventInsideExperience', () => {
 
     expect(list.scrollTop).toBe(0);
     expect((list as any).scrollTo).toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: /new update · jump to latest/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /jump to latest/i })).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

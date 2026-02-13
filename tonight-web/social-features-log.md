@@ -135,3 +135,9 @@ Each run should:
 - Memoized the last-seen timestamp to simplify comparisons and extended the EventInsideExperience tests with coverage for the new badge.
 - Next: surface the unseen-count in the Host updates header (and CTA chip) so guests know how many fresh posts await before scrolling.
 
+## 2026-02-13 04:24 EET — Host update unseen counts surfaced
+- Counted unseen host announcements per guest by comparing the loader's `hostActivityLastSeenAt` cursor with the in-memory feed so we know exactly how many fresh posts are waiting.
+- Updated the Host updates header + realtime CTA chip to show the new count (with pluralization + loading states) and added regression coverage to lock the new UI/behavior.
+- Refreshed the EventInsideExperience component + tests to use the shared host-updates list test id so future tweaks don't break the unseen badges.
+- Next: bubble the unseen host-update count into the discovery/event list cards so guests see pending announcements before opening the inside screen.
+

@@ -331,6 +331,34 @@ export function EventInsideExperience({
     return null;
   }, [hostActivityEntries, hostActivityLastSeenTimestamp, isGuestViewer]);
 
+  const hostActivityUnseenCount = useMemo(() => {
+    if (!isGuestViewer || !hostActivityEntries.length) {
+      return 0;
+    }
+
+    const lastSeen = hostActivityLastSeenTimestamp;
+    return hostActivityEntries.reduce((count, entry) => {
+      const entryTimestamp = parseIsoTimestamp(entry?.postedAtISO);
+      if (!entryTimestamp) {
+        return count;
+      }
+
+      if (!lastSeen || entryTimestamp > lastSeen) {
+        return count + 1;
+      }
+
+      return count;
+    }, 0);
+  }, [hostActivityEntries, hostActivityLastSeenTimestamp, isGuestViewer]);
+
+  const hostActivityHeaderUnseenLabel = hostActivityUnseenCount > 0 ? `${hostActivityUnseenCount} new` : null;
+  const hostActivityNoticeCtaLabel =
+    hostActivityUnseenCount > 1
+      ? `${hostActivityUnseenCount} new updates`
+      : hostActivityUnseenCount === 1
+        ? "1 new update"
+        : "New update";
+
   const scrollHostActivityToTop = useCallback(() => {
     const listEl = hostActivityListRef.current;
     if (!listEl) {
@@ -788,9 +816,19 @@ export function EventInsideExperience({
             ) : null}
             {hostActivityEntries.length > 0 ? (
               <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
-                  {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
+                    {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
+                  </p>
+                  {isGuestViewer && hostActivityHeaderUnseenLabel ? (
+                    <span
+                      data-testid="host-updates-unseen-count"
+                      className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                    >
+                      {hostActivityHeaderUnseenLabel}
+                    </span>
+                  ) : null}
+                </div>
                 {hasHostActivityNotice ? (
                   <div className="mt-3 flex justify-center">
                     <button
@@ -803,7 +841,7 @@ export function EventInsideExperience({
                       className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60 disabled:opacity-60"
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                      {hostActivityCursorStatus === "saving" ? "Marking seen…" : "New update · Jump to latest"}
+                      {hostActivityCursorStatus === "saving" ? "Marking seen…" : `${hostActivityNoticeCtaLabel} · Jump to latest`}
                     </button>
                   </div>
                 ) : null}
