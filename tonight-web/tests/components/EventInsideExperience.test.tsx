@@ -554,4 +554,103 @@ describe('EventInsideExperience', () => {
     expect(screen.getAllByText(/Doors now open/i)).toHaveLength(1);
   });
 
+  it('shows a new update indicator when guests are mid-scroll', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        guestComposer: { joinRequestId: 'jr-guest-scroll' },
+        latestHostActivityFeed: Array.from({ length: 5 }).map((_, index) => ({
+          id: `msg-${index}`,
+          message: `Update #${index}`,
+          postedAtISO: new Date(Date.now() - index * 60 * 1000).toISOString(),
+          authorName: 'Aleks',
+        })),
+        hostActivityFeedPagination: { hasMore: false, nextCursor: null },
+      },
+      socketToken: 'jwt-token',
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const list = screen.getByTestId('host-updates-list') as HTMLUListElement;
+    Object.defineProperty(list, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(({ top }) => {
+        list.scrollTop = typeof top === 'number' ? top : 0;
+      }),
+    });
+    list.scrollTop = 150;
+
+    await act(async () => {
+      fireEvent.scroll(list);
+    });
+
+    const payload = {
+      id: 'announcement-scroll',
+      joinRequestId: 'jr-guest-scroll',
+      senderId: props.host.id,
+      content: 'Fresh update while you were reading.',
+      createdAt: new Date().toISOString(),
+    };
+
+    await act(async () => {
+      lastSocketOptions?.onMessage?.(payload);
+    });
+
+    const indicator = await screen.findByRole('button', { name: /new update · jump to latest/i });
+    expect(indicator).toBeInTheDocument();
+
+    fireEvent.click(indicator);
+
+    await waitFor(() => {
+      expect((list as any).scrollTo).toHaveBeenCalled();
+    });
+  });
+
+  it('auto-scrolls back to the latest update when guests are at the top', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        guestComposer: { joinRequestId: 'jr-guest-autoscroll' },
+        latestHostActivityFeed: [
+          { id: 'msg-top', message: 'Top message', postedAtISO: new Date().toISOString(), authorName: 'Aleks' },
+        ],
+        hostActivityFeedPagination: { hasMore: false, nextCursor: null },
+      },
+      socketToken: 'jwt-token',
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const list = screen.getByTestId('host-updates-list') as HTMLUListElement;
+    Object.defineProperty(list, 'scrollTo', {
+      configurable: true,
+      value: vi.fn(({ top }) => {
+        list.scrollTop = typeof top === 'number' ? top : 0;
+      }),
+    });
+
+    const payload = {
+      id: 'announcement-top',
+      joinRequestId: 'jr-guest-autoscroll',
+      senderId: props.host.id,
+      content: 'Auto-scroll update',
+      createdAt: new Date().toISOString(),
+    };
+
+    await act(async () => {
+      lastSocketOptions?.onMessage?.(payload);
+    });
+
+    expect(list.scrollTop).toBe(0);
+    expect((list as any).scrollTo).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /new update · jump to latest/i })).not.toBeInTheDocument();
+  });
+
 });

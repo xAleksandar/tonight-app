@@ -105,3 +105,10 @@ Each run should:
 - Threaded the authenticated socket token through `/events/[id]` → `EventInsideExperience`, spinning up the guest join-request room when a confirmed attendee loads the page so the host-updates rail can listen for `join-request:message` events.
 - When a payload arrives from the host we now prepend it to the guest feed (with dedupe + author metadata), meaning announcements published from the event screen appear instantly without a manual refresh; added targeted Vitest coverage to lock the realtime behavior.
 - Next: add a lightweight “New update” indicator + auto-scroll affordance so guests who are mid-scroll get a subtle nudge when fresh announcements land.
+
+## 2026-02-13 02:24 EET — Host update indicator + auto-scroll for guests
+- Added scroll-aware tracking to the guest host-updates rail: when realtime announcements land while someone is mid-scroll, we now pin a subtle "New update" chip that jumps back to the latest entry.
+- When the feed is near the top we auto-scroll to surface fresh announcements instantly, complete with a clamped, scrollable list and tests that cover the indicator/auto-scroll behavior.
+- Extended the EventInsideExperience spec to expose the new affordance, ensuring future runs keep the guest announcement UX consistent.
+- Next: persist a per-guest "last seen host update" cursor (loader + API) so returning guests get the same indicator when new posts arrived while they were away.
+

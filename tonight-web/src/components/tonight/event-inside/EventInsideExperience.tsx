@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { CheckCircle2, Clock3, MapPin, MessageCircle, Shield, Sparkles, Users } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
@@ -106,6 +106,8 @@ const quickReplyTemplates: Array<{ label: string; message: string }> = [
 
 const HOST_ANNOUNCEMENT_MAX_LENGTH = 1000;
 
+const HOST_ACTIVITY_SCROLL_THRESHOLD = 16;
+
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
@@ -131,6 +133,8 @@ export function EventInsideExperience({
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
   const isHostViewer = viewerRole === "host";
   const isGuestViewer = viewerRole === "guest";
+  const hostActivityListRef = useRef<HTMLUListElement | null>(null);
+  const [hasRealtimeHostActivityNotice, setHasRealtimeHostActivityNotice] = useState(false);
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
     () =>
       isGuestViewer
@@ -194,12 +198,52 @@ export function EventInsideExperience({
     setHostActivityPagination(chatPreview?.hostActivityFeedPagination);
   }, [initialHostActivityEntries, chatPreview?.hostActivityFeedPagination]);
 
+  useEffect(() => {
+    const listEl = hostActivityListRef.current;
+    if (!listEl) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const scrolled = listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD;
+      if (!scrolled) {
+        setHasRealtimeHostActivityNotice(false);
+      }
+    };
+
+    listEl.addEventListener("scroll", handleScroll);
+    handleScroll();
+    return () => {
+      listEl.removeEventListener("scroll", handleScroll);
+    };
+  }, [hostActivityEntries.length]);
+
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
   const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
   const chatCtaLabel = chatPreview?.ctaLabel ?? "Open chat";
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+
+  const hostActivityListShouldScroll = hostActivityEntries.length > 3;
+  const hostActivityListClasses = classNames(
+    "mt-3 space-y-3",
+    hostActivityListShouldScroll ? "max-h-64 overflow-y-auto pr-1" : null
+  );
+
+  const scrollHostActivityToTop = useCallback(() => {
+    const listEl = hostActivityListRef.current;
+    if (!listEl) {
+      return;
+    }
+
+    if (typeof listEl.scrollTo === "function") {
+      listEl.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      listEl.scrollTop = 0;
+    }
+    setHasRealtimeHostActivityNotice(false);
+  }, []);
 
   const handleRealtimeHostActivity = useCallback(
     (payload: SocketMessagePayload) => {
@@ -221,6 +265,13 @@ export function EventInsideExperience({
           postedAtISO: payload.createdAt,
           authorName: host.displayName ?? host.email ?? "Host",
         };
+        const listEl = hostActivityListRef.current;
+        const scrolledAway = listEl ? listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD : false;
+        if (scrolledAway) {
+          setHasRealtimeHostActivityNotice(true);
+        } else {
+          scrollHostActivityToTop();
+        }
         return [nextEntry, ...prev];
       });
     },
@@ -527,7 +578,6 @@ export function EventInsideExperience({
     }
   };
 
-
   const handleLoadMoreHostUpdates = async () => {
     if (!isGuestViewer || hostActivityLoading || !hostActivityPagination?.hasMore) {
       return;
@@ -632,7 +682,23 @@ export function EventInsideExperience({
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
                   {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
                 </p>
-                <ul className="mt-3 space-y-3">
+                {hasRealtimeHostActivityNotice ? (
+                  <div className="mt-3 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={scrollHostActivityToTop}
+                      className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+                      New update · Jump to latest
+                    </button>
+                  </div>
+                ) : null}
+                <ul
+                  ref={hostActivityListRef}
+                  data-testid="host-updates-list"
+                  className={hostActivityListClasses}
+                >
                   {hostActivityEntries.map((activity) => (
                     <li key={activity.id} className="rounded-xl border border-white/5 bg-white/5 p-3">
                       <p className="text-sm text-white/80">{activity.message}</p>
