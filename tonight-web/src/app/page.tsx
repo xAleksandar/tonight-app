@@ -94,6 +94,16 @@ type DecoratedEvent = NearbyEventPayload & {
   spotsRemaining: number | null;
 };
 
+const eventHasUnseenHostUpdates = (
+  event: Pick<DecoratedEvent, "viewerJoinRequestStatus" | "hostUpdatesUnseenCount">
+) => {
+  return (
+    event.viewerJoinRequestStatus === "ACCEPTED" &&
+    typeof event.hostUpdatesUnseenCount === "number" &&
+    event.hostUpdatesUnseenCount > 0
+  );
+};
+
 function formatEventTime(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
@@ -279,6 +289,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [searchMeta, setSearchMeta] = useState<NearbyEventsResponse["meta"] | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+  const [showOnlyHostUpdates, setShowOnlyHostUpdates] = useState(false);
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
@@ -570,10 +581,20 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     });
   }, [events]);
 
+  const hostUpdatesEligibleCount = useMemo(() => {
+    return decoratedEvents.filter((event) => eventHasUnseenHostUpdates(event)).length;
+  }, [decoratedEvents]);
+
   const visibleEvents = useMemo(() => {
-    if (!selectedCategory) return decoratedEvents;
-    return decoratedEvents.filter((event) => event.categoryId === selectedCategory);
-  }, [decoratedEvents, selectedCategory]);
+    let next = decoratedEvents;
+    if (selectedCategory) {
+      next = next.filter((event) => event.categoryId === selectedCategory);
+    }
+    if (showOnlyHostUpdates) {
+      next = next.filter((event) => eventHasUnseenHostUpdates(event));
+    }
+    return next;
+  }, [decoratedEvents, selectedCategory, showOnlyHostUpdates]);
 
   useEffect(() => {
     setSelectedEventId((previous) => {
@@ -586,6 +607,12 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       return null;
     });
   }, [visibleEvents]);
+
+  useEffect(() => {
+    if (!hostUpdatesEligibleCount && showOnlyHostUpdates) {
+      setShowOnlyHostUpdates(false);
+    }
+  }, [hostUpdatesEligibleCount, showOnlyHostUpdates]);
 
   const handleRefresh = useCallback(() => {
     if (userLocation) {
@@ -717,6 +744,14 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
 
                 {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
 
+                {!isLoading && decoratedEvents.length > 0 && (
+                  <HostUpdatesFilterToggle
+                    active={showOnlyHostUpdates}
+                    availableCount={hostUpdatesEligibleCount}
+                    onToggle={() => setShowOnlyHostUpdates((current) => !current)}
+                  />
+                )}
+
                 {!isLoading && viewMode === "map" && (
                   <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
                     <div className="border-b border-border/60 bg-card/40 p-4">
@@ -775,6 +810,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     onSelect={handleSelectEvent}
                     locationReady={locationReady}
                     radiusSummary={buildRadiusSummary(radiusKm)}
+                    hostUpdatesFilterActive={showOnlyHostUpdates}
+                    onClearHostUpdatesFilter={() => setShowOnlyHostUpdates(false)}
                   />
                 )}
               </section>
@@ -1131,9 +1168,19 @@ type DiscoveryListProps = {
   onSelect: (eventId: string) => void;
   locationReady: boolean;
   radiusSummary: string;
+  hostUpdatesFilterActive?: boolean;
+  onClearHostUpdatesFilter?: () => void;
 };
 
-export function DiscoveryList({ events, selectedEventId, onSelect, locationReady, radiusSummary }: DiscoveryListProps) {
+export function DiscoveryList({
+  events,
+  selectedEventId,
+  onSelect,
+  locationReady,
+  radiusSummary,
+  hostUpdatesFilterActive = false,
+  onClearHostUpdatesFilter,
+}: DiscoveryListProps) {
   if (!locationReady) {
     return <DiscoverySkeleton viewMode="list" />;
   }
@@ -1141,7 +1188,22 @@ export function DiscoveryList({ events, selectedEventId, onSelect, locationReady
   if (events.length === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-border/60 bg-card/40 p-10 text-center text-sm text-muted-foreground">
-        <p>No nearby events yet within {radiusSummary}. Try widening your radius or refreshing.</p>
+        {hostUpdatesFilterActive ? (
+          <div className="space-y-4">
+            <p>No events with new host updates within {radiusSummary}.</p>
+            {typeof onClearHostUpdatesFilter === "function" && (
+              <button
+                type="button"
+                onClick={onClearHostUpdatesFilter}
+                className="inline-flex items-center justify-center rounded-full border border-border/70 px-4 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:text-primary"
+              >
+                Show all nearby events
+              </button>
+            )}
+          </div>
+        ) : (
+          <p>No nearby events yet within {radiusSummary}. Try widening your radius or refreshing.</p>
+        )}
       </div>
     );
   }
@@ -1253,6 +1315,55 @@ export function DiscoveryList({ events, selectedEventId, onSelect, locationReady
         );
         })}
       </div>
+    </div>
+  );
+}
+
+type HostUpdatesFilterToggleProps = {
+  active: boolean;
+  availableCount: number;
+  onToggle: () => void;
+};
+
+function HostUpdatesFilterToggle({ active, availableCount, onToggle }: HostUpdatesFilterToggleProps) {
+  const disabled = availableCount === 0;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-3">
+      <div>
+        <p className="text-sm font-semibold text-foreground">New host updates</p>
+        <p className="text-xs text-muted-foreground">
+          {disabled
+            ? "No fresh host announcements nearby right now."
+            : active
+              ? "Filtering to events waiting on your attention."
+              : "Highlight plans with unseen host announcements."}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (!disabled) {
+            onToggle();
+          }
+        }}
+        disabled={disabled}
+        className={classNames(
+          "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition",
+          disabled
+            ? "cursor-not-allowed border-border/60 text-muted-foreground"
+            : active
+              ? "border-amber-300/60 bg-amber-400/10 text-amber-100"
+              : "border-border/70 text-muted-foreground hover:border-amber-300 hover:text-amber-50"
+        )}
+      >
+        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+        {active ? "Showing updates" : "New host updates"}
+        {availableCount > 0 && (
+          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-50">
+            {availableCount > 99 ? "99+" : availableCount}
+          </span>
+        )}
+      </button>
     </div>
   );
 }

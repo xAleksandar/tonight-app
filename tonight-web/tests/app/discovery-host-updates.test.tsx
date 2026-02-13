@@ -87,4 +87,22 @@ describe('DiscoveryList host update indicator', () => {
 
     expect(screen.queryByTestId('host-updates-pill')).toBeNull();
   });
+
+  it('shows a filter-specific empty state when no events match the host updates filter', () => {
+    const onClear = vi.fn();
+    render(
+      <DiscoveryList
+        events={[]}
+        selectedEventId={null}
+        onSelect={() => {}}
+        locationReady
+        radiusSummary="10 km radius"
+        hostUpdatesFilterActive
+        onClearHostUpdatesFilter={onClear}
+      />
+    );
+
+    expect(screen.getByText(/No events with new host updates/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Show all nearby events/i })).toBeInTheDocument();
+  });
 });

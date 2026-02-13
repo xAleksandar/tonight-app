@@ -154,3 +154,10 @@ Each run should:
 - Tests: `npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
 - Next: surface a lightweight filter/toggle (“New host updates”) in discover so guests can temporarily highlight just the events with unseen announcements.
 
+## 2026-02-13 05:24 EET — "New host updates" discovery filter toggle
+- Added a global "New host updates" toggle to the discovery surface that counts accepted events with unseen announcements, disables itself when nothing is pending, and filters both the list + map views whenever it's active.
+- Updated the discovery list empty state to explain when the filter hides all events and provide a one-tap "Show all" reset, plus refreshed the nearby-events memoization & guard rails so the highlight mode stays in sync with categories.
+- Introduced a reusable helper for checking unseen host updates, surfaced the filtered count badge in the toggle UI, and expanded the Vitest coverage to include the new empty state + discovery regression suite (app + UI tests).
+- Tests: `cd tonight-web && npx vitest run tests/app/discovery-host-updates.test.tsx tests/ui/home-discovery.test.tsx`.
+- Next: persist the filter preference (query param + localStorage) so guests keep the highlight mode between sessions and when sharing deep links.
+
