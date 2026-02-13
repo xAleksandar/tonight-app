@@ -100,3 +100,8 @@ Each run should:
 - Threaded a new host-only "Broadcast to guests" composer into `EventInsideExperience`, including multi-line support, character limits, toast feedback, and wiring to the new API so hosts can publish updates without leaving the page.
 - Expanded the component Vitest suite with coverage for the announcement UI and hooked the shared chat helper with an optional `skipRateLimit` flag so automation can keep reusing the same pathway.
 - Next: push these announcements to guests in real time (websocket refresh of the host updates feed) so they appear without a manual reload.
+
+## 2026-02-13 02:06 EET — Host announcements stream via sockets
+- Threaded the authenticated socket token through `/events/[id]` → `EventInsideExperience`, spinning up the guest join-request room when a confirmed attendee loads the page so the host-updates rail can listen for `join-request:message` events.
+- When a payload arrives from the host we now prepend it to the guest feed (with dedupe + author metadata), meaning announcements published from the event screen appear instantly without a manual refresh; added targeted Vitest coverage to lock the realtime behavior.
+- Next: add a lightweight “New update” indicator + auto-scroll affordance so guests who are mid-scroll get a subtle nudge when fresh announcements land.

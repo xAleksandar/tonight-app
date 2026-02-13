@@ -9,6 +9,29 @@ vi.mock('@/lib/toast', () => ({
   showErrorToast: vi.fn(),
 }));
 
+const joinRoomMock = vi.fn();
+let lastSocketOptions: { onMessage?: ((payload: any) => void) | undefined } | null = null;
+
+vi.mock('@/hooks/useSocket', () => ({
+  useSocket: (options: any) => {
+    lastSocketOptions = options;
+    return {
+      socket: null,
+      connectionState: 'connected',
+      error: null,
+      isConnected: true,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      joinRoom: joinRoomMock,
+      sendMessage: vi.fn(),
+      sendTypingStart: vi.fn(),
+      sendTypingStop: vi.fn(),
+      reconnectAttempt: 0,
+      nextRetryInMs: null,
+    };
+  },
+}));
+
 type TestingLibrary = typeof import('@testing-library/react');
 
 let render: TestingLibrary['render'];
@@ -17,6 +40,7 @@ let cleanup: TestingLibrary['cleanup'];
 let fireEvent: TestingLibrary['fireEvent'];
 let waitFor: TestingLibrary['waitFor'];
 let within: TestingLibrary['within'];
+let act: TestingLibrary['act'];
 
 let jsdomInstance: JSDOM | null = null;
 
@@ -87,6 +111,7 @@ beforeAll(async () => {
   fireEvent = testingLibrary.fireEvent;
   waitFor = testingLibrary.waitFor;
   within = testingLibrary.within;
+  act = testingLibrary.act;
 });
 
 afterAll(() => {
@@ -104,6 +129,8 @@ describe('EventInsideExperience', () => {
 
   afterEach(() => {
     cleanup();
+    joinRoomMock.mockClear();
+    lastSocketOptions = null;
     vi.restoreAllMocks();
     if ('fetch' in globalThis) {
       // Tests that mock fetch can leave it dangling; remove between runs.
@@ -477,4 +504,54 @@ describe('EventInsideExperience', () => {
 
     expect(await screen.findByText(/Reminder about parking/i)).toBeInTheDocument();
   });
+  it('streams host announcements to guests in real time', async () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        guestComposer: { joinRequestId: 'jr-guest-1' },
+        latestHostActivityFeed: [
+          {
+            id: 'initial-host-update',
+            message: 'Original update',
+            postedAtISO: new Date().toISOString(),
+            authorName: 'Aleks',
+          },
+        ],
+        hostActivityFeedPagination: { hasMore: false, nextCursor: null },
+      },
+      socketToken: 'jwt-token',
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    await waitFor(() => {
+      expect(joinRoomMock).toHaveBeenCalledWith('jr-guest-1');
+    });
+
+    expect(screen.getByText(/Original update/i)).toBeInTheDocument();
+
+    const payload = {
+      id: 'announcement-1',
+      joinRequestId: 'jr-guest-1',
+      senderId: props.host.id,
+      content: 'Doors now open — head upstairs.',
+      createdAt: new Date().toISOString(),
+    };
+
+    await act(async () => {
+      lastSocketOptions?.onMessage?.(payload);
+    });
+
+    expect(screen.getByText(/Doors now open/i)).toBeInTheDocument();
+
+    await act(async () => {
+      lastSocketOptions?.onMessage?.(payload);
+    });
+
+    expect(screen.getAllByText(/Doors now open/i)).toHaveLength(1);
+  });
+
 });

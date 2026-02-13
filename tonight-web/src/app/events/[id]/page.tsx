@@ -428,6 +428,7 @@ export default async function EventInsidePage({ params }: PageParams) {
     joinRequests: pendingRequests,
     viewerRole,
     chatPreview,
+    socketToken: authenticatedUser.token,
   };
 
   return (

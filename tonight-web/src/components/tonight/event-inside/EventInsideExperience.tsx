@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useState, type ComponentType, type Rea
 import { CheckCircle2, Clock3, MapPin, MessageCircle, Shield, Sparkles, Users } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
+import { useSocket } from "@/hooks/useSocket";
 import { classNames } from "@/lib/classNames";
+import type { SocketMessagePayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export type EventInsideExperienceProps = {
@@ -77,6 +79,8 @@ export type EventInsideExperienceProps = {
       nextCursor?: string | null;
     };
   };
+  /** JWT token for the realtime socket connection */
+  socketToken?: string | null;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -112,6 +116,7 @@ export function EventInsideExperience({
   joinRequests,
   viewerRole,
   chatPreview,
+  socketToken,
 }: EventInsideExperienceProps) {
   const [pendingRequests, setPendingRequests] = useState(joinRequests);
   const [roster, setRoster] = useState(attendees);
@@ -149,6 +154,8 @@ export function EventInsideExperience({
   const [hostActivityLoading, setHostActivityLoading] = useState(false);
   const [hostAnnouncementValue, setHostAnnouncementValue] = useState("");
   const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
+  const guestJoinRequestId = guestComposerConfig?.joinRequestId?.trim() || null;
+  const realtimeHostActivityEnabled = Boolean(socketToken && isGuestViewer && guestJoinRequestId);
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -193,6 +200,46 @@ export function EventInsideExperience({
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+
+  const handleRealtimeHostActivity = useCallback(
+    (payload: SocketMessagePayload) => {
+      if (!realtimeHostActivityEnabled || !guestJoinRequestId) {
+        return;
+      }
+
+      if (payload.joinRequestId !== guestJoinRequestId || payload.senderId !== host.id) {
+        return;
+      }
+
+      setHostActivityEntries((prev) => {
+        if (prev.some((entry) => entry.id === payload.id)) {
+          return prev;
+        }
+        const nextEntry = {
+          id: payload.id,
+          message: payload.content,
+          postedAtISO: payload.createdAt,
+          authorName: host.displayName ?? host.email ?? "Host",
+        };
+        return [nextEntry, ...prev];
+      });
+    },
+    [guestJoinRequestId, host.displayName, host.email, host.id, realtimeHostActivityEnabled]
+  );
+
+  const { isConnected, joinRoom } = useSocket({
+    token: realtimeHostActivityEnabled ? socketToken ?? undefined : undefined,
+    autoConnect: realtimeHostActivityEnabled,
+    readinessEndpoint: "/api/socket/io",
+    onMessage: realtimeHostActivityEnabled ? handleRealtimeHostActivity : undefined,
+  });
+
+  useEffect(() => {
+    if (!realtimeHostActivityEnabled || !isConnected || !guestJoinRequestId) {
+      return;
+    }
+    joinRoom(guestJoinRequestId);
+  }, [guestJoinRequestId, isConnected, joinRoom, realtimeHostActivityEnabled]);
 
   const handleMarkThreadAsRead = async (joinRequestId: string) => {
     const fallback = "Unable to mark this thread as read.";
