@@ -12,6 +12,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 type EventChatPreview = {
   lastMessageSnippet?: string | null;
+  lastMessageAuthorName?: string | null;
   lastMessageAtISO?: string | null;
   unreadCount?: number | null;
   participantCount?: number | null;
@@ -1077,6 +1078,7 @@ export function EventInsideExperience({
           const nextPreview: EventChatPreview = {
             ...reference,
             lastMessageSnippet: payload.content,
+            lastMessageAuthorName: isHostSender ? host.displayName ?? host.email ?? "Host" : "You",
             lastMessageAtISO: createdAtISO,
           };
 
@@ -1141,6 +1143,7 @@ export function EventInsideExperience({
       }
 
       if (hostRealtimeChatEnabled && hostChatJoinRequestIdSet.has(payload.joinRequestId)) {
+        const participant = hostChatParticipantMap.get(payload.joinRequestId);
         if (isHostSender) {
           setChatPreviewState((prev) => {
             const reference = prev ?? initialChatPreview;
@@ -1151,6 +1154,7 @@ export function EventInsideExperience({
             return {
               ...reference,
               lastMessageSnippet: payload.content,
+              lastMessageAuthorName: "You",
               lastMessageAtISO: createdAtISO,
               ctaHref: `/chat/${payload.joinRequestId}`,
             };
@@ -1170,6 +1174,7 @@ export function EventInsideExperience({
           return {
             ...reference,
             lastMessageSnippet: payload.content,
+            lastMessageAuthorName: participant?.displayName ?? "Guest",
             lastMessageAtISO: createdAtISO,
             unreadCount: totalUnread,
             ctaLabel: totalUnread > 0 ? "Reply to guests" : reference.ctaLabel,

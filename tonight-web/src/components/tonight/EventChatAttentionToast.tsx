@@ -8,6 +8,9 @@ export type EventChatAttentionToastProps = {
   label: string;
   helperText?: string | null;
   attentionLabel?: string | null;
+  snippet?: string | null;
+  snippetSender?: string | null;
+  snippetTimestamp?: string | null;
   onInteract?: () => void;
 };
 
@@ -19,9 +22,15 @@ export function EventChatAttentionToast({
   label,
   helperText,
   attentionLabel,
+  snippet,
+  snippetSender,
+  snippetTimestamp,
   onInteract,
 }: EventChatAttentionToastProps) {
   const resolvedAttentionLabel = attentionLabel && attentionLabel.trim().length > 0 ? attentionLabel : "New chat ping";
+  const resolvedSnippet = typeof snippet === "string" && snippet.trim().length > 0 ? snippet.trim() : null;
+  const resolvedSnippetSender = typeof snippetSender === "string" && snippetSender.trim().length > 0 ? snippetSender.trim() : null;
+  const resolvedSnippetTimestamp = formatRelativeTime(snippetTimestamp);
 
   const handleInteract = () => {
     onInteract?.();
@@ -39,6 +48,15 @@ export function EventChatAttentionToast({
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">{resolvedAttentionLabel}</p>
               <p className="text-base font-semibold text-white">Jump back into chat</p>
               {helperText ? <p className="text-sm text-white/75 line-clamp-2">{helperText}</p> : null}
+              {resolvedSnippet ? (
+                <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                    {resolvedSnippetSender ?? "Latest activity"}
+                    {resolvedSnippetTimestamp ? <span className="text-white/50"> · {resolvedSnippetTimestamp}</span> : null}
+                  </p>
+                  <p className="text-sm text-white line-clamp-2">{resolvedSnippet}</p>
+                </div>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -64,4 +82,35 @@ export function EventChatAttentionToast({
       </div>
     </div>
   );
+}
+
+function formatRelativeTime(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const diffMs = date.getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / (1000 * 60));
+  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+  if (Math.abs(diffMinutes) < 1) {
+    return "just now";
+  }
+
+  if (Math.abs(diffMinutes) < 60) {
+    return formatter.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return formatter.format(diffHours, "hour");
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  return formatter.format(diffDays, "day");
 }

@@ -327,3 +327,10 @@ Each run should:
 - Added a reusable `EventChatAttentionToast` component and wired it into the event layout to surface a floating, dismissible “Jump back into chat” banner whenever live attention is active, ensuring both hosts and guests get nudged mid-scroll; clicking or dismissing clears the socket-driven attention state.
 - Introduced focused coverage for the new UI (`npx vitest run tests/components/DesktopHeader.test.tsx tests/components/EventChatAttentionToast.test.tsx`).
 - Next: enrich the floating toast with the latest message snippet + sender context so the alert tells people *what* changed before they jump into `/chat`.
+
+## 2026-02-17 00:26 EET — Floating toast shows live message context
+- Threaded `lastMessageAuthorName` metadata through the event loader + realtime chat preview so we always know who authored the latest ping when attention fires.
+- Updated the mobile chat action + floating toast wiring so attention alerts now display the sender name, relative timestamp, and a clamped snippet of the newest message, giving hosts/guests immediate context before opening `/chat`.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx tests/components/EventInsideExperience.test.tsx`
+- Next: queue multiple attention pings (and cycle through their snippets) so the floating toast can surface every fresh guest thread instead of only the last one.
+

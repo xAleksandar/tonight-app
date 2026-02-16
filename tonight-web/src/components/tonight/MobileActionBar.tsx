@@ -15,6 +15,9 @@ type MobileChatAction = {
   badgeTone?: "highlight" | "success" | "muted";
   attentionActive?: boolean;
   attentionLabel?: string | null;
+  lastMessageSnippet?: string | null;
+  lastMessageAuthorName?: string | null;
+  lastMessageAtISO?: string | null;
   onInteract?: () => void;
 };
 

@@ -452,6 +452,11 @@ const buildChatPreviewForAcceptedGuest = async ({
 
   const lastMessage = recentMessages[0];
   const lastMessageSnippet = lastMessage?.content ?? "No messages yet. Say hi once you're accepted.";
+  const lastMessageAuthorName = lastMessage
+    ? lastMessage.senderId === viewerId
+      ? "You"
+      : lastMessage.sender?.displayName ?? lastMessage.sender?.email ?? "Guest"
+    : null;
   const lastMessageAtISO = lastMessage?.createdAt?.toISOString() ?? fallbackTimestampISO ?? null;
   const participantCount = acceptedGuestsCount + 1; // host + accepted guests
   const hostActivityFeed = trimmedHostMessages.map((message) => ({
@@ -474,6 +479,7 @@ const buildChatPreviewForAcceptedGuest = async ({
 
   return {
     lastMessageSnippet,
+    lastMessageAuthorName,
     lastMessageAtISO,
     unreadCount: unreadCount > 0 ? unreadCount : null,
     participantCount,
@@ -533,6 +539,16 @@ const buildChatPreviewForHost = async ({
         content: true,
         createdAt: true,
         joinRequestId: true,
+        joinRequest: {
+          select: {
+            user: {
+              select: {
+                displayName: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.message.count({
@@ -559,6 +575,10 @@ const buildChatPreviewForHost = async ({
     }),
     buildHostUnreadThreadSummaries({ eventId, hostId }),
   ]);
+
+  const lastGuestAuthorName = latestGuestMessage
+    ? latestGuestMessage.joinRequest?.user.displayName ?? latestGuestMessage.joinRequest?.user.email ?? "Guest"
+    : null;
 
   let hostRecentThreads: HostUnreadThreadSummary[] = [];
   if (hostUnreadThreads.length === 0) {
@@ -591,6 +611,7 @@ const buildChatPreviewForHost = async ({
   return {
     participantCount,
     lastMessageSnippet: latestGuestMessage.content,
+    lastMessageAuthorName: lastGuestAuthorName ?? "Guest",
     lastMessageAtISO: latestGuestMessage.createdAt.toISOString(),
     unreadCount: unreadCount > 0 ? unreadCount : null,
     ctaLabel: unreadCount > 0 ? "Reply to guests" : "Open latest chat",

@@ -51,6 +51,9 @@ export const buildMobileChatAction = (
     badgeTone,
     attentionActive: Boolean(options.attentionActive),
     attentionLabel: options.attentionActive ? options.attentionLabel ?? "New chat ping" : null,
+    lastMessageSnippet: chatPreview.lastMessageSnippet,
+    lastMessageAuthorName: chatPreview.lastMessageAuthorName,
+    lastMessageAtISO: chatPreview.lastMessageAtISO,
     onInteract: options.onInteract,
   };
 };

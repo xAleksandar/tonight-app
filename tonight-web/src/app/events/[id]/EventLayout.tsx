@@ -68,6 +68,9 @@ export function EventLayout({
           label={chatAction!.label}
           helperText={chatAction?.helperText}
           attentionLabel={chatAction?.attentionLabel}
+          snippet={chatAction?.lastMessageSnippet}
+          snippetSender={chatAction?.lastMessageAuthorName}
+          snippetTimestamp={chatAction?.lastMessageAtISO}
           onInteract={chatAction?.onInteract}
         />
       ) : null}

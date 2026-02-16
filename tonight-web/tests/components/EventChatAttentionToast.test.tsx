@@ -62,19 +62,26 @@ describe('EventChatAttentionToast', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the helper text and CTA', () => {
+  it('renders the helper text, snippet context, and CTA', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-02-17T00:20:00Z').getTime());
+
     render(
       <EventChatAttentionToast
         href="/chat/abc"
         label="Open chat"
         helperText="Latest note from the host"
         attentionLabel="New ping"
+        snippet="Don't forget the speaker setup."
+        snippetSender="Aleks"
+        snippetTimestamp="2026-02-17T00:18:00Z"
       />
     );
 
     expect(screen.getByText('New ping')).toBeInTheDocument();
     expect(screen.getByText('Latest note from the host')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/abc');
+    expect(screen.getByText(/Aleks/)).toHaveTextContent('Aleks · 2 minutes ago');
+    expect(screen.getByText("Don't forget the speaker setup.")).toBeInTheDocument();
   });
 
   it('invokes onInteract when interacting with the CTA or dismiss button', () => {
