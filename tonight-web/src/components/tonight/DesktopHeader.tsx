@@ -116,7 +116,20 @@ export function DesktopHeader({
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
                 <span>{chatAttentionLabel}</span>
               </div>
-            ) : chatAction?.helperText ? (
+            ) : null}
+            {chatAction?.attentionSourceLabel || chatAction?.attentionQueueLabel ? (
+              <div className="flex flex-wrap justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                {chatAction?.attentionSourceLabel ? (
+                  <span className="rounded-full bg-primary/15 px-3 py-1 text-primary/90">{chatAction.attentionSourceLabel}</span>
+                ) : null}
+                {chatAction?.attentionQueueLabel ? (
+                  <span className="rounded-full border border-primary/30 px-3 py-1 text-primary/70">
+                    {chatAction.attentionQueueLabel}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {!chatAction?.attentionActive && chatAction?.helperText ? (
               <p className="text-xs text-muted-foreground line-clamp-1">{chatAction.helperText}</p>
             ) : null}
           </div>

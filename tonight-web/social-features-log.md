@@ -341,3 +341,9 @@ Each run should:
 - Extended `EventInsidePageClient` to keep the queue alive, extend the attention timeout based on queue size, and clear everything when the user interacts so mobile/desktop CTAs stay in sync.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx tests/components/EventInsideExperience.test.tsx`
 - Next: propagate the queued attention payload into the hero/mobile chat CTA badges so the inline chips show which thread pinged (and how many are waiting) even if the toast is dismissed.
+
+## 2026-02-17 01:27 EET — Hero + mobile chat CTAs show queued ping details
+- Threaded the realtime attention queue through `EventInsideExperience`, the event hero, desktop header, and the mobile action bar so the same chips that power the floating toast now list who pinged and how many guests are still waiting, complete with pulse states that reuse the queue metadata even if the toast isn’t visible.
+- Added a shared label builder, pushed the queue context into `buildMobileChatAction`, and surfaced new badge chips (lead guest + “more waiting”) across hero, desktop, and mobile CTAs; tests cover the new UI rails plus the hero chip rendering.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/MobileActionBar.test.tsx tests/components/DesktopHeader.test.tsx`
+- Next: make the lead attention chip actionable (tapping the chip jumps straight into that guest’s `/chat/[joinRequestId]` and exposes a quick picker when multiple guests are queued) so hosts can respond to the right thread without opening the toast carousel.

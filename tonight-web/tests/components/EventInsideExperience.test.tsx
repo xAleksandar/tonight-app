@@ -180,6 +180,36 @@ describe('EventInsideExperience', () => {
     expect(screen.getByText(/Updated/i)).toBeInTheDocument();
   });
 
+  it('renders chat attention chips + indicator when queue metadata is provided', () => {
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Second pending guest',
+            authorName: 'Aaron',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Jess pinged')).toBeInTheDocument();
+    expect(screen.getByText('1 more waiting')).toBeInTheDocument();
+    expect(screen.getByText('Jess pinged · +1 waiting')).toBeInTheDocument();
+  });
+
   it('shows a disabled chat explanation when no CTA href is present', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,

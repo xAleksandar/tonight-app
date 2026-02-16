@@ -15,6 +15,9 @@ type MobileChatAction = {
   badgeTone?: "highlight" | "success" | "muted";
   attentionActive?: boolean;
   attentionLabel?: string | null;
+  attentionSourceLabel?: string | null;
+  attentionQueueLabel?: string | null;
+  attentionQueueCount?: number;
   lastMessageSnippet?: string | null;
   lastMessageAuthorName?: string | null;
   lastMessageAtISO?: string | null;
@@ -111,6 +114,18 @@ export function MobileActionBar({
             <div className="mt-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
               <span>{chatAttentionLabel}</span>
+            </div>
+          ) : null}
+          {chatAction?.attentionSourceLabel || chatAction?.attentionQueueLabel ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide">
+              {chatAction?.attentionSourceLabel ? (
+                <span className="rounded-full bg-primary/15 px-3 py-1 text-primary">{chatAction.attentionSourceLabel}</span>
+              ) : null}
+              {chatAction?.attentionQueueLabel ? (
+                <span className="rounded-full border border-primary/30 px-3 py-1 text-primary/80">
+                  {chatAction.attentionQueueLabel}
+                </span>
+              ) : null}
             </div>
           ) : null}
           {chatAction?.helperText ? (

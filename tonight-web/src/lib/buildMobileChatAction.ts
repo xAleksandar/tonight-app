@@ -1,9 +1,12 @@
 import type { EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
-type BuildMobileChatActionOptions = {
+export type BuildMobileChatActionOptions = {
   attentionActive?: boolean;
   attentionLabel?: string | null;
+  attentionSourceLabel?: string | null;
+  attentionQueueLabel?: string | null;
+  attentionQueueCount?: number;
   onInteract?: () => void;
 };
 
@@ -43,14 +46,22 @@ export const buildMobileChatAction = (
     badgeLabel = "Login required";
   }
 
+  const attentionActive = Boolean(options.attentionActive);
+  const attentionLabel = attentionActive
+    ? options.attentionLabel ?? "New chat ping"
+    : null;
+
   return {
     href: chatPreview.ctaHref,
     label,
     helperText: summary,
     badgeLabel,
     badgeTone,
-    attentionActive: Boolean(options.attentionActive),
-    attentionLabel: options.attentionActive ? options.attentionLabel ?? "New chat ping" : null,
+    attentionActive,
+    attentionLabel,
+    attentionSourceLabel: options.attentionSourceLabel ?? null,
+    attentionQueueLabel: options.attentionQueueLabel ?? null,
+    attentionQueueCount: options.attentionQueueCount ?? 0,
     lastMessageSnippet: chatPreview.lastMessageSnippet,
     lastMessageAuthorName: chatPreview.lastMessageAuthorName,
     lastMessageAtISO: chatPreview.lastMessageAtISO,

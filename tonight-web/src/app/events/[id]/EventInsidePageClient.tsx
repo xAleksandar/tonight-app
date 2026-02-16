@@ -5,6 +5,7 @@ import { EventLayout } from "./EventLayout";
 import type { EventChatAttentionPayload, EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
 import { EventInsideExperience } from "@/components/tonight/event-inside/EventInsideExperience";
 import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
+import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
@@ -26,6 +27,8 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   const [chatAttentionActive, setChatAttentionActive] = useState(false);
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
   const chatAttentionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatAttentionLabels = useMemo(() => buildChatAttentionLabels(chatAttentionQueue), [chatAttentionQueue]);
+  const chatAttentionTotalCount = chatAttentionLabels.leadEntry ? chatAttentionLabels.waitingCount + 1 : chatAttentionLabels.waitingCount;
 
   const startAttentionTimeout = useCallback((queueLength = 1) => {
     const baseDuration = 10_000;
@@ -103,9 +106,22 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
     () =>
       buildMobileChatAction(experience.viewerRole, latestChatPreview, {
         attentionActive: chatAttentionActive,
+        attentionLabel: chatAttentionLabels.indicatorLabel,
+        attentionSourceLabel: chatAttentionLabels.leadLabel,
+        attentionQueueLabel: chatAttentionLabels.waitingLabel,
+        attentionQueueCount: chatAttentionTotalCount,
         onInteract: clearChatAttention,
       }),
-    [experience.viewerRole, latestChatPreview, chatAttentionActive, clearChatAttention]
+    [
+      experience.viewerRole,
+      latestChatPreview,
+      chatAttentionActive,
+      chatAttentionLabels.indicatorLabel,
+      chatAttentionLabels.leadLabel,
+      chatAttentionLabels.waitingLabel,
+      chatAttentionTotalCount,
+      clearChatAttention,
+    ]
   );
 
   return (
@@ -122,6 +138,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
         {...experience}
         onChatPreviewRefresh={handleChatPreviewRefresh}
         chatAttentionActive={chatAttentionActive}
+        chatAttentionQueue={chatAttentionQueue}
         onChatAttentionChange={handleChatAttentionChange}
       />
     </EventLayout>

@@ -7,6 +7,7 @@ import { CheckCircle2, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Spar
 import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
 import { classNames } from "@/lib/classNames";
+import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
@@ -131,6 +132,8 @@ export type EventInsideExperienceProps = {
   onChatPreviewRefresh?: (next: EventChatPreview | undefined) => void;
   /** Controls the chat CTA attention indicator (true = pulse) */
   chatAttentionActive?: boolean;
+  /** Active queue of attention payloads (used for chips + inline context) */
+  chatAttentionQueue?: EventChatAttentionPayload[];
   /** Fired when realtime events request the attention indicator to toggle */
   onChatAttentionChange?: (active: boolean, payload?: EventChatAttentionPayload) => void;
 };
@@ -271,6 +274,7 @@ export function EventInsideExperience({
   pendingJoinRequestId,
   onChatPreviewRefresh,
   chatAttentionActive = false,
+  chatAttentionQueue = [],
   onChatAttentionChange,
 }: EventInsideExperienceProps) {
   const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
@@ -956,6 +960,11 @@ export function EventInsideExperience({
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+  const chatAttentionLabels = buildChatAttentionLabels(chatAttentionQueue);
+  const heroChatAttentionLeadChip = chatAttentionLabels.leadLabel;
+  const heroChatAttentionWaitingChip = chatAttentionLabels.waitingLabel;
+  const heroChatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? "New chat ping";
+  const heroChatAttentionHasQueue = (chatAttentionQueue?.length ?? 0) > 0;
 
   const heroChatSummaryCopy =
     chatPreview?.lastMessageSnippet ??
@@ -2121,13 +2130,29 @@ export function EventInsideExperience({
                       {heroChatFallbackChip}
                     </span>
                   ) : null}
+                  {heroChatAttentionLeadChip ? (
+                    <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      {heroChatAttentionLeadChip}
+                    </span>
+                  ) : null}
+                  {heroChatAttentionWaitingChip ? (
+                    <span className="rounded-full border border-primary/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+                      {heroChatAttentionWaitingChip}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
-                {chatAttentionActive ? (
+                {heroChatAttentionHasQueue ? (
                   <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
-                    <span>New chat ping</span>
+                    <span
+                      className={classNames(
+                        "h-1.5 w-1.5 rounded-full bg-primary",
+                        chatAttentionActive ? "animate-pulse" : null
+                      )}
+                      aria-hidden
+                    />
+                    <span>{heroChatAttentionIndicatorLabel}</span>
                   </div>
                 ) : null}
                 {chatCtaHref ? (

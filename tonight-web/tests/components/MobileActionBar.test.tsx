@@ -168,4 +168,27 @@ describe('MobileActionBar', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
+  it('renders chat attention chips when metadata is provided', () => {
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          badgeLabel: 'You\'re caught up',
+          badgeTone: 'success',
+          attentionSourceLabel: 'Jess pinged',
+          attentionQueueLabel: '2 more waiting',
+        }}
+      />
+    );
+
+    expect(screen.getByText('Jess pinged')).toBeInTheDocument();
+    expect(screen.getByText('2 more waiting')).toBeInTheDocument();
+  });
 });

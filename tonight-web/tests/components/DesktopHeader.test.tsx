@@ -111,4 +111,25 @@ describe('DesktopHeader', () => {
     fireEvent.click(screen.getByRole('link', { name: /open chat/i }));
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
+
+  it('renders inline attention chips in the desktop header when provided', () => {
+    render(
+      <DesktopHeader
+        title="Tonight event"
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        chatAction={{
+          href: '/chat/demo',
+          label: 'Open chat',
+          badgeLabel: 'You\'re caught up',
+          badgeTone: 'success',
+          attentionSourceLabel: 'Jess pinged',
+          attentionQueueLabel: '1 more waiting',
+        }}
+      />
+    );
+
+    expect(screen.getByText('Jess pinged')).toBeInTheDocument();
+    expect(screen.getByText('1 more waiting')).toBeInTheDocument();
+  });
 });
