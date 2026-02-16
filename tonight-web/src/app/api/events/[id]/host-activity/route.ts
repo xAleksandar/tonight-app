@@ -7,13 +7,14 @@ import { getCurrentUser } from "@/middleware/auth";
 
 const HOST_ACTIVITY_PAGE_SIZE = 3;
 
-export async function GET(request: Request, { params }: { params: { id?: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id?: string }> }) {
   const auth = await getCurrentUser();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const eventId = params?.id?.trim();
+  const resolvedParams = await params;
+  const eventId = resolvedParams?.id?.trim();
   if (!eventId) {
     return NextResponse.json({ error: "Missing event id" }, { status: 400 });
   }
@@ -31,8 +32,12 @@ export async function GET(request: Request, { params }: { params: { id?: string 
       event: {
         select: {
           hostId: true,
-          hostDisplayName: true,
-          hostEmail: true,
+          host: {
+            select: {
+              displayName: true,
+              email: true,
+            },
+          },
         },
       },
     },
@@ -70,7 +75,7 @@ export async function GET(request: Request, { params }: { params: { id?: string 
     id: message.id,
     message: message.content,
     postedAtISO: message.createdAt?.toISOString() ?? null,
-    authorName: joinRequest.event?.hostDisplayName ?? joinRequest.event?.hostEmail ?? "Host",
+    authorName: joinRequest.event?.host?.displayName ?? joinRequest.event?.host?.email ?? "Host",
   }));
 
   return NextResponse.json({
@@ -80,13 +85,14 @@ export async function GET(request: Request, { params }: { params: { id?: string 
   });
 }
 
-export async function PATCH(request: Request, { params }: { params: { id?: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id?: string }> }) {
   const auth = await getCurrentUser();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const eventId = params?.id?.trim();
+  const resolvedParams = await params;
+  const eventId = resolvedParams?.id?.trim();
   if (!eventId) {
     return NextResponse.json({ error: "Missing event id" }, { status: 400 });
   }
@@ -129,13 +135,14 @@ export async function PATCH(request: Request, { params }: { params: { id?: strin
   });
 }
 
-export async function POST(request: Request, { params }: { params: { id?: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id?: string }> }) {
   const auth = await getCurrentUser();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const eventId = params?.id?.trim();
+  const resolvedParams = await params;
+  const eventId = resolvedParams?.id?.trim();
   if (!eventId) {
     return NextResponse.json({ error: "Missing event id" }, { status: 400 });
   }

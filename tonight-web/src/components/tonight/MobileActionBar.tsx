@@ -7,7 +7,7 @@ import { classNames } from "@/lib/classNames";
 export type MobileNavTarget = "discover" | "people" | "create" | "messages" | "profile";
 
 export type MobileActionBarProps = {
-  active?: MobileNavTarget;
+  active?: MobileNavTarget | null;
   onNavigateDiscover?: () => void;
   onNavigatePeople?: () => void;
   onNavigateMessages?: () => void;
@@ -25,7 +25,7 @@ type NavItem = {
 };
 
 export function MobileActionBar({
-  active = "discover",
+  active,
   onNavigateDiscover,
   onNavigatePeople,
   onNavigateMessages,

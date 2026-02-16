@@ -11,11 +11,13 @@ import {
   JoinRequestUnauthorizedError,
 } from '@/lib/join-requests';
 import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
+import { socketService } from '@/lib/socket';
+import { JOIN_REQUEST_STATUS_CHANGED_EVENT, type JoinRequestStatusChangedPayload } from '@/lib/socket-shared';
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id?: string;
-  };
+  }>;
 };
 
 const parseRequestBody = async (request: NextRequest) => {
@@ -54,7 +56,8 @@ export const patchJoinRequestHandler: AuthenticatedRouteHandler<NextResponse> = 
   context,
   auth
 ) => {
-  const joinRequestId = (context as RouteContext).params?.id;
+  const params = await (context as RouteContext).params;
+  const joinRequestId = params?.id;
   if (!joinRequestId) {
     return createErrorResponse({
       message: 'Join request id is required',
@@ -87,6 +90,23 @@ export const patchJoinRequestHandler: AuthenticatedRouteHandler<NextResponse> = 
       hostId: auth.userId,
       status: statusField.value,
     });
+
+    // Emit socket event when status changes to ACCEPTED to notify the guest
+    if (statusField.value === JoinRequestStatus.ACCEPTED) {
+      try {
+        const io = socketService.getIO();
+        const payload: JoinRequestStatusChangedPayload = {
+          joinRequestId: joinRequest.id,
+          userId: joinRequest.userId,
+          status: JoinRequestStatus.ACCEPTED,
+          eventId: joinRequest.eventId,
+        };
+        io.to(`join-request:${joinRequest.id}`).emit(JOIN_REQUEST_STATUS_CHANGED_EVENT, payload);
+      } catch (socketError) {
+        // Log socket error but don't fail the request
+        console.error('Failed to emit join request status change event:', socketError);
+      }
+    }
 
     return NextResponse.json({ joinRequest }, { status: 200 });
   } catch (error) {

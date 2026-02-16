@@ -343,7 +343,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const handleSelectEvent = useCallback(
     (eventId: string) => {
       setSelectedEventId(eventId);
-      router.push(`/events/`);
+      router.push(`/events/${eventId}`);
     },
     [router]
   );

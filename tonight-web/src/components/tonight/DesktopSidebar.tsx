@@ -50,7 +50,9 @@ export function DesktopSidebar({
     return null;
   }, [pathname]);
 
-  const currentPrimaryNav = activePrimaryNav ?? inferredPrimaryNav;
+  const currentPrimaryNav = activePrimaryNav !== undefined
+    ? activePrimaryNav
+    : inferredPrimaryNav;
 
   const primaryNavItems: Array<{
     id: PrimaryNavTarget;

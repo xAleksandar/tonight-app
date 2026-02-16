@@ -7,7 +7,7 @@ import { CheckCircle2, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Spar
 import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
 import { classNames } from "@/lib/classNames";
-import type { SocketMessagePayload } from "@/lib/socket-shared";
+import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 export type EventInsideExperienceProps = {
@@ -43,7 +43,7 @@ export type EventInsideExperienceProps = {
     submittedAtISO?: string | null;
     mutualFriends?: number | null;
   }>;
-  viewerRole: "host" | "guest" | "pending";
+  viewerRole: "host" | "guest" | "pending" | "public";
   chatPreview?: {
     lastMessageSnippet?: string | null;
     lastMessageAtISO?: string | null;
@@ -93,12 +93,15 @@ export type EventInsideExperienceProps = {
   }>;
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;
+  /** Join request ID for pending guests to receive approval notifications */
+  pendingJoinRequestId?: string | null;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
   host: { label: "You are hosting", tone: "bg-amber-500/10 text-amber-700" },
   guest: { label: "You are confirmed", tone: "bg-emerald-500/10 text-emerald-600" },
   pending: { label: "Awaiting host approval", tone: "bg-sky-500/10 text-sky-600" },
+  public: { label: "Event details", tone: "bg-slate-500/10 text-slate-400" },
 };
 
 const quickReplyTemplates: Array<{ label: string; message: string }> = [
@@ -199,6 +202,7 @@ export function EventInsideExperience({
   chatPreview,
   hostFriendInvites,
   socketToken,
+  pendingJoinRequestId,
 }: EventInsideExperienceProps) {
   const [pendingRequests, setPendingRequests] = useState(joinRequests);
   const [roster, setRoster] = useState(attendees);
@@ -226,9 +230,15 @@ export function EventInsideExperience({
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
+  const [joinRequestStatus, setJoinRequestStatus] = useState<"idle" | "submitting" | "submitted">("idle");
   const isHostViewer = viewerRole === "host";
   const isGuestViewer = viewerRole === "guest";
-  const hostFriendInviteEntries = isHostViewer ? hostFriendInvites ?? [] : [];
+  const isPendingViewer = viewerRole === "pending";
+  const isPublicViewer = viewerRole === "public";
+  const hostFriendInviteEntries = useMemo(
+    () => (isHostViewer ? hostFriendInvites ?? [] : []),
+    [isHostViewer, hostFriendInvites]
+  );
   const hostActivityListRef = useRef<HTMLUListElement | null>(null);
   const [hasHostActivityNotice, setHasHostActivityNotice] = useState(false);
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
@@ -259,6 +269,9 @@ export function EventInsideExperience({
   const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
   const guestJoinRequestId = guestComposerConfig?.joinRequestId?.trim() || null;
   const realtimeHostActivityEnabled = Boolean(socketToken && isGuestViewer && guestJoinRequestId);
+  const realtimeJoinApprovalEnabled = Boolean(socketToken && isPendingViewer && pendingJoinRequestId);
+  const activeJoinRequestId = guestJoinRequestId || pendingJoinRequestId || null;
+  const socketEnabled = realtimeHostActivityEnabled || realtimeJoinApprovalEnabled;
   const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
   const eventInviteShareText = useMemo(() => buildEventInviteShareText(event), [event]);
 
@@ -756,6 +769,25 @@ export function EventInsideExperience({
     ]
   );
 
+  const handleJoinRequestStatusChanged = useCallback(
+    (payload: JoinRequestStatusChangedPayload) => {
+      // Only handle if this is for the current join request and status is ACCEPTED
+      if (!activeJoinRequestId || payload.joinRequestId !== activeJoinRequestId) {
+        return;
+      }
+
+      if (payload.status === "ACCEPTED") {
+        showSuccessToast("Request approved!", "The host has approved your join request.");
+
+        // Reload the page to update all data and show full guest experience
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    },
+    [activeJoinRequestId]
+  );
+
   const handleCopyEventInvite = useCallback(async () => {
     if (!eventShareUrl) {
       showErrorToast("Copy failed", "Invite link is still loading. Try again in a second.");
@@ -807,19 +839,55 @@ export function EventInsideExperience({
     }
   }, [event.title, eventInviteShareText, eventShareUrl, handleCopyEventInvite]);
 
+  const handleJoinRequest = useCallback(async () => {
+    if (joinRequestStatus !== "idle") {
+      return;
+    }
+
+    try {
+      setJoinRequestStatus("submitting");
+      const response = await fetch("/api/join-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message = errorData?.error ?? "Unable to submit join request";
+        throw new Error(message);
+      }
+
+      setJoinRequestStatus("submitted");
+      showSuccessToast("Request sent!", "The host will review your request soon.");
+
+      // Reload the page to show the updated status
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      setJoinRequestStatus("idle");
+      const message = (error as Error)?.message ?? "Unable to submit join request";
+      showErrorToast("Request failed", message);
+    }
+  }, [event.id, joinRequestStatus]);
+
   const { isConnected, joinRoom } = useSocket({
-    token: realtimeHostActivityEnabled ? socketToken ?? undefined : undefined,
-    autoConnect: realtimeHostActivityEnabled,
+    token: socketEnabled ? socketToken ?? undefined : undefined,
+    autoConnect: socketEnabled,
     readinessEndpoint: "/api/socket/io",
     onMessage: realtimeHostActivityEnabled ? handleRealtimeHostActivity : undefined,
+    onJoinRequestStatusChanged: socketEnabled ? handleJoinRequestStatusChanged : undefined,
   });
 
   useEffect(() => {
-    if (!realtimeHostActivityEnabled || !isConnected || !guestJoinRequestId) {
+    if (!socketEnabled || !isConnected || !activeJoinRequestId) {
       return;
     }
-    joinRoom(guestJoinRequestId);
-  }, [guestJoinRequestId, isConnected, joinRoom, realtimeHostActivityEnabled]);
+    joinRoom(activeJoinRequestId);
+  }, [activeJoinRequestId, isConnected, joinRoom, socketEnabled]);
 
   const handleMarkThreadAsRead = async (joinRequestId: string) => {
     const fallback = "Unable to mark this thread as read.";
@@ -880,7 +948,7 @@ export function EventInsideExperience({
         setPendingRequests((prev) => prev.filter((request) => request.id !== requestId));
         setRoster((prev) => {
           let found = false;
-          const status = nextStatus === "accepted" ? "confirmed" : "waitlist";
+          const status: "confirmed" | "pending" | "waitlist" = nextStatus === "accepted" ? "confirmed" : "waitlist";
           const blurb = nextStatus === "accepted" ? "Coming tonight" : "Moved to waitlist";
 
           const nextRoster = prev.map((attendee) => {
@@ -1901,6 +1969,15 @@ export function EventInsideExperience({
                 >
                   {chatCtaLabel}
                 </Link>
+              ) : isPublicViewer ? (
+                <button
+                  type="button"
+                  onClick={handleJoinRequest}
+                  disabled={joinRequestStatus !== "idle"}
+                  className="mt-4 w-full rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {joinRequestStatus === "submitting" ? "Sending request..." : joinRequestStatus === "submitted" ? "Request sent!" : chatCtaLabel}
+                </button>
               ) : (
                 <button
                   type="button"

@@ -6,11 +6,12 @@ import { fetchEventById } from "@/lib/events";
 import { listJoinRequestsForEvent, type SerializedJoinRequestWithUser } from "@/lib/join-requests";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/middleware/auth";
+import { EventLayout } from "./EventLayout";
 
 interface PageParams {
-  params?: {
+  params: Promise<{
     id?: string | string[];
-  };
+  }>;
 }
 
 const HOST_UNREAD_THREAD_LIMIT = 3;
@@ -22,8 +23,8 @@ type HostUnreadThreadSummary = {
   joinRequestId: string;
   displayName: string;
   lastMessageSnippet: string;
-  lastMessageAtISO?: string | null;
-  unreadCount?: number | null;
+  lastMessageAtISO: string | null;
+  unreadCount: number | null;
 };
 
 const normalizeEventId = (value: string | string[] | undefined) => {
@@ -165,7 +166,13 @@ const buildHostUnreadThreadSummaries = async ({
     })
   );
 
-  return summaries.filter((entry): entry is HostUnreadThreadSummary => Boolean(entry));
+  const filtered: HostUnreadThreadSummary[] = [];
+  for (const entry of summaries) {
+    if (entry !== null) {
+      filtered.push(entry);
+    }
+  }
+  return filtered;
 };
 
 const buildHostFriendInviteCandidates = async ({
@@ -485,39 +492,92 @@ const buildChatPreviewForHost = async ({
 };
 
 export default async function EventInsidePage({ params }: PageParams) {
-  const eventId = normalizeEventId(params?.id);
+  const resolvedParams = await params;
+  const eventId = normalizeEventId(resolvedParams?.id);
   if (!eventId) {
     notFound();
   }
 
   const auth = await getCurrentUser();
-  if (!auth) {
-    const searchParams = new URLSearchParams({ next: `/events/${eventId}` });
-    redirect(`/login?${searchParams.toString()}`);
-  }
+  const authenticatedUser = auth ? (auth as NonNullable<typeof auth>) : null;
 
-  const authenticatedUser = auth as NonNullable<typeof auth>;
+  // Fetch current user's profile data for header display
+  let currentUserProfile: { displayName: string | null; email: string; photoUrl: string | null; } | null = null;
+  if (authenticatedUser) {
+    const userRecord = await prisma.user.findUnique({
+      where: { id: authenticatedUser.userId },
+      select: { displayName: true, email: true, photoUrl: true },
+    });
+    if (userRecord) {
+      currentUserProfile = userRecord;
+    }
+  }
 
   const eventRecord = await fetchEventById(eventId);
   if (!eventRecord) {
     notFound();
   }
 
+  const isHostViewer = authenticatedUser ? eventRecord.hostId === authenticatedUser.userId : false;
+
+  // Only fetch join requests if the user is authenticated AND is the host
+  // Public viewers and guests don't need join request data
   let joinRequests: SerializedJoinRequestWithUser[] = [];
-  try {
-    joinRequests = await listJoinRequestsForEvent({
-      eventId,
-      hostId: eventRecord.hostId,
-    });
-  } catch (error) {
-    console.error("Unable to load join requests for event", eventId, error);
+  if (authenticatedUser && isHostViewer) {
+    try {
+      joinRequests = await listJoinRequestsForEvent({
+        eventId,
+        hostId: eventRecord.hostId,
+      });
+    } catch (error) {
+      console.error("Unable to load join requests for event", eventId, error);
+    }
   }
 
-  const isHostViewer = eventRecord.hostId === authenticatedUser.userId;
-  const viewerJoinRequest = joinRequests.find((request) => request.user.id === authenticatedUser.userId);
+  // For non-host authenticated users, check if they have a join request
+  let viewerJoinRequest: SerializedJoinRequestWithUser | undefined;
+  if (authenticatedUser && !isHostViewer) {
+    const viewerRequest = await prisma.joinRequest.findFirst({
+      where: {
+        eventId,
+        userId: authenticatedUser.userId,
+      },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        lastSeenHostActivityAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            photoUrl: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
 
-  if (!isHostViewer && !viewerJoinRequest) {
-    notFound();
+    if (viewerRequest) {
+      viewerJoinRequest = {
+        id: viewerRequest.id,
+        eventId: eventId,
+        userId: authenticatedUser.userId,
+        status: viewerRequest.status,
+        createdAt: viewerRequest.createdAt.toISOString(),
+        updatedAt: viewerRequest.updatedAt.toISOString(),
+        lastSeenHostActivityAt: viewerRequest.lastSeenHostActivityAt?.toISOString() ?? null,
+        user: {
+          id: viewerRequest.user.id,
+          email: viewerRequest.user.email,
+          displayName: viewerRequest.user.displayName,
+          photoUrl: viewerRequest.user.photoUrl,
+          createdAt: viewerRequest.user.createdAt.toISOString(),
+        },
+      };
+    }
   }
 
   const attendees = mapJoinRequestsToAttendees(joinRequests);
@@ -537,26 +597,42 @@ export default async function EventInsidePage({ params }: PageParams) {
     ? "host"
     : viewerJoinRequest?.status === JoinRequestStatus.ACCEPTED
       ? "guest"
-      : "pending";
+      : viewerJoinRequest?.status === JoinRequestStatus.PENDING
+        ? "pending"
+        : "public";
 
   let chatPreview: EventInsideExperienceProps["chatPreview"] | undefined;
-  if (viewerRole === "host") {
-    chatPreview = await buildChatPreviewForHost({
-      eventId,
-      hostId: eventRecord.hostId,
-    });
-  } else if (viewerRole === "guest" && viewerJoinRequest) {
-    chatPreview = await buildChatPreviewForAcceptedGuest({
-      joinRequestId: viewerJoinRequest.id,
-      viewerId: authenticatedUser.userId,
-      eventId,
-      hostId: eventRecord.hostId,
-      hostDisplayName: eventRecord.hostDisplayName ?? eventRecord.hostEmail,
-      fallbackTimestampISO: viewerJoinRequest.updatedAt,
-      lastSeenHostActivityAt: viewerJoinRequest.lastSeenHostActivityAt,
-    });
-  } else if (viewerRole === "pending") {
-    chatPreview = buildChatPreviewForPendingViewer(viewerJoinRequest?.status);
+  if (authenticatedUser) {
+    if (viewerRole === "host") {
+      chatPreview = await buildChatPreviewForHost({
+        eventId,
+        hostId: eventRecord.hostId,
+      });
+    } else if (viewerRole === "guest" && viewerJoinRequest) {
+      chatPreview = await buildChatPreviewForAcceptedGuest({
+        joinRequestId: viewerJoinRequest.id,
+        viewerId: authenticatedUser.userId,
+        eventId,
+        hostId: eventRecord.hostId,
+        hostDisplayName: eventRecord.hostDisplayName ?? eventRecord.hostEmail,
+        fallbackTimestampISO: viewerJoinRequest.updatedAt,
+        lastSeenHostActivityAt: viewerJoinRequest.lastSeenHostActivityAt,
+      });
+    } else if (viewerRole === "pending") {
+      chatPreview = buildChatPreviewForPendingViewer(viewerJoinRequest?.status);
+    } else if (viewerRole === "public") {
+      // Authenticated users who haven't requested to join yet
+      chatPreview = {
+        ctaLabel: "Request to join event",
+        ctaDisabledReason: "Send a join request to chat with the host and other guests.",
+      };
+    }
+  } else {
+    // Unauthenticated users see a login prompt
+    chatPreview = {
+      ctaLabel: "Login to join event",
+      ctaDisabledReason: "You must be logged in to request to join this event.",
+    };
   }
 
   const experience: EventInsideExperienceProps = {
@@ -579,15 +655,39 @@ export default async function EventInsidePage({ params }: PageParams) {
     viewerRole,
     chatPreview,
     hostFriendInvites,
-    socketToken: authenticatedUser.token,
+    socketToken: authenticatedUser?.token,
+    pendingJoinRequestId: viewerRole === "pending" && viewerJoinRequest ? viewerJoinRequest.id : null,
   };
 
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-0">
+  // Content that appears in both authenticated and unauthenticated views
+  const content = (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <EventInsideExperience {...experience} />
       <p className="text-center text-xs text-white/60">
         Built on live event + join-request data. Next: explore inline host reply shortcuts.
       </p>
+    </div>
+  );
+
+  // Authenticated users get full layout with sidebar, header, and mobile action bar
+  if (authenticatedUser && currentUserProfile) {
+    return (
+      <EventLayout
+        eventTitle={eventRecord.title}
+        eventLocation={eventRecord.locationName}
+        userDisplayName={currentUserProfile.displayName}
+        userEmail={currentUserProfile.email}
+        userPhotoUrl={currentUserProfile.photoUrl}
+      >
+        {content}
+      </EventLayout>
+    );
+  }
+
+  // Unauthenticated users get minimal view for public sharing
+  return (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-0">
+      {content}
     </div>
   );
 }

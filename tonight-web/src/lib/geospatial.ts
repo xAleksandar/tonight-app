@@ -50,6 +50,21 @@ const resolveRadius = (radiusMeters?: number | null): number => {
 };
 
 const buildOriginFragment = (latitude: number, longitude: number) => {
+  // Defensive validation: catch any values that slip through
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error(
+      `Invalid coordinates for geometry construction: lat=${latitude}, lng=${longitude}`
+    );
+  }
+
+  if (latitude < -90 || latitude > 90) {
+    throw new Error(`Latitude ${latitude} out of valid range [-90, 90]`);
+  }
+
+  if (longitude < -180 || longitude > 180) {
+    throw new Error(`Longitude ${longitude} out of valid range [-180, 180]`);
+  }
+
   return Prisma.sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), ${EARTH_SRID})::geography`;
 };
 
@@ -72,7 +87,6 @@ export const findNearbyEvents = async (
   const lat = assertFiniteCoordinate(latitude, 'latitude');
   const lng = assertFiniteCoordinate(longitude, 'longitude');
   const radius = resolveRadius(radiusMeters);
-  const origin = buildOriginFragment(lat, lng);
 
   const events = await prisma.$queryRaw<NearbyEventRecord[]>`
     SELECT
@@ -90,7 +104,7 @@ export const findNearbyEvents = async (
       e."updatedAt",
       ST_Y(e."location"::geometry) AS "latitude",
       ST_X(e."location"::geometry) AS "longitude",
-      ST_Distance(e."location", ${origin}) AS "distanceMeters",
+      ST_Distance(e."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), ${EARTH_SRID})::geography) AS "distanceMeters",
       COALESCE(accepted."acceptedCount", 0) AS "acceptedCount",
       viewer_request."status" AS "viewerJoinRequestStatus",
       COALESCE(host_updates."unseenCount", 0) AS "viewerHostUpdatesUnseen"
@@ -117,7 +131,7 @@ export const findNearbyEvents = async (
         )
     ) AS host_updates ON TRUE
     WHERE e."status" = 'ACTIVE'
-      AND ST_DWithin(e."location", ${origin}, ${radius})
+      AND ST_DWithin(e."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), ${EARTH_SRID})::geography, ${radius})
       AND NOT EXISTS (
         SELECT 1 FROM "BlockedUser" b
         WHERE (b."blockerId" = ${userId} AND b."blockedId" = e."hostId")

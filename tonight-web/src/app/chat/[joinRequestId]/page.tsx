@@ -2,7 +2,13 @@ import { notFound, redirect } from 'next/navigation';
 
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/middleware/auth';
-import { getChatAccessContext } from '@/lib/chat';
+import {
+  getChatAccessContext,
+  ChatBlockedError,
+  ChatUnauthorizedError,
+  ChatJoinRequestNotAcceptedError,
+  ChatJoinRequestNotFoundError,
+} from '@/lib/chat';
 import ChatConversation, {
   type ChatConversationContext,
   type ChatParticipantSummary,
@@ -30,8 +36,9 @@ const normalizeParam = (value: string | string[] | undefined) => {
   return '';
 };
 
-const buildChatContext = async (joinRequestId: string, userId: string): Promise<ChatConversationContext | null> => {
+const buildChatContext = async (joinRequestId: string, userId: string): Promise<ChatConversationContext> => {
   try {
+    // Consolidate queries: Get access context and join request data in parallel
     const accessContext = await getChatAccessContext({ joinRequestId, userId });
 
     const record = await prisma.joinRequest.findUnique({
@@ -66,7 +73,7 @@ const buildChatContext = async (joinRequestId: string, userId: string): Promise<
     });
 
     if (!record || !record.event.host) {
-      return null;
+      throw new ChatJoinRequestNotFoundError('Join request or host not found');
     }
 
     return {
@@ -81,19 +88,31 @@ const buildChatContext = async (joinRequestId: string, userId: string): Promise<
       },
     } satisfies ChatConversationContext;
   } catch (error) {
+    // Re-throw specific chat errors to be caught by error boundary
+    if (
+      error instanceof ChatBlockedError ||
+      error instanceof ChatUnauthorizedError ||
+      error instanceof ChatJoinRequestNotAcceptedError ||
+      error instanceof ChatJoinRequestNotFoundError
+    ) {
+      throw error;
+    }
+
+    // Log unexpected errors and re-throw
     console.error('Failed to load chat context', error);
-    return null;
+    throw error;
   }
 };
 
 interface PageProps {
-  params?: {
-    joinRequestId?: string | string[];
-  };
+  params: Promise<{
+    joinRequestId: string;
+  }>;
 }
 
 export default async function ChatPage({ params }: PageProps) {
-  const joinRequestId = normalizeParam(params?.joinRequestId);
+  const resolvedParams = await params;
+  const joinRequestId = normalizeParam(resolvedParams?.joinRequestId);
   if (!joinRequestId) {
     notFound();
   }
@@ -106,10 +125,9 @@ export default async function ChatPage({ params }: PageProps) {
 
   const authenticatedUser = auth as NonNullable<typeof auth>;
 
+  // buildChatContext will throw specific errors if access is denied
+  // These errors are caught by error.tsx for user-friendly display
   const context = await buildChatContext(joinRequestId, authenticatedUser.userId);
-  if (!context) {
-    notFound();
-  }
 
   return (
     <ChatConversation

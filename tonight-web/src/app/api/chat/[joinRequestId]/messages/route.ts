@@ -13,9 +13,9 @@ import {
 import { createErrorResponse, handleRouteError } from '@/lib/http/errors';
 
 interface RouteContext {
-  params?: {
+  params: Promise<{
     joinRequestId?: string;
-  };
+  }>;
 }
 
 const normalizeJoinRequestId = (value: unknown) => {
@@ -55,7 +55,8 @@ export const getChatMessagesHandler: AuthenticatedRouteHandler<NextResponse> = a
   context,
   auth
 ) => {
-  const joinRequestIdParam = (context as RouteContext)?.params?.joinRequestId;
+  const params = await (context as RouteContext).params;
+  const joinRequestIdParam = params?.joinRequestId;
   const normalizedJoinRequestId = normalizeJoinRequestId(joinRequestIdParam);
   if ('error' in normalizedJoinRequestId) {
     return createErrorResponse({
@@ -114,7 +115,8 @@ export const postChatMessageHandler: AuthenticatedRouteHandler<NextResponse> = a
   context,
   auth
 ) => {
-  const joinRequestIdParam = (context as RouteContext)?.params?.joinRequestId;
+  const params = await (context as RouteContext).params;
+  const joinRequestIdParam = params?.joinRequestId;
   const normalizedJoinRequestId = normalizeJoinRequestId(joinRequestIdParam);
   if ('error' in normalizedJoinRequestId) {
     return createErrorResponse({

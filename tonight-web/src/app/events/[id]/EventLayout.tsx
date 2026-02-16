@@ -1,0 +1,70 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
+import { DesktopHeader } from "@/components/tonight/DesktopHeader";
+import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import type { CategoryId } from "@/lib/categories";
+
+type EventLayoutProps = {
+  children: React.ReactNode;
+  eventTitle: string;
+  eventLocation: string;
+  userDisplayName: string | null;
+  userEmail: string | null;
+  userPhotoUrl: string | null;
+};
+
+export function EventLayout({
+  children,
+  eventTitle,
+  eventLocation,
+  userDisplayName,
+  userEmail,
+  userPhotoUrl,
+}: EventLayoutProps) {
+  const router = useRouter();
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+
+  return (
+    <div className="min-h-dvh bg-background text-foreground">
+      <div className="flex min-h-dvh flex-col md:flex-row">
+        <DesktopSidebar
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          onCreate={() => router.push('/events/create')}
+          onNavigateDiscover={() => router.push('/')}
+          onNavigatePeople={() => router.push('/people')}
+          onNavigateMessages={() => router.push('/messages')}
+          activePrimaryNav={null}
+        />
+
+        <div className="flex flex-1 flex-col">
+          <DesktopHeader
+            title={eventTitle}
+            subtitle={eventLocation}
+            onNavigateProfile={() => router.push('/profile')}
+            onNavigateMessages={() => router.push('/messages')}
+            userDisplayName={userDisplayName}
+            userEmail={userEmail}
+            userPhotoUrl={userPhotoUrl}
+          />
+
+          <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
+            {children}
+          </main>
+        </div>
+      </div>
+
+      <MobileActionBar
+        active={null}
+        onNavigateDiscover={() => router.push('/')}
+        onNavigatePeople={() => router.push('/people')}
+        onNavigateMessages={() => router.push('/messages')}
+        onCreate={() => router.push('/events/create')}
+        onOpenProfile={() => router.push('/profile')}
+      />
+    </div>
+  );
+}
