@@ -198,6 +198,11 @@ type HostFriendSelectionBlockedEntry = {
   eventInviteCoolingDown: boolean;
 };
 
+type HostFriendSelectionEligibility = {
+  eligible: boolean;
+  blockedEntry?: HostFriendSelectionBlockedEntry;
+};
+
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
@@ -230,6 +235,7 @@ export function EventInsideExperience({
   const [hostFriendSelectionState, setHostFriendSelectionState] = useState<Record<string, boolean>>({});
   const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
   const [hostFriendSelectionSkippedExpanded, setHostFriendSelectionSkippedExpanded] = useState(false);
+  const [hostFriendSelectionSkippedHistory, setHostFriendSelectionSkippedHistory] = useState<string[]>([]);
   const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
   const [hostFriendEventInviteState, setHostFriendEventInviteState] = useState<Record<string, string | null>>({});
   const [hostFriendEventInviteOverrides, setHostFriendEventInviteOverrides] = useState<Record<string, string | null>>({});
@@ -457,6 +463,18 @@ export function EventInsideExperience({
   }, [hostFriendInviteEntries]);
 
   useEffect(() => {
+    if (!hostFriendSelectionSkippedHistory.length) {
+      return;
+    }
+
+    const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+    setHostFriendSelectionSkippedHistory((prev) => {
+      const filtered = prev.filter((id) => activeIds.has(id));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [hostFriendInviteEntries, hostFriendSelectionSkippedHistory]);
+
+  useEffect(() => {
     if (!Object.keys(hostFriendInviteGuardrails).length) {
       return;
     }
@@ -640,28 +658,22 @@ export function EventInsideExperience({
     },
     [hostFriendInviteEntries, hostFriendInviteGuardrails]
   );
-  const hostFriendSelectedEntries = useMemo(
-    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
-    [hostFriendInviteEntries, hostFriendSelectionState]
-  );
-  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
-  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
-  const hostFriendSelectionBreakdown = useMemo(() => {
-    return hostFriendSelectedEntries.reduce(
-      (acc, friend) => {
-        const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
-        const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO ?? null;
-        const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
-        const currentEventInviteAtISO =
-          hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
-        const overrideToken = hostFriendEventInviteOverrides[friend.joinRequestId] ?? null;
-        const eventInviteLocked = Boolean(currentEventInviteAtISO && overrideToken !== currentEventInviteAtISO);
-        const eventInviteCooldownUntilISO = getEventInviteCooldownUntil(currentEventInviteAtISO);
-        const eventInviteCoolingDown = Boolean(currentEventInviteAtISO) && isInviteGuardrailActive(eventInviteCooldownUntilISO);
-        const eventInviteOverrideAvailable = eventInviteLocked && !eventInviteCoolingDown;
+  const evaluateHostFriendSelectionEligibility = useCallback(
+    (friend: HostFriendInviteEntry): HostFriendSelectionEligibility => {
+      const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
+      const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO ?? null;
+      const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
+      const currentEventInviteAtISO = hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
+      const overrideToken = hostFriendEventInviteOverrides[friend.joinRequestId] ?? null;
+      const eventInviteLocked = Boolean(currentEventInviteAtISO && overrideToken !== currentEventInviteAtISO);
+      const eventInviteCooldownUntilISO = getEventInviteCooldownUntil(currentEventInviteAtISO);
+      const eventInviteCoolingDown = Boolean(currentEventInviteAtISO) && isInviteGuardrailActive(eventInviteCooldownUntilISO);
+      const eventInviteOverrideAvailable = eventInviteLocked && !eventInviteCoolingDown;
 
-        if (inviteGuardrailActive || eventInviteLocked) {
-          acc.blockedEntries.push({
+      if (inviteGuardrailActive || eventInviteLocked) {
+        return {
+          eligible: false,
+          blockedEntry: {
             friend,
             reason: inviteGuardrailActive
               ? nextInviteAvailableAtISO
@@ -675,7 +687,26 @@ export function EventInsideExperience({
             currentEventInviteAtISO,
             eventInviteOverrideAvailable,
             eventInviteCoolingDown,
-          });
+          },
+        };
+      }
+
+      return { eligible: true };
+    },
+    [event.title, getHostFriendGuardrailFor, hostFriendEventInviteOverrides, hostFriendEventInviteState]
+  );
+  const hostFriendSelectedEntries = useMemo(
+    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
+    [hostFriendInviteEntries, hostFriendSelectionState]
+  );
+  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
+  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
+  const hostFriendSelectionBreakdown = useMemo(() => {
+    return hostFriendSelectedEntries.reduce(
+      (acc, friend) => {
+        const { eligible, blockedEntry } = evaluateHostFriendSelectionEligibility(friend);
+        if (!eligible && blockedEntry) {
+          acc.blockedEntries.push(blockedEntry);
           return acc;
         }
 
@@ -684,7 +715,7 @@ export function EventInsideExperience({
       },
       { eligibleEntries: [] as HostFriendInviteEntry[], blockedEntries: [] as HostFriendSelectionBlockedEntry[] }
     );
-  }, [event.title, getHostFriendGuardrailFor, hostFriendEventInviteOverrides, hostFriendEventInviteState, hostFriendSelectedEntries]);
+  }, [evaluateHostFriendSelectionEligibility, hostFriendSelectedEntries]);
   const hostFriendSelectionEligibleEntries = hostFriendSelectionBreakdown.eligibleEntries;
   const hostFriendSelectionBlockedEntries = hostFriendSelectionBreakdown.blockedEntries;
   const hostFriendSelectionEligibleCount = hostFriendSelectionEligibleEntries.length;
@@ -705,6 +736,27 @@ export function EventInsideExperience({
       : hostFriendSelectionEligibleCount === 1
         ? "Send template to 1 friend"
         : `Send template to ${hostFriendSelectionEligibleCount} friends`;
+  const hostFriendSelectionSkippedHistorySet = useMemo(
+    () => new Set(hostFriendSelectionSkippedHistory),
+    [hostFriendSelectionSkippedHistory]
+  );
+  const hostFriendSelectionSkippedHistoryEntries = useMemo(() => {
+    if (!hostFriendSelectionSkippedHistorySet.size) {
+      return [];
+    }
+    return hostFriendInviteEntries.filter((friend) => hostFriendSelectionSkippedHistorySet.has(friend.joinRequestId));
+  }, [hostFriendInviteEntries, hostFriendSelectionSkippedHistorySet]);
+  const hostFriendSelectionSkippedHistoryCount = hostFriendSelectionSkippedHistoryEntries.length;
+  const hostFriendSelectionSkippedReselectableEntries = useMemo(
+    () =>
+      hostFriendSelectionSkippedHistoryEntries.filter((friend) => evaluateHostFriendSelectionEligibility(friend).eligible),
+    [evaluateHostFriendSelectionEligibility, hostFriendSelectionSkippedHistoryEntries]
+  );
+  const hostFriendSelectionSkippedReselectableCount = hostFriendSelectionSkippedReselectableEntries.length;
+  const hostFriendSelectionSkippedReadyLabel =
+    hostFriendSelectionSkippedReselectableCount === 1
+      ? "1 friend ready again"
+      : `${hostFriendSelectionSkippedReselectableCount} friends ready again`;
 
   useEffect(() => {
     if (!hostFriendSelectionActive) {
@@ -1349,6 +1401,39 @@ export function EventInsideExperience({
     });
   };
 
+  const handleHostFriendSelectionReselectSkipped = () => {
+    if (hostFriendSelectionStatus === "sending") {
+      return;
+    }
+
+    if (!hostFriendSelectionSkippedReselectableEntries.length) {
+      showErrorToast("Still cooling down", "We’ll light this back up once friends are ready again.");
+      return;
+    }
+
+    setHostFriendSelectionState((prev) => {
+      const next = { ...prev };
+      for (const friend of hostFriendSelectionSkippedReselectableEntries) {
+        next[friend.joinRequestId] = true;
+      }
+      return next;
+    });
+
+    setHostFriendSelectionSkippedHistory((prev) => {
+      if (!prev.length) {
+        return prev;
+      }
+      const readyIds = new Set(hostFriendSelectionSkippedReselectableEntries.map((friend) => friend.joinRequestId));
+      const filtered = prev.filter((id) => !readyIds.has(id));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+
+    const readyCount = hostFriendSelectionSkippedReselectableEntries.length;
+    const label = readyCount === 1 ? "Friend reselected" : "Friends reselected";
+    const helper = readyCount === 1 ? "They’re back in your selection." : `${readyCount} friends are ready again.`;
+    showSuccessToast(label, helper);
+  };
+
   const handleHostFriendSelectionSend = async () => {
     if (!hostFriendSelectedEntries.length) {
       showErrorToast("No friends selected", "Pick at least one friend before sending.");
@@ -1361,6 +1446,9 @@ export function EventInsideExperience({
       showErrorToast("Invite cooling down", "Everyone you selected was invited recently. Give them a moment before re-sending.");
       return;
     }
+
+    const skippedEntries = hostFriendSelectionBlockedEntries;
+    setHostFriendSelectionSkippedHistory(skippedEntries.map((entry) => entry.friend.joinRequestId));
 
     setHostFriendSelectionStatus("sending");
     const invites = eligibleEntries.map((friend) => ({
@@ -1375,10 +1463,47 @@ export function EventInsideExperience({
       const successes = results.filter((result) => result.status === "sent");
 
       if (successes.length > 0) {
-        const label = successes.length === 1 ? "Invite sent" : "Invites sent";
-        const helper =
-          successes.length === 1 ? "Template delivered to 1 friend." : `Template delivered to ${successes.length} friends.`;
-        showSuccessToast(label, helper);
+        const sentCount = successes.length;
+        const skippedCount = skippedEntries.length;
+        const failedCount = failures.size;
+        const summaryLabel = sentCount === 1 ? "Invite sent" : "Invites sent";
+        const summaryTextSegments: string[] = [
+          sentCount === 1 ? "1 invite delivered." : `${sentCount} invites delivered.`,
+        ];
+        if (skippedCount > 0) {
+          summaryTextSegments.push(
+            skippedCount === 1 ? "1 friend skipped (cooldown)." : `${skippedCount} friends skipped (cooldown).`
+          );
+        }
+        if (failedCount > 0) {
+          summaryTextSegments.push(
+            failedCount === 1 ? "1 invite failed (see error)." : `${failedCount} invites failed (see error).`
+          );
+        }
+
+        const handleToastReselect = () => {
+          setHostFriendSelectionSkippedExpanded(true);
+          handleHostFriendSelectionReselectSkipped();
+        };
+
+        const toastDescription = (
+          <div className="space-y-2">
+            <p className="text-sm">
+              {summaryTextSegments.join(" ")}
+            </p>
+            {skippedCount > 0 ? (
+              <button
+                type="button"
+                onClick={handleToastReselect}
+                className="rounded-full border border-foreground/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground transition hover:border-foreground/40"
+              >
+                Reselect skipped friends
+              </button>
+            ) : null}
+          </div>
+        );
+
+        showSuccessToast(summaryLabel, toastDescription);
         successes.forEach((result) => {
           stampHostFriendInviteGuardrail(result.joinRequestId);
         });
@@ -2038,6 +2163,50 @@ export function EventInsideExperience({
                             Clear selection
                           </button>
                         </div>
+                      </div>
+                    ) : null}
+                    {hostFriendSelectionSkippedHistoryCount > 0 ? (
+                      <div className="mt-4 rounded-2xl border border-dashed border-white/15 bg-black/30 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Skipped friends</p>
+                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80">
+                            {hostFriendSelectionSkippedHistoryCount}
+                          </span>
+                          {hostFriendSelectionSkippedReselectableCount > 0 ? (
+                            <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+                              {hostFriendSelectionSkippedReadyLabel}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-white/50">Waiting for cooldowns</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-white/60">
+                          {hostFriendSelectionSkippedReselectableCount > 0
+                            ? "We’ll drop them back into your selection once you tap the button."
+                            : "We’ll re-enable the button once cooldowns lift."}
+                        </p>
+                        {hostFriendSelectionSkippedHistoryEntries.length ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {hostFriendSelectionSkippedHistoryEntries.map((friend) => (
+                              <span
+                                key={friend.joinRequestId}
+                                className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-semibold text-white/70"
+                              >
+                                {friend.displayName}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={handleHostFriendSelectionReselectSkipped}
+                          className="mt-3 rounded-full border border-white/30 px-4 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={hostFriendSelectionSkippedReselectableCount === 0 || hostFriendSelectionStatus === "sending"}
+                        >
+                          {hostFriendSelectionSkippedReselectableCount > 0
+                            ? `Reselect skipped ${hostFriendSelectionSkippedReselectableCount === 1 ? "friend" : "friends"}`
+                            : "Reselect skipped friends"}
+                        </button>
                       </div>
                     ) : null}
                     {filteredHostFriendInvites.length === 0 ? (

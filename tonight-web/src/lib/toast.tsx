@@ -91,7 +91,11 @@ function ToastCard({ intent, title, description, visible, onDismiss }: ToastCard
             </span>
           </div>
           <p className="text-sm font-semibold text-foreground">{title}</p>
-          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+          {description === undefined || description === null ? null : typeof description === "string" || typeof description === "number" ? (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          ) : (
+            <div className="text-sm text-muted-foreground">{description}</div>
+          )}
         </div>
         <button
           type="button"
