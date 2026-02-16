@@ -272,3 +272,9 @@ Each run should:
 - Introduced a shared inline chip style to keep the new row lightweight, hid scrollbars for horizontal swipe use, and wired the actions into the existing handlers so there’s no duplicated logic.
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: add host-only share chips (copy invite link + Web Share) next to the new action row so hosts can blast the plan straight from chat without reopening the sheet.
+
+## 2026-02-16 20:45 EET — Host invite sharing chips in chat header
+- Added host-only "Copy invite link" and Web Share chips to the `/chat/[joinRequestId]` inline action row so hosts can blast event invitations without reopening the info sheet, complete with clipboard/share state, success toasts, and graceful fallbacks when the browser lacks Web Share support.
+- Threaded reusable invite-share helpers into `ChatConversation` (link resolver, share text builder, clipboard util) so the new chips stay hydrated with the correct Tonight origin even inside the standalone chat view.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: hook the `/events/[id]` experience with richer chat entry points (CTA + inline preview) so guests can jump into their thread straight from the event page.

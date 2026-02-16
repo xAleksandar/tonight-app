@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarPlus, Copy, Flag, Info, MapPin, Send, X } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, Copy, Flag, Info, MapPin, Send, Share2, X } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
@@ -131,18 +131,27 @@ export default function ChatConversation({
   const [isEventSheetOpen, setIsEventSheetOpen] = useState(false);
   const [isCopyingLocation, setIsCopyingLocation] = useState(false);
   const [isCalendarExporting, setIsCalendarExporting] = useState(false);
+  const [eventShareUrl, setEventShareUrl] = useState<string | null>(`https://tonight.app/events/${context.event.id}`);
+  const [eventShareCopyState, setEventShareCopyState] = useState<'idle' | 'copying' | 'copied'>('idle');
+  const [eventShareShareState, setEventShareShareState] = useState<'idle' | 'sharing'>('idle');
+  const [eventShareSupported, setEventShareSupported] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const isHostViewer = context.requesterRole === 'host';
   const counterpart = useMemo(() => {
-    return context.requesterRole === 'host' ? context.participant : context.host;
-  }, [context]);
+    return isHostViewer ? context.participant : context.host;
+  }, [context, isHostViewer]);
   const counterpartId = counterpart.id;
 
   const eventTimeLabel = useMemo(() => formatDateTime(context.event.datetime), [context.event.datetime]);
+  const eventInviteShareText = useMemo(
+    () => buildChatEventInviteShareText(context.event.title, eventTimeLabel, context.event.locationName),
+    [context.event.locationName, context.event.title, eventTimeLabel]
+  );
   const eventStartDate = useMemo(() => {
     const date = new Date(context.event.datetime);
     return Number.isNaN(date.getTime()) ? null : date;
@@ -154,6 +163,18 @@ export default function ChatConversation({
     const query = encodeURIComponent(context.event.locationName);
     return `https://www.google.com/maps/search/?api=1&query=${query}`;
   }, [context.event.locationName]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const origin = window.location?.origin?.trim().length ? window.location.origin : 'https://tonight.app';
+    setEventShareUrl(`${origin}/events/${context.event.id}`);
+  }, [context.event.id]);
+
+  useEffect(() => {
+    setEventShareSupported(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+  }, []);
 
   const appendMessage = useCallback((message: SerializedMessage) => {
     setMessages((previous) => {
@@ -618,6 +639,56 @@ export default function ChatConversation({
     }
   }, [context.event.locationName, hasLocationDetails]);
 
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!eventShareUrl) {
+      showErrorToast('Invite link not ready', 'The invite link is still loading. Try again in a moment.');
+      return;
+    }
+    try {
+      setEventShareCopyState('copying');
+      await copyTextToClipboard(eventShareUrl);
+      setEventShareCopyState('copied');
+      showSuccessToast('Invite link copied', 'Drop it anywhere to fast-pass your friends.');
+    } catch (error) {
+      setEventShareCopyState('idle');
+      const message = (error as Error)?.message ?? 'Copy the link manually for now.';
+      showErrorToast('Copy failed', message);
+    }
+  }, [eventShareUrl]);
+
+  const handleShareInviteLink = useCallback(async () => {
+    if (!eventShareUrl) {
+      showErrorToast('Share unavailable', 'The invite link is still loading. Try again shortly.');
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+      await handleCopyInviteLink();
+      return;
+    }
+
+    try {
+      setEventShareShareState('sharing');
+      await navigator.share({
+        title: context.event.title,
+        text: eventInviteShareText,
+        url: eventShareUrl,
+      });
+      showSuccessToast('Share sheet ready', 'Pick any app to send this plan.');
+    } catch (error) {
+      const dismissed =
+        error instanceof DOMException
+          ? error.name === 'AbortError'
+          : typeof error === 'object' && error !== null && 'name' in error && (error as { name?: string }).name === 'AbortError';
+      if (!dismissed) {
+        const message = (error as Error)?.message ?? 'Copy the link instead.';
+        showErrorToast('Share failed', message);
+      }
+    } finally {
+      setEventShareShareState('idle');
+    }
+  }, [context.event.title, eventInviteShareText, eventShareUrl, handleCopyInviteLink]);
+
   const handleOpenMaps = useCallback(() => {
     if (!mapsUrl) {
       showErrorToast('Location coming soon', 'Maps will unlock once the host shares the venue.');
@@ -766,6 +837,35 @@ export default function ChatConversation({
               <CalendarPlus className="h-3.5 w-3.5" />
               {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
             </button>
+            {isHostViewer ? (
+              <>
+                <span className="mx-1 hidden h-4 w-px self-center bg-border/40 sm:block" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={handleCopyInviteLink}
+                  disabled={!eventShareUrl || eventShareCopyState === 'copying'}
+                  className={inlineChipClass(!eventShareUrl || eventShareCopyState === 'copying')}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {eventShareCopyState === 'copying'
+                    ? 'Copying…'
+                    : eventShareCopyState === 'copied'
+                      ? 'Link copied'
+                      : 'Copy invite link'}
+                </button>
+                {eventShareSupported ? (
+                  <button
+                    type="button"
+                    onClick={handleShareInviteLink}
+                    disabled={!eventShareUrl || eventShareShareState === 'sharing'}
+                    className={inlineChipClass(!eventShareUrl || eventShareShareState === 'sharing')}
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {eventShareShareState === 'sharing' ? 'Sharing…' : 'Share invite'}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
           </div>
         </div>
       </header>
@@ -1000,4 +1100,42 @@ export default function ChatConversation({
       ) : null}
     </div>
   );
+}
+
+function buildChatEventInviteShareText(title: string, eventMomentLabel: string | null, locationName?: string | null) {
+  const parts: string[] = [`Join me at "${title}"`];
+  if (eventMomentLabel) {
+    parts.push(`on ${eventMomentLabel}`);
+  }
+  const locationLabel = locationName?.trim();
+  if (locationLabel) {
+    parts.push(`near ${locationLabel}`);
+  }
+  parts.push('Request access on Tonight.');
+  return parts.join(' ');
+}
+
+async function copyTextToClipboard(value: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  if (typeof document === 'undefined') {
+    throw new Error('Clipboard unavailable');
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.top = '-1000px';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const successful = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!successful) {
+    throw new Error('Unable to copy to clipboard.');
+  }
 }
