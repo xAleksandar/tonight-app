@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { List as ListIcon, Map as MapIcon, MessageCircle } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
 import { classNames } from "@/lib/classNames";
+import type { MobileActionBarProps } from "./MobileActionBar";
 
 export type DesktopHeaderProps = {
   title: string;
@@ -16,6 +18,15 @@ export type DesktopHeaderProps = {
   userDisplayName?: string | null;
   userEmail?: string | null;
   userPhotoUrl?: string | null;
+  chatAction?: MobileActionBarProps["chatAction"];
+};
+
+type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
+
+const CHAT_BADGE_TONE_CLASS: Record<NonNullable<DesktopChatAction["badgeTone"]>, string> = {
+  highlight: "bg-primary/15 text-primary",
+  success: "bg-emerald-400/15 text-emerald-100",
+  muted: "bg-white/10 text-white/70",
 };
 
 export function DesktopHeader({
@@ -29,9 +40,13 @@ export function DesktopHeader({
   userDisplayName,
   userEmail,
   userPhotoUrl,
+  chatAction,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
+  const hasChatAction = Boolean(chatAction?.href && chatAction?.label);
+  const chatBadgeClassName = chatAction?.badgeTone ? CHAT_BADGE_TONE_CLASS[chatAction.badgeTone] : CHAT_BADGE_TONE_CLASS.muted;
+  const chatAttentionLabel = chatAction?.attentionLabel ?? "New chat ping";
 
   return (
     <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-background/85 px-10 py-3 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:grid md:grid-cols-3 md:items-center">
@@ -71,7 +86,41 @@ export function DesktopHeader({
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end gap-4">
+        {hasChatAction ? (
+          <div className="flex w-full max-w-xs flex-col items-end gap-1 text-right">
+            <Link
+              href={chatAction!.href}
+              prefetch={false}
+              onClick={chatAction?.onInteract}
+              className={classNames(
+                "inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                chatAction?.attentionActive ? "shadow-[0_0_35px_rgba(236,72,153,0.45)] animate-[pulse_2s_ease-in-out_infinite]" : undefined
+              )}
+              aria-label={`Open chat (${chatAction!.label})`}
+            >
+              <span>{chatAction!.label}</span>
+              {chatAction?.badgeLabel ? (
+                <span
+                  className={classNames(
+                    "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
+                    chatBadgeClassName
+                  )}
+                >
+                  {chatAction.badgeLabel}
+                </span>
+              ) : null}
+            </Link>
+            {chatAction?.attentionActive ? (
+              <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                <span>{chatAttentionLabel}</span>
+              </div>
+            ) : chatAction?.helperText ? (
+              <p className="text-xs text-muted-foreground line-clamp-1">{chatAction.helperText}</p>
+            ) : null}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={messagesDisabled ? undefined : onNavigateMessages}

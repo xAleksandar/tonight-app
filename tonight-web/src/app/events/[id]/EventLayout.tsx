@@ -5,6 +5,7 @@ import { useState } from "react";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { MobileActionBar, type MobileActionBarProps } from "@/components/tonight/MobileActionBar";
+import { EventChatAttentionToast } from "@/components/tonight/EventChatAttentionToast";
 import type { CategoryId } from "@/lib/categories";
 
 type EventLayoutProps = {
@@ -28,6 +29,7 @@ export function EventLayout({
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+  const showChatAttentionToast = Boolean(chatAction?.attentionActive && chatAction?.href);
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -51,6 +53,7 @@ export function EventLayout({
             userDisplayName={userDisplayName}
             userEmail={userEmail}
             userPhotoUrl={userPhotoUrl}
+            chatAction={chatAction}
           />
 
           <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -58,6 +61,16 @@ export function EventLayout({
           </main>
         </div>
       </div>
+
+      {showChatAttentionToast ? (
+        <EventChatAttentionToast
+          href={chatAction!.href}
+          label={chatAction!.label}
+          helperText={chatAction?.helperText}
+          attentionLabel={chatAction?.attentionLabel}
+          onInteract={chatAction?.onInteract}
+        />
+      ) : null}
 
       <MobileActionBar
         active={null}

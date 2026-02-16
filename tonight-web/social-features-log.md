@@ -321,3 +321,9 @@ Each run should:
 - Restyled the event hero CTA and mobile action bar chat block to show a “New chat ping” chip plus a gentle glow/pulse when attention is requested, and wired the CTA interactions to acknowledge/clear the signal.
 - Extended the mobile action bar + builder + tests to support the new attention metadata, and refreshed the EventInsideExperience + MobileActionBar Vitest suites (`cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/MobileActionBar.test.tsx`).
 - Next: bubble the same attention signal into the scrolling event layout (e.g., sticky desktop header and in-page toast) so hosts/guests notice new chat pings even after they scroll past the hero block.
+
+## 2026-02-17 00:12 EET — Desktop header + floating toast mirror chat attention
+- Plumbed the chat-action payload into `EventLayout` so the sticky desktop header now renders the chat CTA with unread badges + the “New chat ping” pulse, making the signal visible even after the hero scrolls off-screen.
+- Added a reusable `EventChatAttentionToast` component and wired it into the event layout to surface a floating, dismissible “Jump back into chat” banner whenever live attention is active, ensuring both hosts and guests get nudged mid-scroll; clicking or dismissing clears the socket-driven attention state.
+- Introduced focused coverage for the new UI (`npx vitest run tests/components/DesktopHeader.test.tsx tests/components/EventChatAttentionToast.test.tsx`).
+- Next: enrich the floating toast with the latest message snippet + sender context so the alert tells people *what* changed before they jump into `/chat`.
