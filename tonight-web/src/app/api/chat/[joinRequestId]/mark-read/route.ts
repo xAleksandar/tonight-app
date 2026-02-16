@@ -5,7 +5,8 @@ import { getChatAccessContext } from '@/lib/chat';
 import { socketService } from '@/lib/socket';
 
 export const POST = requireAuth(async (request, context, auth): Promise<NextResponse> => {
-  const { joinRequestId } = (context as { params: { joinRequestId: string } }).params;
+  const params = await (context as { params: Promise<{ joinRequestId: string }> }).params;
+  const { joinRequestId } = params;
   const userId = auth.userId;
 
   try {
