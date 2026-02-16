@@ -1,4 +1,4 @@
-import { Prisma, EventStatus } from '@/generated/prisma/client';
+import { Prisma, EventStatus, JoinRequestStatus } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
 import { expirePastEvents } from '@/lib/event-expiration';
 
@@ -22,6 +22,8 @@ export type NearbyEventRecord = {
   latitude: number | string;
   longitude: number | string;
   acceptedCount: number | string;
+  viewerJoinRequestStatus: JoinRequestStatus | null;
+  viewerHostUpdatesUnseen: number | string | null;
 };
 
 const assertFiniteCoordinate = (value: number, label: 'latitude' | 'longitude'): number => {
@@ -48,6 +50,21 @@ const resolveRadius = (radiusMeters?: number | null): number => {
 };
 
 const buildOriginFragment = (latitude: number, longitude: number) => {
+  // Defensive validation: catch any values that slip through
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error(
+      `Invalid coordinates for geometry construction: lat=${latitude}, lng=${longitude}`
+    );
+  }
+
+  if (latitude < -90 || latitude > 90) {
+    throw new Error(`Latitude ${latitude} out of valid range [-90, 90]`);
+  }
+
+  if (longitude < -180 || longitude > 180) {
+    throw new Error(`Longitude ${longitude} out of valid range [-180, 180]`);
+  }
+
   return Prisma.sql`ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), ${EARTH_SRID})::geography`;
 };
 
@@ -70,7 +87,6 @@ export const findNearbyEvents = async (
   const lat = assertFiniteCoordinate(latitude, 'latitude');
   const lng = assertFiniteCoordinate(longitude, 'longitude');
   const radius = resolveRadius(radiusMeters);
-  const origin = buildOriginFragment(lat, lng);
 
   const events = await prisma.$queryRaw<NearbyEventRecord[]>`
     SELECT
@@ -88,8 +104,10 @@ export const findNearbyEvents = async (
       e."updatedAt",
       ST_Y(e."location"::geometry) AS "latitude",
       ST_X(e."location"::geometry) AS "longitude",
-      ST_Distance(e."location", ${origin}) AS "distanceMeters",
-      COALESCE(accepted."acceptedCount", 0) AS "acceptedCount"
+      ST_Distance(e."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), ${EARTH_SRID})::geography) AS "distanceMeters",
+      COALESCE(accepted."acceptedCount", 0) AS "acceptedCount",
+      viewer_request."status" AS "viewerJoinRequestStatus",
+      COALESCE(host_updates."unseenCount", 0) AS "viewerHostUpdatesUnseen"
     FROM "Event" e
     INNER JOIN "User" u ON u."id" = e."hostId"
     LEFT JOIN (
@@ -98,8 +116,22 @@ export const findNearbyEvents = async (
       WHERE "status" = 'ACCEPTED'
       GROUP BY "eventId"
     ) AS accepted ON accepted."eventId" = e."id"
+    LEFT JOIN "JoinRequest" AS viewer_request
+      ON viewer_request."eventId" = e."id"
+     AND viewer_request."userId" = ${userId}
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::integer AS "unseenCount"
+      FROM "Message" m
+      WHERE viewer_request."status" = 'ACCEPTED'
+        AND m."joinRequestId" = viewer_request."id"
+        AND m."senderId" = e."hostId"
+        AND (
+          viewer_request."lastSeenHostActivityAt" IS NULL
+          OR m."createdAt" > viewer_request."lastSeenHostActivityAt"
+        )
+    ) AS host_updates ON TRUE
     WHERE e."status" = 'ACTIVE'
-      AND ST_DWithin(e."location", ${origin}, ${radius})
+      AND ST_DWithin(e."location", ST_SetSRID(ST_MakePoint(${lng}, ${lat}), ${EARTH_SRID})::geography, ${radius})
       AND NOT EXISTS (
         SELECT 1 FROM "BlockedUser" b
         WHERE (b."blockerId" = ${userId} AND b."blockedId" = e."hostId")
@@ -124,6 +156,10 @@ export const findNearbyEvents = async (
         typeof event.acceptedCount === 'number'
           ? event.acceptedCount
           : Number(event.acceptedCount),
+      viewerHostUpdatesUnseen:
+        typeof event.viewerHostUpdatesUnseen === 'number'
+          ? event.viewerHostUpdatesUnseen
+          : Number(event.viewerHostUpdatesUnseen ?? 0),
     }))
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 };

@@ -23,6 +23,7 @@ export type SerializedJoinRequest = {
   status: JoinRequestStatus;
   createdAt: string;
   updatedAt: string;
+  lastSeenHostActivityAt: string | null;
 };
 
 export type SerializedJoinRequestWithUser = SerializedJoinRequest & {
@@ -58,6 +59,7 @@ const serializeJoinRequest = (record: JoinRequest): SerializedJoinRequest => ({
   status: record.status,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
+  lastSeenHostActivityAt: record.lastSeenHostActivityAt ? record.lastSeenHostActivityAt.toISOString() : null,
 });
 
 const serializeJoinRequestWithUser = (

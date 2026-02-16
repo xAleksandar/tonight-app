@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { JoinRequestStatus } from '@/generated/prisma/client';
 import type { AuthenticatedRouteHandler } from '@/middleware/auth';
 import { requireAuth } from '@/middleware/auth';
 import { findNearbyEvents, DEFAULT_RADIUS_METERS } from '@/lib/geospatial';
@@ -82,6 +83,12 @@ const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>
   const hostInitials = buildHostInitials(event.hostDisplayName);
   const acceptedCount = Number(event.acceptedCount ?? 0);
   const spotsRemaining = Math.max(event.maxParticipants - acceptedCount, 0);
+  const viewerStatus = event.viewerJoinRequestStatus ?? null;
+  const hostUpdatesUnseenRaw = Number(event.viewerHostUpdatesUnseen ?? 0);
+  const hostUpdatesUnseenCount =
+    viewerStatus === JoinRequestStatus.ACCEPTED && hostUpdatesUnseenRaw > 0
+      ? hostUpdatesUnseenRaw
+      : null;
 
   return {
     id: event.id,
@@ -114,6 +121,8 @@ const serializeNearbyEvent = (event: Awaited<ReturnType<typeof findNearbyEvents>
       photoUrl: event.hostPhotoUrl,
       initials: hostInitials,
     },
+    viewerJoinRequestStatus: viewerStatus,
+    hostUpdatesUnseenCount,
   };
 };
 

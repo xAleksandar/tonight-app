@@ -5,6 +5,18 @@ import { createId } from '@paralleldrive/cuid2';
 const EARTH_SRID = 4326;
 
 export const buildLocationFragment = (latitude: number, longitude: number) => {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error(
+      `Invalid coordinates for event location: lat=${latitude}, lng=${longitude}`
+    );
+  }
+
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    throw new Error(
+      `Coordinates out of range: lat=${latitude} (must be -90 to 90), lng=${longitude} (must be -180 to 180)`
+    );
+  }
+
   return Prisma.sql`
     ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), ${EARTH_SRID})::geography
   `;
@@ -88,7 +100,23 @@ const toNumber = (value: number | string): number => {
 
 export const fetchEventById = async (eventId: string): Promise<EventRecordWithHost | null> => {
   const records = await prisma.$queryRaw<EventRecordWithHost[]>`
-    SELECT ${EVENT_SELECT_FRAGMENT}
+    SELECT
+      e."id",
+      e."title",
+      e."description",
+      e."datetime",
+      e."locationName",
+      e."maxParticipants",
+      e."status",
+      e."hostId",
+      e."createdAt",
+      e."updatedAt",
+      ST_Y(e."location"::geometry) AS "latitude",
+      ST_X(e."location"::geometry) AS "longitude",
+      u."email" AS "hostEmail",
+      u."displayName" AS "hostDisplayName",
+      u."photoUrl" AS "hostPhotoUrl",
+      u."createdAt" AS "hostCreatedAt"
     FROM "Event" e
     JOIN "User" u ON u."id" = e."hostId"
     WHERE e."id" = ${eventId}
@@ -124,7 +152,19 @@ export const serializeEvent = (record: EventRecordWithHost): SerializedEvent => 
 };
 
 export const createEvent = async (input: CreateEventInput): Promise<SerializedEvent> => {
-  const locationFragment = buildLocationFragment(input.latitude, input.longitude);
+  // Validate coordinates before using them
+  if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) {
+    throw new Error(
+      `Invalid coordinates for event location: lat=${input.latitude}, lng=${input.longitude}`
+    );
+  }
+
+  if (input.latitude < -90 || input.latitude > 90 || input.longitude < -180 || input.longitude > 180) {
+    throw new Error(
+      `Coordinates out of range: lat=${input.latitude} (must be -90 to 90), lng=${input.longitude} (must be -180 to 180)`
+    );
+  }
+
   const eventId = createId();
   const now = new Date();
 
@@ -147,7 +187,7 @@ export const createEvent = async (input: CreateEventInput): Promise<SerializedEv
       ${input.title},
       ${input.description},
       ${input.datetime},
-      ${locationFragment},
+      ST_SetSRID(ST_MakePoint(${input.longitude}, ${input.latitude}), ${EARTH_SRID})::geography,
       ${input.locationName},
       ${input.maxParticipants},
       ${EventStatus.ACTIVE},

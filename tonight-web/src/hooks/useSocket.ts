@@ -7,12 +7,14 @@ import { io, type Socket } from 'socket.io-client';
 import {
   JOIN_REQUEST_JOIN_EVENT,
   JOIN_REQUEST_MESSAGE_EVENT,
+  JOIN_REQUEST_STATUS_CHANGED_EVENT,
   CHAT_TYPING_START_EVENT,
   CHAT_TYPING_STOP_EVENT,
   CHAT_TYPING_EVENT,
   CHAT_TYPING_STOP_BROADCAST_EVENT,
   type SocketMessagePayload,
   type SocketTypingPayload,
+  type JoinRequestStatusChangedPayload,
 } from '@/lib/socket-shared';
 
 export type SocketConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
@@ -26,6 +28,7 @@ type EventHandlers = {
   onError?: (error: Error) => void;
   onTyping?: (payload: SocketTypingPayload) => void;
   onTypingStop?: (payload: { joinRequestId: string; userId: string }) => void;
+  onJoinRequestStatusChanged?: (payload: JoinRequestStatusChangedPayload) => void;
 };
 
 export type UseSocketOptions = EventHandlers & {
@@ -95,6 +98,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     onError,
     onTyping,
     onTypingStop,
+    onJoinRequestStatusChanged,
   } = options;
 
   const handlersRef = useRef<EventHandlers>({
@@ -104,11 +108,12 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     onError,
     onTyping,
     onTypingStop,
+    onJoinRequestStatusChanged,
   });
 
   useEffect(() => {
-    handlersRef.current = { onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop };
-  }, [onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop]);
+    handlersRef.current = { onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop, onJoinRequestStatusChanged };
+  }, [onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop, onJoinRequestStatusChanged]);
 
   const socketRef = useRef<ClientSocket | null>(null);
   const joinedRoomsRef = useRef<Set<string>>(new Set());
@@ -280,6 +285,10 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
 
       socket.on(CHAT_TYPING_STOP_BROADCAST_EVENT, (payload: { joinRequestId: string; userId: string }) => {
         handlersRef.current.onTypingStop?.(payload);
+      });
+
+      socket.on(JOIN_REQUEST_STATUS_CHANGED_EVENT, (payload: JoinRequestStatusChangedPayload) => {
+        handlersRef.current.onJoinRequestStatusChanged?.(payload);
       });
     },
     [flushQueuedRoomJoins, resetReconnectTracking, scheduleReconnect, updateState]

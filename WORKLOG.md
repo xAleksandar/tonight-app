@@ -44,6 +44,7 @@
 - Task 20.8: Promoted Messages to a dedicated /messages route with shared ConversationList scaffolding, rerouted discovery/people entry points, and kept the nav state synced across breakpoints — Commit `HEAD`.
 - Task 20.9: Added the Discover CTA to every Messages empty state so the fallback steers people back into planning (matching the V0 preview) and updated ConversationList to render the new button — Commit `HEAD`.
 ## In Progress / Priority Notes
+- 2026-02-10 21:26 runner: Ensured the desktop sidebar always renders the Messages tab and now falls back to direct router pushes when navigation callbacks are missing (so Discover/People/Messages stay clickable everywhere); added regression coverage around the fallback to keep the nav reliable. `npm test` (74 suites) passes.
 - 2026-02-10 20:57 runner: Added the People Quick Invite panel so the roster page now exposes copy/share affordances with stateful feedback before folks widen their radius; `npm test` (74 suites) passes.
 - 2026-02-10 21:10 runner: Added the desktop People category filters panel so you can change vibes without opening the sidebar and taught the shared chip row to wrap on larger breakpoints; `npm test` (74 suites) passes.
 - 2026-02-10 20:25 runner: Added a UI regression test that exercises the MobileActionBar state so the Messages toggle highlights correctly on open/close and keeps Discover active otherwise; `npm test` (74 suites) passes.

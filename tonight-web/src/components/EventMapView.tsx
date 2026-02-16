@@ -16,6 +16,8 @@ export type MapPoint = {
   longitude: number;
 };
 
+type JoinRequestStatusValue = "PENDING" | "ACCEPTED" | "REJECTED";
+
 export type EventMapItem = {
   id: string;
   title: string;
@@ -23,6 +25,8 @@ export type EventMapItem = {
   location: MapPoint;
   datetimeISO?: string | null;
   distanceMeters?: number | null;
+  viewerJoinRequestStatus?: JoinRequestStatusValue | null;
+  hostUpdatesUnseenCount?: number | null;
 };
 
 export type EventMapViewProps = {
@@ -44,6 +48,7 @@ type EventMarkerEntry = {
   cleanup: () => void;
   event: EventMapItem;
   isHovered: boolean;
+  hostUpdatesBadge: HTMLSpanElement | null;
 };
 
 type MapStatus = "idle" | "loading" | "ready" | "error";
@@ -56,7 +61,7 @@ const getEventMarkerClass = ({
   isHovered: boolean;
 }) =>
   classNames(
-    "pointer-events-auto grid h-5 w-5 place-items-center rounded-full border-2 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300",
+    "pointer-events-auto relative grid h-5 w-5 place-items-center rounded-full border-2 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-300",
     isSelected
       ? "border-pink-100 bg-gradient-to-br from-pink-400 to-pink-500 text-white shadow-lg shadow-pink-400/50"
       : isHovered
@@ -73,6 +78,48 @@ const applyMarkerAppearance = (entry: EventMarkerEntry, selectedEventId: string 
   entry.element.setAttribute("aria-pressed", isSelected ? "true" : "false");
 };
 
+const deriveHostUpdatesIndicator = (event: EventMapItem) => {
+  if (event.viewerJoinRequestStatus !== "ACCEPTED") {
+    return null;
+  }
+  if (typeof event.hostUpdatesUnseenCount !== "number" || event.hostUpdatesUnseenCount <= 0) {
+    return null;
+  }
+
+  const count = Math.trunc(event.hostUpdatesUnseenCount);
+  const value = count > 99 ? "99+" : `${count}`;
+  const label = count === 1 ? "1 new host update" : `${count} new host updates`;
+
+  return { value, label } as const;
+};
+
+const syncHostUpdatesBadge = (entry: EventMarkerEntry) => {
+  const indicator = deriveHostUpdatesIndicator(entry.event);
+
+  if (!indicator) {
+    entry.hostUpdatesBadge?.remove();
+    entry.hostUpdatesBadge = null;
+    entry.element.removeAttribute("data-has-host-updates");
+    entry.element.setAttribute("aria-label", `${entry.event.title} marker`);
+    return;
+  }
+
+  if (!entry.hostUpdatesBadge) {
+    const badge = document.createElement("span");
+    badge.className =
+      "pointer-events-none absolute -top-2 -right-2 min-w-[18px] rounded-full border border-amber-400/80 bg-amber-400 text-[10px] font-semibold leading-none text-zinc-900 shadow shadow-amber-400/50";
+    entry.element.appendChild(badge);
+    entry.hostUpdatesBadge = badge;
+  }
+
+  entry.hostUpdatesBadge.textContent = indicator.value;
+  entry.hostUpdatesBadge.title = indicator.label;
+  entry.hostUpdatesBadge.setAttribute("aria-label", indicator.label);
+  entry.element.setAttribute("data-has-host-updates", "true");
+  entry.element.setAttribute("aria-label", `${entry.event.title} marker — ${indicator.label}`);
+};
+
+
 const buildPopupContent = (event: EventMapItem) => {
   const wrapper = document.createElement("div");
   wrapper.className = "rounded-xl border border-rose-400/40 bg-gradient-to-br from-zinc-700 via-zinc-800 to-zinc-900 p-3 shadow-xl shadow-black/40 backdrop-blur-sm min-w-[200px]";
@@ -81,6 +128,17 @@ const buildPopupContent = (event: EventMapItem) => {
   title.className = "text-sm font-semibold text-white mb-2";
   title.textContent = event.title;
   wrapper.appendChild(title);
+
+  const hostUpdatesIndicator = deriveHostUpdatesIndicator(event);
+  if (hostUpdatesIndicator) {
+    const pill = document.createElement("div");
+    pill.className =
+      "mb-2 inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-200";
+    pill.innerHTML =
+      '<svg class=\"h-3 w-3\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 2l1.76 5.42L19.5 7l-4.28 3.11L16 15l-4-2.9L8 15l.78-4.89L4.5 7l5.74.42L12 2z\"/></svg>' +
+      `<span>${hostUpdatesIndicator.label}</span>`;
+    wrapper.appendChild(pill);
+  }
 
   const venue = document.createElement("p");
   venue.className = "text-xs text-rose-200/80 mb-1.5 flex items-center gap-1";
@@ -285,6 +343,7 @@ export default function EventMapView({
         existing.marker.setLngLat(lngLat);
         existing.popup.setDOMContent(buildPopupContent(event));
         existing.event = event;
+        syncHostUpdatesBadge(existing);
         return;
       }
 
@@ -314,6 +373,7 @@ export default function EventMapView({
         cleanup: () => {},
         event,
         isHovered: false,
+        hostUpdatesBadge: null,
       };
 
       const updateAppearance = () => {
@@ -361,6 +421,7 @@ export default function EventMapView({
       };
 
       updateAppearance();
+      syncHostUpdatesBadge(entry);
 
       markerMap.set(event.id, entry);
     });

@@ -4,8 +4,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
 
+const routerPushMock = vi.fn();
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/profile',
+  useRouter: () => ({ push: routerPushMock }),
 }));
 
 type TestingLibrary = typeof import('@testing-library/react');
@@ -63,6 +66,7 @@ describe('DesktopSidebar', () => {
 
   afterEach(() => {
     cleanup();
+    routerPushMock.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -89,5 +93,23 @@ describe('DesktopSidebar', () => {
     expect(onNavigateDiscover).toHaveBeenCalledTimes(1);
     expect(onNavigatePeople).toHaveBeenCalledTimes(1);
     expect(onNavigateMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to router navigation when callbacks are omitted', () => {
+    render(
+      <DesktopSidebar
+        selectedCategory={null}
+        onCategoryChange={noop}
+        onCreate={noop}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /discover/i }));
+    fireEvent.click(screen.getByRole('button', { name: /people nearby/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^messages$/i }));
+
+    expect(routerPushMock).toHaveBeenNthCalledWith(1, '/');
+    expect(routerPushMock).toHaveBeenNthCalledWith(2, '/people');
+    expect(routerPushMock).toHaveBeenNthCalledWith(3, '/messages');
   });
 });

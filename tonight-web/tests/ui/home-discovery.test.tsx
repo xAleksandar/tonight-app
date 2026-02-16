@@ -43,6 +43,8 @@ const mockReplace = vi.fn();
 let currentSearchParams = new URLSearchParams();
 const useRequireAuthMock = vi.fn(() => ({ status: 'authenticated' as const }));
 
+const mapEventsPropHistory: Array<Array<Record<string, unknown>>> = [];
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
   usePathname: () => '/',
@@ -54,9 +56,10 @@ vi.mock('@/hooks/useRequireAuth', () => ({
 }));
 
 vi.mock('@/components/EventMapView', () => {
-  const MockMap = ({ events }: { events: Array<Record<string, unknown>> }) => (
-    <div data-testid="event-map-view">Map with {events.length} events</div>
-  );
+  const MockMap = ({ events }: { events: Array<Record<string, unknown>> }) => {
+    mapEventsPropHistory.push(events);
+    return <div data-testid="event-map-view">Map with {events.length} events</div>;
+  };
   return {
     __esModule: true,
     default: MockMap,
@@ -67,6 +70,7 @@ const originalFetch = global.fetch;
 let originalMatchMedia: typeof window.matchMedia | undefined;
 let originalGeolocation: Geolocation | undefined;
 let jsdomInstance: JSDOM | null = null;
+let navigatorShareDescriptor: PropertyDescriptor | undefined;
 
 const locationCoords = { latitude: 37.7749, longitude: -122.4194 };
 
@@ -91,6 +95,8 @@ const sampleEvents = [
       acceptedCount: 19,
       spotsRemaining: 1,
     },
+    viewerJoinRequestStatus: 'ACCEPTED',
+    hostUpdatesUnseenCount: 4,
   },
   {
     id: 'evt-social',
@@ -112,6 +118,8 @@ const sampleEvents = [
       acceptedCount: 10,
       spotsRemaining: 2,
     },
+    viewerJoinRequestStatus: 'PENDING',
+    hostUpdatesUnseenCount: 2,
   },
   {
     id: 'evt-music',
@@ -133,6 +141,8 @@ const sampleEvents = [
       acceptedCount: 25,
       spotsRemaining: 5,
     },
+    viewerJoinRequestStatus: 'ACCEPTED',
+    hostUpdatesUnseenCount: 0,
   },
 ];
 
@@ -198,6 +208,7 @@ const installGeolocation = () => {
 
 beforeAll(async () => {
   ensureDomGlobals();
+  navigatorShareDescriptor = typeof navigator !== 'undefined' ? Object.getOwnPropertyDescriptor(navigator, 'share') ?? undefined : undefined;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   await import('@testing-library/jest-dom/vitest');
   const testingLibrary = await import('@testing-library/react');
@@ -232,11 +243,18 @@ afterAll(() => {
     delete (navigator as Partial<Navigator>).geolocation;
   }
 
+  if (navigatorShareDescriptor) {
+    Object.defineProperty(navigator, 'share', navigatorShareDescriptor);
+  } else {
+    delete (navigator as Partial<Navigator>).share;
+  }
+
   global.fetch = originalFetch;
 });
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  mapEventsPropHistory.length = 0;
   useRequireAuthMock.mockReturnValue({ status: 'authenticated' });
   currentSearchParams = new URLSearchParams();
   global.fetch = mockFetchSuccess() as unknown as typeof fetch;
@@ -250,6 +268,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  if (typeof navigator !== 'undefined') {
+    if (navigatorShareDescriptor) {
+      Object.defineProperty(navigator, 'share', navigatorShareDescriptor);
+    } else {
+      delete (navigator as Partial<Navigator>).share;
+    }
+  }
 });
 
 describe('HomePage authentication states', () => {
@@ -274,10 +299,10 @@ describe('Authenticated home/discovery experience', () => {
 
     const heroCopies = await screen.findAllByText(/events near you/i);
     expect(heroCopies.length).toBeGreaterThan(0);
-    expect(screen.getByText('Live nearby meetups')).toBeInTheDocument();
+    expect(screen.getByText('Meetups in real life')).toBeInTheDocument();
     expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
     expect(screen.getByText('Downtown Coffee Crawl')).toBeInTheDocument();
-    expect(screen.getAllByText(/37\.7749, -122\.4194/)[0]).toBeInTheDocument();
+    expect(screen.getByText('Mission Rooftop')).toBeInTheDocument();
     expect(screen.getByText('Marco R.')).toBeInTheDocument();
     expect(screen.getByText('Elena K.')).toBeInTheDocument();
     expect(screen.getByText(/1 spot left/i)).toBeInTheDocument();
@@ -359,4 +384,79 @@ describe('Authenticated home/discovery experience', () => {
     await waitFor(() => expect(discoverButton).toHaveAttribute('aria-current', 'page'));
     expect(messagesButton).not.toHaveAttribute('aria-current');
   });
+  it('passes host update metadata through to the map view markers', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const mapButtons = screen.getAllByRole('button', { name: /^map$/i });
+    fireEvent.click(mapButtons[mapButtons.length - 1]);
+
+    const latestEvents = mapEventsPropHistory[mapEventsPropHistory.length - 1] ?? [];
+    const cinema = latestEvents.find((event) => event.id === 'evt-cinema');
+    const social = latestEvents.find((event) => event.id === 'evt-social');
+
+    expect(cinema).toMatchObject({ viewerJoinRequestStatus: 'ACCEPTED', hostUpdatesUnseenCount: 4 });
+    expect(social).toMatchObject({ viewerJoinRequestStatus: 'PENDING', hostUpdatesUnseenCount: 2 });
+  });
+
+  it('initializes the host updates filter from the query string', async () => {
+    currentSearchParams = new URLSearchParams('hostUpdates=new');
+
+    render(<HomePage />);
+
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    expect(screen.getByRole('button', { name: /^Showing updates/i })).toBeInTheDocument();
+    expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
+    expect(screen.queryByText('Downtown Coffee Crawl')).not.toBeInTheDocument();
+    expect(screen.queryByText('Midnight Jazz Session')).not.toBeInTheDocument();
+  });
+
+  it('restores the host updates filter from localStorage when no query param exists', async () => {
+    window.localStorage.setItem('tonight:host-updates-filter', 'on');
+
+    render(<HomePage />);
+
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    expect(screen.getByRole('button', { name: /^Showing updates/i })).toBeInTheDocument();
+    expect(screen.getByText('Sunset Cinema on the Roof')).toBeInTheDocument();
+    expect(screen.queryByText('Downtown Coffee Crawl')).not.toBeInTheDocument();
+  });
+
+  it('syncs host updates toggle changes into the URL query param', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const toggleButton = screen.getByRole('button', { name: /^New host updates/i });
+    fireEvent.click(toggleButton);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/?hostUpdates=new', { scroll: false }));
+    currentSearchParams = new URLSearchParams('hostUpdates=new');
+
+    const showingButton = screen.getByRole('button', { name: /^Showing updates/i });
+    fireEvent.click(showingButton);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/', { scroll: false }));
+    currentSearchParams = new URLSearchParams();
+  });
+
+  it('offers a native share link when the Web Share API is available', async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', { configurable: true, value: shareMock, writable: true });
+
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Share filtered link/i })).toBeInTheDocument());
+    const shareButton = screen.getByRole('button', { name: /Share filtered link/i });
+
+    fireEvent.click(shareButton);
+
+    await waitFor(() => expect(shareMock).toHaveBeenCalledTimes(1));
+    const payload = shareMock.mock.calls[0][0];
+    expect(payload).toMatchObject({ url: expect.stringContaining('hostUpdates=new') });
+  });
+
+
 });
