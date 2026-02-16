@@ -885,6 +885,43 @@ export function EventInsideExperience({
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
 
+  const heroChatSummaryCopy =
+    chatPreview?.lastMessageSnippet ??
+    (isHostViewer
+      ? "Guest pings will show up here once someone reaches out."
+      : isGuestViewer
+        ? "Host updates will surface here once the thread gets activity."
+        : isPendingViewer
+          ? "Chat unlocks right after the host approves you."
+          : "Request access to unlock this chat.");
+
+  const hasUnreadMessages = typeof chatPreview?.unreadCount === "number" && (chatPreview?.unreadCount ?? 0) > 0;
+
+  const heroChatBadge: { label: string; tone: string } | null = hasUnreadMessages
+    ? {
+        label: `${chatPreview!.unreadCount} unread`,
+        tone: "bg-primary/20 text-primary",
+      }
+    : isHostViewer || isGuestViewer
+      ? { label: "You're caught up", tone: "bg-emerald-400/15 text-emerald-200" }
+      : isPendingViewer
+        ? { label: "Approval required", tone: "bg-white/10 text-white/70" }
+        : { label: "Login required", tone: "bg-white/10 text-white/70" };
+
+  const heroChatTimestampChip = chatPreview?.lastMessageAtISO ? `Updated ${formatRelativeTime(chatPreview.lastMessageAtISO)}` : null;
+  const heroChatParticipantChip =
+    chatPreview?.participantCount && chatPreview.participantCount > 0
+      ? `${chatPreview.participantCount} ${chatPreview.participantCount === 1 ? "person" : "people"} in chat`
+      : null;
+  const heroChatFallbackChip =
+    !heroChatTimestampChip && !heroChatParticipantChip
+      ? isHostViewer || isGuestViewer
+        ? "No messages yet"
+        : isPendingViewer
+          ? "Waiting on host approval"
+          : "Chat locked"
+      : null;
+
   const hostActivityListShouldScroll = hostActivityEntries.length > 3;
   const hostActivityListClasses = classNames(
     "mt-3 space-y-3",
@@ -1820,6 +1857,73 @@ export function EventInsideExperience({
             </div>
           ) : null}
         </div>
+        {chatPreview ? (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Chat status</p>
+                <p className="mt-1 text-sm text-white/80 line-clamp-2">{heroChatSummaryCopy}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {heroChatBadge ? (
+                    <span
+                      className={classNames(
+                        "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
+                        heroChatBadge.tone
+                      )}
+                    >
+                      {heroChatBadge.label}
+                    </span>
+                  ) : null}
+                  {heroChatTimestampChip ? (
+                    <span className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                      {heroChatTimestampChip}
+                    </span>
+                  ) : null}
+                  {heroChatParticipantChip ? (
+                    <span className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                      {heroChatParticipantChip}
+                    </span>
+                  ) : null}
+                  {heroChatFallbackChip ? (
+                    <span className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                      {heroChatFallbackChip}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+                {chatCtaHref ? (
+                  <Link
+                    href={chatCtaHref}
+                    className="inline-flex w-full items-center justify-center rounded-full bg-primary/80 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    {chatCtaLabel}
+                  </Link>
+                ) : isPublicViewer ? (
+                  <button
+                    type="button"
+                    onClick={handleJoinRequest}
+                    disabled={joinRequestStatus !== "idle"}
+                    className="inline-flex w-full items-center justify-center rounded-full bg-primary/80 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {joinRequestStatus === "submitting" ? "Sending request..." : joinRequestStatus === "submitted" ? "Request sent!" : chatCtaLabel}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="inline-flex w-full items-center justify-center rounded-full bg-primary/60 px-5 py-2 text-sm font-semibold text-white opacity-70"
+                    disabled
+                  >
+                    {chatCtaLabel}
+                  </button>
+                )}
+              </div>
+            </div>
+            {!chatCtaHref && chatCtaDisabledReason ? (
+              <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">

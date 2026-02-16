@@ -166,9 +166,18 @@ describe('EventInsideExperience', () => {
   it('exposes an actionable chat link when a CTA href is provided', () => {
     render(<EventInsideExperience {...baseProps} />);
 
-    const link = screen.getByRole('link', { name: /open chat/i });
-    expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', '/chat/jr-1');
+    const links = screen.getAllByRole('link', { name: /open chat/i });
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    expect(links.some((link) => link.getAttribute('href') === '/chat/jr-1')).toBe(true);
+  });
+
+  it('surfaces the chat status badge + chip in the hero CTA', () => {
+    render(<EventInsideExperience {...baseProps} />);
+
+    expect(screen.getByText(/Chat status/i)).toBeInTheDocument();
+    const unreadBadges = screen.getAllByText(/2 unread/i);
+    expect(unreadBadges.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Updated/i)).toBeInTheDocument();
   });
 
   it('shows a disabled chat explanation when no CTA href is present', () => {
@@ -181,9 +190,11 @@ describe('EventInsideExperience', () => {
     };
     render(<EventInsideExperience {...props} />);
 
-    const button = screen.getByRole('button', { name: /no guest chats yet/i });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button', { name: /no guest chats yet/i });
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    buttons.forEach((button) => expect(button).toBeDisabled());
+    const reasons = screen.getAllByText(/approve at least one guest/i);
+    expect(reasons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows a disabled chat explanation when no CTA href is present', () => {
@@ -196,9 +207,11 @@ describe('EventInsideExperience', () => {
     };
     render(<EventInsideExperience {...props} />);
 
-    const button = screen.getByRole('button', { name: /no guest chats yet/i });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button', { name: /no guest chats yet/i });
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    buttons.forEach((button) => expect(button).toBeDisabled());
+    const reasons = screen.getAllByText(/approve at least one guest/i);
+    expect(reasons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('lets hosts copy the event invite link when Web Share is unavailable', async () => {
