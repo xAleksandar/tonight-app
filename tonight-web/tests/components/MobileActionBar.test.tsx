@@ -139,4 +139,33 @@ describe('MobileActionBar', () => {
     expect(screen.getByText('Latest note from the host')).toBeInTheDocument();
   });
 
+  it('shows the attention indicator when a new chat ping arrives', () => {
+    const onInteract = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          helperText: 'Latest note from the host',
+          badgeLabel: '2 unread',
+          badgeTone: 'highlight',
+          attentionActive: true,
+          attentionLabel: 'New chat ping',
+          onInteract,
+        }}
+      />
+    );
+
+    expect(screen.getByText('New chat ping')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: /open chat/i }));
+    expect(onInteract).toHaveBeenCalledTimes(1);
+  });
+
 });

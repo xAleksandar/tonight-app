@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { JoinRequestStatus } from "@/generated/prisma/client";
 import { EventInsideExperience, type EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
-import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 import { fetchEventById } from "@/lib/events";
 import { listJoinRequestsForEvent, type SerializedJoinRequestWithUser } from "@/lib/join-requests";
 import { prisma } from "@/lib/prisma";
@@ -758,8 +757,6 @@ export default async function EventInsidePage({ params }: PageParams) {
     };
   }
 
-  const mobileChatAction = buildMobileChatAction(viewerRole, chatPreview);
-
   const experience: EventInsideExperienceProps = {
     event: {
       id: eventRecord.id,
@@ -796,7 +793,6 @@ export default async function EventInsidePage({ params }: PageParams) {
           userEmail: currentUserProfile.email,
           userPhotoUrl: currentUserProfile.photoUrl,
         }}
-        initialChatAction={mobileChatAction}
       />
     );
   }

@@ -1,9 +1,16 @@
 import type { EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
+type BuildMobileChatActionOptions = {
+  attentionActive?: boolean;
+  attentionLabel?: string | null;
+  onInteract?: () => void;
+};
+
 export const buildMobileChatAction = (
   viewerRole: EventInsideExperienceProps["viewerRole"],
-  chatPreview?: EventInsideExperienceProps["chatPreview"]
+  chatPreview?: EventInsideExperienceProps["chatPreview"],
+  options: BuildMobileChatActionOptions = {}
 ): MobileActionBarProps["chatAction"] => {
   if (!chatPreview?.ctaHref) {
     return null;
@@ -42,5 +49,8 @@ export const buildMobileChatAction = (
     helperText: summary,
     badgeLabel,
     badgeTone,
+    attentionActive: Boolean(options.attentionActive),
+    attentionLabel: options.attentionActive ? options.attentionLabel ?? "New chat ping" : null,
+    onInteract: options.onInteract,
   };
 };

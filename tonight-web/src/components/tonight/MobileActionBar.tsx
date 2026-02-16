@@ -13,6 +13,9 @@ type MobileChatAction = {
   helperText?: string | null;
   badgeLabel?: string | null;
   badgeTone?: "highlight" | "success" | "muted";
+  attentionActive?: boolean;
+  attentionLabel?: string | null;
+  onInteract?: () => void;
 };
 
 export type MobileActionBarProps = {
@@ -68,6 +71,7 @@ export function MobileActionBar({
   const chatBadgeClassName = chatAction?.badgeTone
     ? CHAT_BADGE_TONE_CLASS[chatAction.badgeTone]
     : CHAT_BADGE_TONE_CLASS.muted;
+  const chatAttentionLabel = chatAction?.attentionLabel ?? "New chat ping";
 
   return (
     <nav
@@ -81,7 +85,11 @@ export function MobileActionBar({
           <Link
             href={chatAction!.href}
             prefetch={false}
-            className="mt-2 inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            onClick={chatAction?.onInteract}
+            className={classNames(
+              "mt-2 inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              chatAction?.attentionActive ? "shadow-[0_0_25px_rgba(236,72,153,0.45)] animate-[pulse_1.8s_ease-in-out_infinite]" : null
+            )}
             aria-label={`Open chat (${chatAction!.label})`}
           >
             <span className="text-left">{chatAction!.label}</span>
@@ -96,6 +104,12 @@ export function MobileActionBar({
               </span>
             ) : null}
           </Link>
+          {chatAction?.attentionActive ? (
+            <div className="mt-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+              <span>{chatAttentionLabel}</span>
+            </div>
+          ) : null}
           {chatAction?.helperText ? (
             <p className="mt-2 text-[11px] text-white/70 line-clamp-2">{chatAction.helperText}</p>
           ) : null}

@@ -119,6 +119,10 @@ export type EventInsideExperienceProps = {
   pendingJoinRequestId?: string | null;
   /** Callback fired whenever the chat preview snapshot changes (e.g., realtime events) */
   onChatPreviewRefresh?: (next: EventChatPreview | undefined) => void;
+  /** Controls the chat CTA attention indicator (true = pulse) */
+  chatAttentionActive?: boolean;
+  /** Fired when realtime events request the attention indicator to toggle */
+  onChatAttentionChange?: (active: boolean) => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -256,6 +260,8 @@ export function EventInsideExperience({
   socketToken,
   pendingJoinRequestId,
   onChatPreviewRefresh,
+  chatAttentionActive = false,
+  onChatAttentionChange,
 }: EventInsideExperienceProps) {
   const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
   const chatPreview = chatPreviewState ?? initialChatPreview;
@@ -379,6 +385,8 @@ export function EventInsideExperience({
   const socketEnabled = realtimeChatUpdatesEnabled || realtimeJoinApprovalEnabled;
   const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
   const eventInviteShareText = useMemo(() => buildEventInviteShareText(event), [event]);
+  const requestChatAttention = useCallback(() => onChatAttentionChange?.(true), [onChatAttentionChange]);
+  const acknowledgeChatAttention = useCallback(() => onChatAttentionChange?.(false), [onChatAttentionChange]);
 
   useEffect(() => {
     setChatPreviewState(initialChatPreview);
@@ -1101,6 +1109,10 @@ export function EventInsideExperience({
           return nextPreview;
         });
 
+        if (isHostSender) {
+          requestChatAttention();
+        }
+
         if (!isHostSender || !realtimeHostActivityEnabled) {
           return;
         }
@@ -1164,6 +1176,8 @@ export function EventInsideExperience({
             ctaHref: `/chat/${payload.joinRequestId}`,
           };
         });
+
+        requestChatAttention();
 
         setHostUnreadThreads((prev) => {
           const participant = hostChatParticipantMap.get(payload.joinRequestId);
@@ -2077,10 +2091,20 @@ export function EventInsideExperience({
                 </div>
               </div>
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+                {chatAttentionActive ? (
+                  <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                    <span>New chat ping</span>
+                  </div>
+                ) : null}
                 {chatCtaHref ? (
                   <Link
                     href={chatCtaHref}
-                    className="inline-flex w-full items-center justify-center rounded-full bg-primary/80 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    onClick={acknowledgeChatAttention}
+                    className={classNames(
+                      "inline-flex w-full items-center justify-center rounded-full bg-primary/80 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                      chatAttentionActive ? "shadow-[0_0_25px_rgba(236,72,153,0.45)] animate-[pulse_1.8s_ease-in-out_infinite]" : null
+                    )}
                   >
                     {chatCtaLabel}
                   </Link>

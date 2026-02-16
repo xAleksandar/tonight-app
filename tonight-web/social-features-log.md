@@ -309,3 +309,15 @@ Each run should:
 - Threaded the derived action into `EventLayout` → `MobileActionBar`, expanded the bar with a new “Event chat” panel that surfaces the unread badge plus helper copy, and polished the CTA accessibility states.
 - Extended the MobileActionBar test suite (self shim + new assertions) and reran `cd tonight-web && npx vitest run tests/components/MobileActionBar.test.tsx` to keep the mobile nav covered.
 - Next: listen for chat socket events on the event page and auto-refresh the hero/action-bar badge + helper text when new messages arrive, so the mobile CTA stays live without a reload.
+
+## 2026-02-16 23:29 EET — Event chat CTA stays live via sockets
+- Added a client wrapper for the event page layout so the sticky mobile action bar now rebuilds its chat CTA whenever the event experience emits a refreshed preview.
+- Threaded host chat participant metadata through the loader and taught `EventInsideExperience` to join every relevant chat room (hosts + guests), updating the hero badge, unread summaries, and host reply rail the moment socket payloads arrive.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/MobileActionBar.test.tsx`.
+- Next: surface an explicit “New chat ping” indicator + gentle pulse on the hero/action-bar CTA so hosts/guests get a visual nudge the instant a socket update lands.
+
+## 2026-02-16 23:52 EET — Chat CTA pulses on live pings
+- Threaded a new chat-attention channel through `EventInsideExperience` → `EventInsidePageClient` so realtime socket payloads can flag when a fresh guest/host message lands, with a shared timer + clear helpers.
+- Restyled the event hero CTA and mobile action bar chat block to show a “New chat ping” chip plus a gentle glow/pulse when attention is requested, and wired the CTA interactions to acknowledge/clear the signal.
+- Extended the mobile action bar + builder + tests to support the new attention metadata, and refreshed the EventInsideExperience + MobileActionBar Vitest suites (`cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/MobileActionBar.test.tsx`).
+- Next: bubble the same attention signal into the scrolling event layout (e.g., sticky desktop header and in-page toast) so hosts/guests notice new chat pings even after they scroll past the hero block.
