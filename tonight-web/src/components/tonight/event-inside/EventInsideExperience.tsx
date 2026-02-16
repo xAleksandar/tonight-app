@@ -186,6 +186,18 @@ const HOST_FRIEND_INVITE_TEMPLATE_DEFINITIONS: HostFriendInviteTemplateDefinitio
 
 const DEFAULT_HOST_FRIEND_TEMPLATE_ID: HostFriendInviteTemplateId = "save-spot";
 
+type HostFriendInviteEntry = NonNullable<EventInsideExperienceProps["hostFriendInvites"]>[number];
+
+type HostFriendSelectionBlockedEntry = {
+  friend: HostFriendInviteEntry;
+  reason: string;
+  type: "cooldown" | "event";
+  nextInviteAvailableAtISO?: string | null;
+  currentEventInviteAtISO?: string | null;
+  eventInviteOverrideAvailable: boolean;
+  eventInviteCoolingDown: boolean;
+};
+
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
@@ -217,6 +229,7 @@ export function EventInsideExperience({
   const [hostFriendComposerState, setHostFriendComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
   const [hostFriendSelectionState, setHostFriendSelectionState] = useState<Record<string, boolean>>({});
   const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
+  const [hostFriendSelectionSkippedExpanded, setHostFriendSelectionSkippedExpanded] = useState(false);
   const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
   const [hostFriendEventInviteState, setHostFriendEventInviteState] = useState<Record<string, string | null>>({});
   const [hostFriendEventInviteOverrides, setHostFriendEventInviteOverrides] = useState<Record<string, string | null>>({});
@@ -613,13 +626,6 @@ export function EventInsideExperience({
   const hostFriendInviteEmptyCopy = hostFriendSearchActive
     ? "No friends match this search yet."
     : "We’ll surface your recent Tonight friends here as they RSVP to your events.";
-  const hostFriendSelectedEntries = useMemo(
-    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
-    [hostFriendInviteEntries, hostFriendSelectionState]
-  );
-  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
-  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
-  const hostFriendSelectionCtaLabel = hostFriendSelectedCount === 1 ? "Send template to 1 friend" : `Send template to ${hostFriendSelectedCount} friends`;
   const getHostFriendGuardrailFor = useCallback(
     (joinRequestId: string) => {
       const stateEntry = hostFriendInviteGuardrails[joinRequestId];
@@ -634,6 +640,83 @@ export function EventInsideExperience({
     },
     [hostFriendInviteEntries, hostFriendInviteGuardrails]
   );
+  const hostFriendSelectedEntries = useMemo(
+    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
+    [hostFriendInviteEntries, hostFriendSelectionState]
+  );
+  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
+  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
+  const hostFriendSelectionBreakdown = useMemo(() => {
+    return hostFriendSelectedEntries.reduce(
+      (acc, friend) => {
+        const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
+        const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO ?? null;
+        const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
+        const currentEventInviteAtISO =
+          hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
+        const overrideToken = hostFriendEventInviteOverrides[friend.joinRequestId] ?? null;
+        const eventInviteLocked = Boolean(currentEventInviteAtISO && overrideToken !== currentEventInviteAtISO);
+        const eventInviteCooldownUntilISO = getEventInviteCooldownUntil(currentEventInviteAtISO);
+        const eventInviteCoolingDown = Boolean(currentEventInviteAtISO) && isInviteGuardrailActive(eventInviteCooldownUntilISO);
+        const eventInviteOverrideAvailable = eventInviteLocked && !eventInviteCoolingDown;
+
+        if (inviteGuardrailActive || eventInviteLocked) {
+          acc.blockedEntries.push({
+            friend,
+            reason: inviteGuardrailActive
+              ? nextInviteAvailableAtISO
+                ? `Cooling down — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
+                : "Cooling down — invited moments ago."
+              : eventInviteCoolingDown && eventInviteCooldownUntilISO
+                ? `Already pinged for this event — try again ${formatRelativeTime(eventInviteCooldownUntilISO)}.`
+                : `Already invited to ${event.title}.`,
+            type: inviteGuardrailActive ? "cooldown" : "event",
+            nextInviteAvailableAtISO,
+            currentEventInviteAtISO,
+            eventInviteOverrideAvailable,
+            eventInviteCoolingDown,
+          });
+          return acc;
+        }
+
+        acc.eligibleEntries.push(friend);
+        return acc;
+      },
+      { eligibleEntries: [] as HostFriendInviteEntry[], blockedEntries: [] as HostFriendSelectionBlockedEntry[] }
+    );
+  }, [event.title, getHostFriendGuardrailFor, hostFriendEventInviteOverrides, hostFriendEventInviteState, hostFriendSelectedEntries]);
+  const hostFriendSelectionEligibleEntries = hostFriendSelectionBreakdown.eligibleEntries;
+  const hostFriendSelectionBlockedEntries = hostFriendSelectionBreakdown.blockedEntries;
+  const hostFriendSelectionEligibleCount = hostFriendSelectionEligibleEntries.length;
+  const hostFriendSelectionSkippedCount = hostFriendSelectionBlockedEntries.length;
+  const hostFriendSelectionHasSkipped = hostFriendSelectionSkippedCount > 0;
+  const hostFriendSelectionReadyLabel =
+    hostFriendSelectionEligibleCount === 1
+      ? "1 friend ready to ping"
+      : `${hostFriendSelectionEligibleCount} friends ready to ping`;
+  const hostFriendSelectionSkippedLabel =
+    hostFriendSelectionSkippedCount === 1
+      ? "1 selection paused"
+      : `${hostFriendSelectionSkippedCount} selections paused`;
+  const hostFriendSelectionSkippedHelperLabel = hostFriendSelectionSkippedCount === 1 ? "that friend" : "those friends";
+  const hostFriendSelectionCtaLabel =
+    hostFriendSelectionEligibleCount === 0
+      ? "No eligible friends right now"
+      : hostFriendSelectionEligibleCount === 1
+        ? "Send template to 1 friend"
+        : `Send template to ${hostFriendSelectionEligibleCount} friends`;
+
+  useEffect(() => {
+    if (!hostFriendSelectionActive) {
+      setHostFriendSelectionSkippedExpanded(false);
+    }
+  }, [hostFriendSelectionActive]);
+
+  useEffect(() => {
+    if (!hostFriendSelectionHasSkipped) {
+      setHostFriendSelectionSkippedExpanded(false);
+    }
+  }, [hostFriendSelectionHasSkipped]);
   const stampHostFriendInviteGuardrail = useCallback((joinRequestId: string, lastInviteSourceISO?: string) => {
     const baseTimestamp = lastInviteSourceISO ? new Date(lastInviteSourceISO) : new Date();
     const nextTimestamp = new Date(baseTimestamp.getTime() + HOST_FRIEND_INVITE_COOLDOWN_MS);
@@ -1272,19 +1355,7 @@ export function EventInsideExperience({
       return;
     }
 
-    const eligibleEntries = hostFriendSelectedEntries.filter((friend) => {
-      const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
-      if (isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO)) {
-        return false;
-      }
-      const currentEventInviteAtISO =
-        hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
-      if (!currentEventInviteAtISO) {
-        return true;
-      }
-      const overrideToken = hostFriendEventInviteOverrides[friend.joinRequestId];
-      return overrideToken === currentEventInviteAtISO;
-    });
+    const eligibleEntries = hostFriendSelectionEligibleEntries;
 
     if (!eligibleEntries.length) {
       showErrorToast("Invite cooling down", "Everyone you selected was invited recently. Give them a moment before re-sending.");
@@ -1876,6 +1947,65 @@ export function EventInsideExperience({
                         <p className="mt-2 text-xs text-white/70">
                           We’ll send the {activeHostFriendTemplate?.label ?? "default"} template to each friend with their name auto-filled.
                         </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/70">
+                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-white/90">{hostFriendSelectionReadyLabel}</span>
+                          {hostFriendSelectionHasSkipped ? (
+                            <>
+                              <span className="rounded-full bg-amber-200/20 px-2 py-0.5 text-amber-100">{hostFriendSelectionSkippedLabel}</span>
+                              <button
+                                type="button"
+                                onClick={() => setHostFriendSelectionSkippedExpanded((prev) => !prev)}
+                                className="text-[11px] font-semibold text-primary/90 underline-offset-2 hover:underline"
+                                aria-expanded={hostFriendSelectionSkippedExpanded}
+                                disabled={hostFriendSelectionStatus === "sending"}
+                              >
+                                {hostFriendSelectionSkippedExpanded ? "Hide skipped" : "Review skipped"}
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                        {hostFriendSelectionHasSkipped ? (
+                          <div className="mt-3 rounded-xl border border-amber-200/30 bg-amber-100/5 p-3">
+                            <p className="text-xs text-amber-100">
+                              We’ll hold {hostFriendSelectionSkippedHelperLabel} until cooldowns clear or you override them.
+                            </p>
+                            {hostFriendSelectionSkippedExpanded ? (
+                              <ul className="mt-3 space-y-2">
+                                {hostFriendSelectionBlockedEntries.map((entry) => {
+                                  const friend = entry.friend;
+                                  const canOverride =
+                                    entry.type === "event" && entry.eventInviteOverrideAvailable && entry.currentEventInviteAtISO;
+                                  return (
+                                    <li key={friend.joinRequestId} className="rounded-lg border border-white/10 bg-black/30 p-3">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                          <p className="text-sm font-semibold text-white">{friend.displayName}</p>
+                                          <p className="text-xs text-white/70">{entry.reason}</p>
+                                        </div>
+                                        {canOverride ? (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleHostFriendEventInviteOverride(friend.joinRequestId, entry.currentEventInviteAtISO)
+                                            }
+                                            className="rounded-full border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-white/40"
+                                          >
+                                            Re-enable + send
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                      {entry.type === "cooldown" && entry.nextInviteAvailableAtISO ? (
+                                        <p className="mt-1 text-[11px] text-white/50">
+                                          Ready again {formatRelativeTime(entry.nextInviteAvailableAtISO)}.
+                                        </p>
+                                      ) : null}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="mt-3 flex flex-wrap gap-2">
                           {hostFriendSelectedEntries.map((friend) => (
                             <button
@@ -1895,7 +2025,7 @@ export function EventInsideExperience({
                             type="button"
                             onClick={handleHostFriendSelectionSend}
                             className="rounded-full bg-primary/80 px-4 py-1.5 text-xs font-semibold text-black transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={hostFriendSelectionStatus === "sending"}
+                            disabled={hostFriendSelectionStatus === "sending" || hostFriendSelectionEligibleCount === 0}
                           >
                             {hostFriendSelectionStatus === "sending" ? "Sending…" : hostFriendSelectionCtaLabel}
                           </button>

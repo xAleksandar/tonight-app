@@ -217,3 +217,9 @@ Each run should:
 - Surfaced clearer inline copy (“Already invited to this event” + cooldown timing) so hosts understand why a friend can’t be selected, and reran the EventInsideExperience Vitest suite.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`
 - Next: bubble the auto-disable reasoning into the multi-send summary (show how many selections were skipped + offer a one-tap override list) so hosts know why their send count shrank.
+
+## 2026-02-16 17:25 EET — Multi-send summary surfaces skipped invites
+- Reordered the guardrail helpers so we can break down multi-send selections into eligible vs. blocked entries, then exposed the counts in the “Multi-send ready” banner (ready chip + paused chip).
+- Added a review drawer that lists every skipped friend with the exact cooldown/“already invited” copy plus inline override buttons, so hosts can re-enable people without scrolling through the full list.
+- Disabled the bulk CTA when no eligible friends remain and kept the Vitest suite green (`cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`).
+- Next: extend the bulk-send result toast to summarize how many invites actually went out vs. were skipped, and surface a quick “reselect skipped friends” action so hosts can revisit them once cooldowns lift.
