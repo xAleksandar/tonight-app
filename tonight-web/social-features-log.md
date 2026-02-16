@@ -291,3 +291,9 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
 - Next: when hosts are fully caught up, fall back to the latest guest activity (even if read) so the preview still shows context instead of disappearing entirely.
 
+
+## 2026-02-16 21:48 EET — Host chat preview keeps context when caught up
+- Added a fallback builder on the `/events/[id]` loader that grabs the latest guest messages per thread whenever the host has zero unread conversations, threading the snapshots through the chat preview contract.
+- Updated `EventInsideExperience` so the "Latest guest pings" module now swaps to a "Recent guest activity" state with the same timestamps/links, ensuring the rail never disappears for caught-up hosts while keeping the actionable "Guests needing replies" list gated to real unreads.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
+- Next: promote the unread/recent chat summary into the event hero CTA (badge + chip) so hosts and guests see the chat state the moment they land on `/events/[id]`.

@@ -176,6 +176,77 @@ const buildHostUnreadThreadSummaries = async ({
   return filtered;
 };
 
+
+const buildHostRecentThreadSummaries = async ({
+  eventId,
+  hostId,
+}: {
+  eventId: string;
+  hostId: string;
+}): Promise<HostUnreadThreadSummary[]> => {
+  const recentMessages = await prisma.message.findMany({
+    where: {
+      joinRequest: {
+        eventId,
+        status: JoinRequestStatus.ACCEPTED,
+      },
+      senderId: {
+        not: hostId,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: HOST_UNREAD_THREAD_LIMIT * 4,
+    select: {
+      content: true,
+      createdAt: true,
+      joinRequestId: true,
+      joinRequest: {
+        select: {
+          user: {
+            select: {
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!recentMessages.length) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const summaries: HostUnreadThreadSummary[] = [];
+
+  for (const message of recentMessages) {
+    if (!message.joinRequestId || seen.has(message.joinRequestId)) {
+      continue;
+    }
+
+    seen.add(message.joinRequestId);
+    const displayName =
+      message.joinRequest?.user.displayName ?? message.joinRequest?.user.email ?? "Guest";
+
+    summaries.push({
+      joinRequestId: message.joinRequestId,
+      displayName,
+      lastMessageSnippet: message.content,
+      lastMessageAtISO: message.createdAt?.toISOString() ?? null,
+      unreadCount: null,
+    });
+
+    if (summaries.length >= HOST_UNREAD_THREAD_LIMIT) {
+      break;
+    }
+  }
+
+  return summaries;
+};
+
 const buildHostFriendInviteCandidates = async ({
   hostId,
   currentEventId,
@@ -488,6 +559,14 @@ const buildChatPreviewForHost = async ({
     buildHostUnreadThreadSummaries({ eventId, hostId }),
   ]);
 
+  let hostRecentThreads: HostUnreadThreadSummary[] = [];
+  if (hostUnreadThreads.length === 0) {
+    hostRecentThreads = await buildHostRecentThreadSummaries({
+      eventId,
+      hostId,
+    });
+  }
+
   const participantCount = acceptedGuestCount > 0 ? acceptedGuestCount + 1 : null;
 
   if (!acceptedGuestCount) {
@@ -504,6 +583,7 @@ const buildChatPreviewForHost = async ({
       ctaLabel: "Open guest chats",
       ctaDisabledReason: "Guests can message you once they DM the host.",
       hostUnreadThreads: hostUnreadThreads.length ? hostUnreadThreads : undefined,
+      hostRecentThreads: hostUnreadThreads.length === 0 && hostRecentThreads.length ? hostRecentThreads : undefined,
     };
   }
 
@@ -515,6 +595,7 @@ const buildChatPreviewForHost = async ({
     ctaLabel: unreadCount > 0 ? "Reply to guests" : "Open latest chat",
     ctaHref: "/chat/" + latestGuestMessage.joinRequestId,
     hostUnreadThreads: hostUnreadThreads.length ? hostUnreadThreads : undefined,
+    hostRecentThreads: hostUnreadThreads.length === 0 && hostRecentThreads.length ? hostRecentThreads : undefined,
   };
 };
 

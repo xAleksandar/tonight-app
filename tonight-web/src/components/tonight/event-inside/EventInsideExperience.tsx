@@ -70,6 +70,12 @@ export type EventInsideExperienceProps = {
       lastMessageAtISO?: string | null;
       unreadCount?: number | null;
     }>;
+    hostRecentThreads?: Array<{
+      joinRequestId: string;
+      displayName: string;
+      lastMessageSnippet: string;
+      lastMessageAtISO?: string | null;
+    }>;
     guestComposer?: {
       joinRequestId?: string | null;
       disabledReason?: string | null;
@@ -214,6 +220,8 @@ type HostFriendSelectionEligibility = {
 type JoinRequestActionState = "approving" | "rejecting";
 type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
 
+type HostRecentThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostRecentThreads"]>[number];
+
 type HostFriendInviteDispatchResult = { joinRequestId: string; status: "sent" | "failed"; error?: string };
 
 type HostFriendInviteGuardrailState = Record<string, { lastInviteAtISO: string | null; nextInviteAvailableAtISO: string | null }>;
@@ -267,6 +275,23 @@ export function EventInsideExperience({
   const guestMessagePreviewEntries = viewerRole === "guest" ? chatPreview?.guestMessagePreview ?? [] : [];
   const hostUnreadPreviewEntries = viewerRole === "host" ? hostUnreadThreads.slice(0, 3) : [];
   const hostUnreadPreviewOverflow = viewerRole === "host" ? Math.max(hostUnreadThreads.length - hostUnreadPreviewEntries.length, 0) : 0;
+  const hostRecentThreadSnapshots: HostRecentThread[] =
+    viewerRole === "host" && hostUnreadThreads.length === 0 ? chatPreview?.hostRecentThreads ?? [] : [];
+  const hostRecentPreviewEntries = hostRecentThreadSnapshots.slice(0, 3);
+  const hostRecentPreviewOverflow = Math.max(hostRecentThreadSnapshots.length - hostRecentPreviewEntries.length, 0);
+  const hostPreviewHasUnread = hostUnreadPreviewEntries.length > 0;
+  const hostThreadPreviewEntries = hostPreviewHasUnread ? hostUnreadPreviewEntries : hostRecentPreviewEntries;
+  const hostThreadPreviewOverflow = hostPreviewHasUnread ? hostUnreadPreviewOverflow : hostRecentPreviewOverflow;
+  const hostThreadPreviewTitle = hostPreviewHasUnread ? "Latest guest pings" : "Recent guest activity";
+  const hostThreadPreviewOverflowCopy = hostThreadPreviewOverflow > 0
+    ? hostPreviewHasUnread
+      ? hostThreadPreviewOverflow === 1
+        ? "1 more guest is waiting in the replies list below."
+        : `${hostThreadPreviewOverflow} more guests are waiting in the replies list below.`
+      : hostThreadPreviewOverflow === 1
+        ? "1 more guest recently checked in — open the chat view for full context."
+        : `${hostThreadPreviewOverflow} more guests have fresh activity inside chat.`
+    : null;
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
   const [joinRequestStatus, setJoinRequestStatus] = useState<"idle" | "submitting" | "submitted">("idle");
@@ -2496,11 +2521,11 @@ export function EventInsideExperience({
                   </ul>
                 </div>
               ) : null}
-              {isHostViewer && hostUnreadPreviewEntries.length > 0 ? (
+              {isHostViewer && hostThreadPreviewEntries.length > 0 ? (
                 <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Latest guest pings</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">{hostThreadPreviewTitle}</p>
                   <ul className="mt-2 space-y-2">
-                    {hostUnreadPreviewEntries.map((thread) => (
+                    {hostThreadPreviewEntries.map((thread) => (
                       <li key={thread.joinRequestId}>
                         <Link
                           href={`/chat/${thread.joinRequestId}`}
@@ -2520,12 +2545,8 @@ export function EventInsideExperience({
                       </li>
                     ))}
                   </ul>
-                  {hostUnreadPreviewOverflow > 0 ? (
-                    <p className="mt-2 text-[11px] text-white/60">
-                      {hostUnreadPreviewOverflow === 1
-                        ? "1 more guest is waiting in the replies list below."
-                        : `${hostUnreadPreviewOverflow} more guests are waiting in the replies list below.`}
-                    </p>
+                  {hostThreadPreviewOverflowCopy ? (
+                    <p className="mt-2 text-[11px] text-white/60">{hostThreadPreviewOverflowCopy}</p>
                   ) : null}
                 </div>
               ) : null}

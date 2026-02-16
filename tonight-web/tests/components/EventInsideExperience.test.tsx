@@ -428,6 +428,30 @@ describe('EventInsideExperience', () => {
     expect(previewScope.getByText(/Landing at the venue in 5/i)).toBeInTheDocument();
   });
 
+  it('falls back to recent guest activity when hosts are caught up', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [],
+        hostRecentThreads: [
+          {
+            joinRequestId: 'jr-latest-3',
+            displayName: 'Maya',
+            lastMessageSnippet: 'Need any snacks before I head over?',
+            lastMessageAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/Recent guest activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Need any snacks/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
+  });
+
   it('shows a chat preview for guests when recent messages are provided', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,
