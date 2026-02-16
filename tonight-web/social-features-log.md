@@ -247,3 +247,9 @@ Each run should:
 - Reworked the footer into a sticky, glowing composer bar that keeps safety actions + connection status in one place, added an auto-resizing textarea, and improved the typing indicator treatment for better ergonomics on small screens.
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: continue polishing the dedicated chat page by tightening the message list visuals (bubble spacing/read badges) and threading in the upcoming event-detail shortcuts.
+
+## 2026-02-16 19:24 EET — Chat bubbles grouped and read badges polished
+- Refined `MessageList` so sequential messages from the same sender collapse into grouped bubbles with softened corner radii, tighter vertical spacing, and desktop/mobile width clamps, yielding a chat stack that feels closer to the Tonight event aesthetic.
+- Upgraded the metadata row to only appear at the end of a burst, restyled the delivery states, and introduced a pill-style “Seen” badge that mirrors the new read receipts from `/chat/[joinRequestId]`.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: add the event-detail shortcuts inside the dedicated chat header (info sheet + CTA) so guests can peek Tonight plan details without leaving the conversation.
