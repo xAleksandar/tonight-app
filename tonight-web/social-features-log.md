@@ -278,3 +278,9 @@ Each run should:
 - Threaded reusable invite-share helpers into `ChatConversation` (link resolver, share text builder, clipboard util) so the new chips stay hydrated with the correct Tonight origin even inside the standalone chat view.
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: hook the `/events/[id]` experience with richer chat entry points (CTA + inline preview) so guests can jump into their thread straight from the event page.
+
+## 2026-02-16 21:03 EET — Event page now shows live guest chat preview
+- Extended the `/events/[id]` loader to fetch the three latest messages for accepted guests, threading author metadata into the chat preview contract so the event screen always knows what’s happening in their DM thread.
+- Updated `EventInsideExperience` with a "Latest in chat" rail that displays those snippets (oldest → newest) plus relative timestamps, giving confirmed guests context before they hit the "Open chat" CTA.
+- Added coverage to `tests/components/EventInsideExperience.test.tsx` for the new preview and reran the suite (`cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`).
+- Next: surface the same chat preview affordance for hosts (e.g., top unread snippets) so they can jump into `/chat` from the event screen with equal context.

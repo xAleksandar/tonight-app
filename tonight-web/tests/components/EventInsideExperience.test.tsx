@@ -393,6 +393,39 @@ describe('EventInsideExperience', () => {
     });
   });
 
+  it('shows a chat preview for guests when recent messages are provided', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        ctaHref: '/chat/jr-guest',
+        guestMessagePreview: [
+          {
+            id: 'm1',
+            authorName: 'Aleks',
+            content: 'Doors open at 9:30 — come early for the view.',
+            postedAtISO: new Date().toISOString(),
+          },
+          {
+            id: 'm2',
+            authorName: 'You',
+            isViewer: true,
+            content: 'On my way! Need anything from the store?',
+            postedAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/Latest in chat/i)).toBeInTheDocument();
+    expect(screen.getByText(/Doors open at 9:30/i)).toBeInTheDocument();
+    expect(screen.getByText(/On my way/i)).toBeInTheDocument();
+  });
+
   it('renders the guest inline composer when metadata is provided', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,

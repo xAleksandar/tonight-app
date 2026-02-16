@@ -16,6 +16,7 @@ interface PageParams {
 
 const HOST_UNREAD_THREAD_LIMIT = 3;
 const HOST_ACTIVITY_FEED_LIMIT = 3;
+const CHAT_PREVIEW_MESSAGE_LIMIT = 3;
 const HOST_FRIEND_INVITE_LIMIT = 6;
 const HOST_FRIEND_INVITE_COOLDOWN_MS = 15 * 60 * 1000;
 
@@ -326,11 +327,24 @@ const buildChatPreviewForAcceptedGuest = async ({
   fallbackTimestampISO?: string;
   lastSeenHostActivityAt?: string | null;
 }): Promise<EventInsideExperienceProps["chatPreview"]> => {
-  const [lastMessage, unreadCount, acceptedGuestsCount, latestHostMessages] = await Promise.all([
-    prisma.message.findFirst({
+  const [recentMessages, unreadCount, acceptedGuestsCount, latestHostMessages] = await Promise.all([
+    prisma.message.findMany({
       where: { joinRequestId },
       orderBy: { createdAt: "desc" },
-      select: { content: true, createdAt: true },
+      take: CHAT_PREVIEW_MESSAGE_LIMIT,
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        senderId: true,
+        sender: {
+          select: {
+            displayName: true,
+            email: true,
+            photoUrl: true,
+          },
+        },
+      },
     }),
     prisma.message.count({
       where: {
@@ -364,14 +378,26 @@ const buildChatPreviewForAcceptedGuest = async ({
   const hostActivityCursorSource = hostActivityHasMore ? latestHostMessages[HOST_ACTIVITY_FEED_LIMIT] : undefined;
   const trimmedHostMessages = hostActivityHasMore ? latestHostMessages.slice(0, HOST_ACTIVITY_FEED_LIMIT) : latestHostMessages;
 
+  const lastMessage = recentMessages[0];
   const lastMessageSnippet = lastMessage?.content ?? "No messages yet. Say hi once you're accepted.";
-  const lastMessageAtISO = lastMessage?.createdAt.toISOString() ?? fallbackTimestampISO ?? null;
+  const lastMessageAtISO = lastMessage?.createdAt?.toISOString() ?? fallbackTimestampISO ?? null;
   const participantCount = acceptedGuestsCount + 1; // host + accepted guests
   const hostActivityFeed = trimmedHostMessages.map((message) => ({
     id: message.id,
     message: message.content,
     postedAtISO: message.createdAt?.toISOString() ?? null,
     authorName: hostDisplayName ?? "Host",
+  }));
+
+  const guestMessagePreview = recentMessages.map((message) => ({
+    id: message.id,
+    content: message.content,
+    postedAtISO: message.createdAt?.toISOString() ?? null,
+    authorName: message.senderId === viewerId
+      ? "You"
+      : message.sender?.displayName ?? message.sender?.email ?? "Guest",
+    authorAvatarUrl: message.sender?.photoUrl ?? null,
+    isViewer: message.senderId === viewerId,
   }));
 
   return {
@@ -384,6 +410,7 @@ const buildChatPreviewForAcceptedGuest = async ({
     guestComposer: {
       joinRequestId,
     },
+    guestMessagePreview: guestMessagePreview.length ? guestMessagePreview.reverse() : undefined,
     latestHostActivity: hostActivityFeed[0],
     latestHostActivityFeed: hostActivityFeed.length ? hostActivityFeed : undefined,
     hostActivityFeedPagination:

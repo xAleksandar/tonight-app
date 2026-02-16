@@ -74,6 +74,14 @@ export type EventInsideExperienceProps = {
       joinRequestId?: string | null;
       disabledReason?: string | null;
     };
+    guestMessagePreview?: Array<{
+      id: string;
+      authorName: string;
+      authorAvatarUrl?: string | null;
+      content: string;
+      postedAtISO?: string | null;
+      isViewer?: boolean;
+    }>;
     hostActivityFeedPagination?: {
       hasMore: boolean;
       nextCursor?: string | null;
@@ -256,6 +264,7 @@ export function EventInsideExperience({
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
+  const guestMessagePreviewEntries = viewerRole === "guest" ? chatPreview?.guestMessagePreview ?? [] : [];
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
   const [joinRequestStatus, setJoinRequestStatus] = useState<"idle" | "submitting" | "submitted">("idle");
@@ -2467,6 +2476,24 @@ export function EventInsideExperience({
                   </span>
                 ) : null}
               </div>
+              {isGuestViewer && guestMessagePreviewEntries.length > 0 ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Latest in chat</p>
+                  <ul className="mt-2 space-y-2">
+                    {guestMessagePreviewEntries.map((message) => (
+                      <li key={message.id} className="rounded-xl border border-white/5 bg-black/30 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3 text-[11px] text-white/60">
+                          <p className="font-semibold text-white">
+                            {message.isViewer ? "You" : message.authorName}
+                          </p>
+                          <span>{formatRelativeTime(message.postedAtISO)}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-white/70 line-clamp-2">{message.content}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {chatCtaHref ? (
                 <Link
                   href={chatCtaHref}
