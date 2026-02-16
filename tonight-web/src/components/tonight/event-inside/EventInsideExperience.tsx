@@ -210,6 +210,13 @@ type HostFriendInviteDispatchResult = { joinRequestId: string; status: "sent" | 
 
 type HostFriendInviteGuardrailState = Record<string, { lastInviteAtISO: string | null; nextInviteAvailableAtISO: string | null }>;
 
+type HostFriendSelectionSummary = {
+  sentCount: number;
+  skippedCount: number;
+  failedCount: number;
+  timestampISO: string;
+};
+
 export function EventInsideExperience({
   event,
   host,
@@ -239,6 +246,7 @@ export function EventInsideExperience({
   const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
   const [hostFriendEventInviteState, setHostFriendEventInviteState] = useState<Record<string, string | null>>({});
   const [hostFriendEventInviteOverrides, setHostFriendEventInviteOverrides] = useState<Record<string, string | null>>({});
+  const [hostFriendSelectionSummary, setHostFriendSelectionSummary] = useState<HostFriendSelectionSummary | null>(null);
 
   const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
 
@@ -375,6 +383,12 @@ export function EventInsideExperience({
       return mutated ? next : prev;
     });
   }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendSelectionSummary(null);
+    }
+  }, [hostFriendInviteEntries.length]);
 
   useEffect(() => {
     if (!hostFriendInviteEntries.length) {
@@ -757,6 +771,11 @@ export function EventInsideExperience({
     hostFriendSelectionSkippedReselectableCount === 1
       ? "1 friend ready again"
       : `${hostFriendSelectionSkippedReselectableCount} friends ready again`;
+  const hostFriendSelectionSummaryRelativeTime = hostFriendSelectionSummary?.timestampISO
+    ? formatRelativeTime(hostFriendSelectionSummary.timestampISO)
+    : null;
+  const hostFriendSelectionSummaryHasSkipped = Boolean(hostFriendSelectionSummary?.skippedCount);
+  const hostFriendSelectionSummaryHasFailures = Boolean(hostFriendSelectionSummary?.failedCount);
 
   useEffect(() => {
     if (!hostFriendSelectionActive) {
@@ -1434,6 +1453,11 @@ export function EventInsideExperience({
     showSuccessToast(label, helper);
   };
 
+  const triggerHostFriendSkippedReselect = () => {
+    setHostFriendSelectionSkippedExpanded(true);
+    handleHostFriendSelectionReselectSkipped();
+  };
+
   const handleHostFriendSelectionSend = async () => {
     if (!hostFriendSelectedEntries.length) {
       showErrorToast("No friends selected", "Pick at least one friend before sending.");
@@ -1481,10 +1505,12 @@ export function EventInsideExperience({
           );
         }
 
-        const handleToastReselect = () => {
-          setHostFriendSelectionSkippedExpanded(true);
-          handleHostFriendSelectionReselectSkipped();
-        };
+        setHostFriendSelectionSummary({
+          sentCount,
+          skippedCount,
+          failedCount,
+          timestampISO: new Date().toISOString(),
+        });
 
         const toastDescription = (
           <div className="space-y-2">
@@ -1494,7 +1520,7 @@ export function EventInsideExperience({
             {skippedCount > 0 ? (
               <button
                 type="button"
-                onClick={handleToastReselect}
+                onClick={triggerHostFriendSkippedReselect}
                 className="rounded-full border border-foreground/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground transition hover:border-foreground/40"
               >
                 Reselect skipped friends
@@ -2163,6 +2189,69 @@ export function EventInsideExperience({
                             Clear selection
                           </button>
                         </div>
+                      </div>
+                    ) : null}
+                    {hostFriendSelectionSummary ? (
+                      <div className="mt-4 rounded-2xl border border-white/15 bg-black/30 p-3" data-testid="multi-send-summary">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Last multi-send summary</p>
+                            <p className="text-xs text-white/60">
+                              {hostFriendSelectionSummary.sentCount === 1
+                                ? "1 invite delivered"
+                                : `${hostFriendSelectionSummary.sentCount} invites delivered`}
+                              {hostFriendSelectionSummaryHasSkipped
+                                ? hostFriendSelectionSummary.skippedCount === 1
+                                  ? " · 1 skipped"
+                                  : ` · ${hostFriendSelectionSummary.skippedCount} skipped`
+                                : ""}
+                              {hostFriendSelectionSummaryHasFailures
+                                ? hostFriendSelectionSummary.failedCount === 1
+                                  ? " · 1 failed"
+                                  : ` · ${hostFriendSelectionSummary.failedCount} failed`
+                                : ""}
+                              {hostFriendSelectionSummaryRelativeTime ? ` · ${hostFriendSelectionSummaryRelativeTime}` : ""}
+                            </p>
+                          </div>
+                          {hostFriendSelectionSummaryHasSkipped ? (
+                            <button
+                              type="button"
+                              onClick={triggerHostFriendSkippedReselect}
+                              className="rounded-full border border-white/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-white/45 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={hostFriendSelectionSkippedReselectableCount === 0 || hostFriendSelectionStatus === "sending"}
+                            >
+                              {hostFriendSelectionSkippedReselectableCount > 0 ? "Reselect skipped friends" : "Waiting for cooldowns"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-primary">
+                            {hostFriendSelectionSummary.sentCount === 1
+                              ? "1 invite sent"
+                              : `${hostFriendSelectionSummary.sentCount} invites sent`}
+                          </span>
+                          {hostFriendSelectionSummaryHasSkipped ? (
+                            <span className="rounded-full bg-amber-200/20 px-2 py-0.5 text-amber-50">
+                              {hostFriendSelectionSummary.skippedCount === 1
+                                ? "1 skipped"
+                                : `${hostFriendSelectionSummary.skippedCount} skipped`}
+                            </span>
+                          ) : null}
+                          {hostFriendSelectionSummaryHasFailures ? (
+                            <span className="rounded-full bg-rose-200/25 px-2 py-0.5 text-rose-50">
+                              {hostFriendSelectionSummary.failedCount === 1
+                                ? "1 failed"
+                                : `${hostFriendSelectionSummary.failedCount} failed`}
+                            </span>
+                          ) : null}
+                        </div>
+                        {hostFriendSelectionSummaryHasSkipped ? (
+                          <p className="mt-2 text-[11px] text-white/60">
+                            {hostFriendSelectionSkippedReselectableCount > 0
+                              ? "Tap reselect to drop cooled-down friends back into your selection."
+                              : "We’ll light up the reselect button once cooldowns lift."}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
                     {hostFriendSelectionSkippedHistoryCount > 0 ? (

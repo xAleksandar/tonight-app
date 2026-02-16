@@ -226,6 +226,12 @@ Each run should:
 
 ## 2026-02-16 18:07 EET — Bulk-send toast shows real counts + action
 - Reworked the multi-send success toast so it now spells out how many invites delivered, how many were skipped for cooldown/event guardrails, and whether any API attempts failed.
-- Upgraded the toast system to render rich React nodes, letting us inject a “Reselect skipped friends” pill that toggles the skipped list + reuse logic directly from the toast without hunting for the UI section.
+- Upgraded the toast system to render rich React nodes, letting us inject a “Reselect skipped friends” pill that toggles the skipped list + reuse logic directly from the UI section.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
 - Next: keep the multi-send banner in sync by persisting the latest send summary (sent vs. skipped counts + reselect CTA) so hosts still see the breakdown if they miss the toast.
+
+## 2026-02-16 18:25 EET — Multi-send banner carries the latest summary
+- Added persistent multi-send summary state so we hang on to the most recent send counts (delivered/skipped/failed) and thread them into a new “Last multi-send summary” card directly inside the host invite rail.
+- Wired the summary card to mirror the toast breakdown (badges + relative timestamp) and surface the same “Reselect skipped friends” CTA so hosts can reopen cooled-down selections without hunting for a dismissed toast.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
+- Next: start polishing the dedicated `/chat/[joinRequestId]` page (layout + composer styles + live update indicators) so the standalone chat view matches the new event-inside experience.

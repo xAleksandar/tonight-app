@@ -1106,6 +1106,12 @@ describe('EventInsideExperience', () => {
     await waitFor(() => {
       expect(screen.queryByText(/multi-send ready/i)).not.toBeInTheDocument();
     });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('multi-send-summary')).toBeInTheDocument();
+      expect(screen.getByText(/last multi-send summary/i)).toBeInTheDocument();
+      expect(screen.getByText(/invites delivered/i)).toBeInTheDocument();
+    });
   });
 
 });
