@@ -9,6 +9,7 @@ import MessageList, { type ChatMessage, type MessageListStatus } from '@/compone
 import UserAvatar from '@/components/UserAvatar';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
+import type { SocketReadReceiptEventPayload } from '@/lib/socket-shared';
 import { showErrorToast } from '@/lib/toast';
 
 export type ChatParticipantSummary = {
@@ -133,6 +134,7 @@ export default function ChatConversation({
   const counterpart = useMemo(() => {
     return context.requesterRole === 'host' ? context.participant : context.host;
   }, [context]);
+  const counterpartId = counterpart.id;
 
   const eventTimeLabel = useMemo(() => formatDateTime(context.event.datetime), [context.event.datetime]);
 
@@ -181,6 +183,37 @@ export default function ChatConversation({
     }
   }, [joinRequestId]);
 
+  const handleReadReceipt = useCallback(
+    (payload: SocketReadReceiptEventPayload) => {
+      if (payload.joinRequestId !== joinRequestId) {
+        return;
+      }
+      if (payload.readerId === currentUserId) {
+        return;
+      }
+      setMessages((previous) => {
+        let changed = false;
+        const receiptMap = new Map(payload.receipts.map((entry) => [entry.messageId, entry.readAt]));
+        const next = previous.map((message) => {
+          if (!receiptMap.has(message.id)) {
+            return message;
+          }
+          const alreadyAcknowledged = (message.readBy ?? []).some((entry) => entry.userId === payload.readerId);
+          if (alreadyAcknowledged) {
+            return message;
+          }
+          changed = true;
+          return {
+            ...message,
+            readBy: [...(message.readBy ?? []), { userId: payload.readerId, readAt: receiptMap.get(message.id)! }],
+          };
+        });
+        return changed ? next : previous;
+      });
+    },
+    [currentUserId, joinRequestId]
+  );
+
   useEffect(() => {
     fetchMessages().catch((error) => {
       console.error('Unexpected chat fetch failure', error);
@@ -225,6 +258,7 @@ export default function ChatConversation({
         setIsOtherUserTyping(false);
       }
     },
+    onReadReceipt: handleReadReceipt,
   });
 
   useEffect(() => {
@@ -303,6 +337,7 @@ export default function ChatConversation({
         content,
         createdAt: new Date().toISOString(),
         deliveryStatus: 'queued',
+        readBy: [],
       };
 
       queuedMessagesRef.current.push({ clientReferenceId, content });
@@ -571,6 +606,7 @@ export default function ChatConversation({
             error={messagesError}
             messages={messages}
             currentUserId={currentUserId}
+            counterpartId={counterpartId}
             onRetry={() => fetchMessages().catch(() => {})}
             className="!px-0"
           />

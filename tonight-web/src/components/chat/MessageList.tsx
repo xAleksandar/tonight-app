@@ -25,6 +25,7 @@ type MessageListProps = {
   error?: string | null;
   messages: ChatMessage[];
   currentUserId: string;
+  counterpartId: string;
   onRetry?: () => void;
   className?: string;
 };
@@ -34,6 +35,7 @@ export default function MessageList({
   error,
   messages,
   currentUserId,
+  counterpartId,
   onRetry,
   className,
 }: MessageListProps) {
@@ -100,15 +102,21 @@ export default function MessageList({
           );
           const statusLabel = message.deliveryStatus ? DELIVERY_STATUS_LABELS[message.deliveryStatus] : null;
           const timestampLabel = formatMessageTimestamp(message.createdAt);
-          const metaLabel = statusLabel
-            ? [statusLabel, timestampLabel].filter(Boolean).join(' • ')
-            : timestampLabel;
+          const metaSegments = [statusLabel, timestampLabel].filter(Boolean);
           const metaTone = message.deliveryStatus === 'failed' ? 'text-destructive-foreground' : 'text-muted-foreground';
+          const isSeenByCounterpart = isSelf && (message.readBy ?? []).some((entry) => entry.userId === counterpartId);
 
           return (
             <div key={message.id} className={classNames('flex flex-col gap-0.5', isSelf ? 'items-end' : 'items-start')}>
               <div className={bubbleClass}>{message.content}</div>
-              <span className={classNames('px-1 text-[10px]', metaTone)}>{metaLabel}</span>
+              <div className="flex items-center gap-1 px-1 text-[10px]">
+                {metaSegments.length > 0 ? (
+                  <span className={metaTone}>{metaSegments.join(' • ')}</span>
+                ) : null}
+                {isSeenByCounterpart ? (
+                  <span className="font-semibold text-emerald-400">Seen</span>
+                ) : null}
+              </div>
             </div>
           );
         })}

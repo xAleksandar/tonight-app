@@ -235,3 +235,9 @@ Each run should:
 - Wired the summary card to mirror the toast breakdown (badges + relative timestamp) and surface the same “Reselect skipped friends” CTA so hosts can reopen cooled-down selections without hunting for a dismissed toast.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
 - Next: start polishing the dedicated `/chat/[joinRequestId]` page (layout + composer styles + live update indicators) so the standalone chat view matches the new event-inside experience.
+
+## 2026-02-16 18:50 EET — Read receipts land on the dedicated chat page
+- Extended chat messages to carry read-receipt metadata (Prisma joins + API payloads) and emit socket events whenever someone clears their inbox, so the standalone chat view knows exactly which messages were seen.
+- Added a read-receipt listener in `useSocket`, updated the `/chat/[joinRequestId]` page to merge those events in real time, and refreshed the message list UI with a “Seen” badge on your own bubbles once the counterpart catches up.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: continue polishing `/chat/[joinRequestId]` (chat layout refinements, composer ergonomics, desktop/mobile spacing) so the page matches the new Tonight aesthetic before hooking in event detail shortcuts.

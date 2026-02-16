@@ -8,6 +8,7 @@ import {
   JOIN_REQUEST_JOIN_EVENT,
   JOIN_REQUEST_MESSAGE_EVENT,
   JOIN_REQUEST_STATUS_CHANGED_EVENT,
+  JOIN_REQUEST_READ_RECEIPT_EVENT,
   CHAT_TYPING_START_EVENT,
   CHAT_TYPING_STOP_EVENT,
   CHAT_TYPING_EVENT,
@@ -15,6 +16,7 @@ import {
   type SocketMessagePayload,
   type SocketTypingPayload,
   type JoinRequestStatusChangedPayload,
+  type SocketReadReceiptEventPayload,
 } from '@/lib/socket-shared';
 
 export type SocketConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
@@ -29,6 +31,7 @@ type EventHandlers = {
   onTyping?: (payload: SocketTypingPayload) => void;
   onTypingStop?: (payload: { joinRequestId: string; userId: string }) => void;
   onJoinRequestStatusChanged?: (payload: JoinRequestStatusChangedPayload) => void;
+  onReadReceipt?: (payload: SocketReadReceiptEventPayload) => void;
 };
 
 export type UseSocketOptions = EventHandlers & {
@@ -99,6 +102,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     onTyping,
     onTypingStop,
     onJoinRequestStatusChanged,
+    onReadReceipt,
   } = options;
 
   const handlersRef = useRef<EventHandlers>({
@@ -109,11 +113,21 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     onTyping,
     onTypingStop,
     onJoinRequestStatusChanged,
+    onReadReceipt,
   });
 
   useEffect(() => {
-    handlersRef.current = { onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop, onJoinRequestStatusChanged };
-  }, [onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop, onJoinRequestStatusChanged]);
+    handlersRef.current = {
+      onMessage,
+      onConnect,
+      onDisconnect,
+      onError,
+      onTyping,
+      onTypingStop,
+      onJoinRequestStatusChanged,
+      onReadReceipt,
+    };
+  }, [onMessage, onConnect, onDisconnect, onError, onTyping, onTypingStop, onJoinRequestStatusChanged, onReadReceipt]);
 
   const socketRef = useRef<ClientSocket | null>(null);
   const joinedRoomsRef = useRef<Set<string>>(new Set());
@@ -289,6 +303,10 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
 
       socket.on(JOIN_REQUEST_STATUS_CHANGED_EVENT, (payload: JoinRequestStatusChangedPayload) => {
         handlersRef.current.onJoinRequestStatusChanged?.(payload);
+      });
+
+      socket.on(JOIN_REQUEST_READ_RECEIPT_EVENT, (payload: SocketReadReceiptEventPayload) => {
+        handlersRef.current.onReadReceipt?.(payload);
       });
     },
     [flushQueuedRoomJoins, resetReconnectTracking, scheduleReconnect, updateState]

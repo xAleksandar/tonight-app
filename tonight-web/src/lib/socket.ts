@@ -6,11 +6,13 @@ import {
   JOIN_REQUEST_ROOM_PREFIX,
   JOIN_REQUEST_MESSAGE_EVENT,
   JOIN_REQUEST_JOIN_EVENT,
+  JOIN_REQUEST_READ_RECEIPT_EVENT,
   CHAT_TYPING_START_EVENT,
   CHAT_TYPING_STOP_EVENT,
   CHAT_TYPING_EVENT,
   CHAT_TYPING_STOP_BROADCAST_EVENT,
   type SocketMessagePayload,
+  type SocketReadReceiptEventPayload,
 } from '@/lib/socket-shared';
 
 export type { SocketMessagePayload };
@@ -71,6 +73,13 @@ class SocketService {
       throw new Error('joinRequestId is required');
     }
     this.getIO().to(this.getRoomName(joinRequestId)).emit(JOIN_REQUEST_MESSAGE_EVENT, payload);
+  }
+
+  public emitReadReceipt(payload: SocketReadReceiptEventPayload): void {
+    if (!payload.joinRequestId) {
+      throw new Error('joinRequestId is required for read receipt events');
+    }
+    this.getIO().to(this.getRoomName(payload.joinRequestId)).emit(JOIN_REQUEST_READ_RECEIPT_EVENT, payload);
   }
 
   private configure(io: SocketIOServer): void {
