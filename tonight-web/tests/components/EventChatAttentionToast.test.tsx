@@ -10,6 +10,7 @@ let render: TestingLibrary['render'];
 let screen: TestingLibrary['screen'];
 let fireEvent: TestingLibrary['fireEvent'];
 let cleanup: TestingLibrary['cleanup'];
+let act: TestingLibrary['act'];
 
 let jsdomInstance: JSDOM | null = null;
 
@@ -38,6 +39,7 @@ beforeAll(async () => {
   screen = testingLibrary.screen;
   fireEvent = testingLibrary.fireEvent;
   cleanup = testingLibrary.cleanup;
+  act = testingLibrary.act;
 });
 
 afterAll(() => {
@@ -60,6 +62,7 @@ describe('EventChatAttentionToast', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('renders the helper text, snippet context, and CTA', () => {
@@ -80,7 +83,8 @@ describe('EventChatAttentionToast', () => {
     expect(screen.getByText('New ping')).toBeInTheDocument();
     expect(screen.getByText('Latest note from the host')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/abc');
-    expect(screen.getByText(/Aleks/)).toHaveTextContent('Aleks · 2 minutes ago');
+    expect(screen.getByText('Aleks')).toBeInTheDocument();
+    expect(screen.getByText('2 minutes ago')).toBeInTheDocument();
     expect(screen.getByText("Don't forget the speaker setup.")).toBeInTheDocument();
   });
 
@@ -100,5 +104,46 @@ describe('EventChatAttentionToast', () => {
     fireEvent.click(screen.getByRole('button', { name: /dismiss chat alert/i }));
 
     expect(onInteract).toHaveBeenCalledTimes(2);
+  });
+
+  it('cycles through queued snippets and updates the CTA href per entry', () => {
+    vi.useFakeTimers();
+
+    render(
+      <EventChatAttentionToast
+        href="/chat/fallback"
+        label="Open chat"
+        attentionQueue={[
+          {
+            id: 'first',
+            snippet: 'First guest ping',
+            authorName: 'Mira',
+            timestampISO: '2026-02-17T00:25:00Z',
+            href: '/chat/first',
+            helperText: 'Mira sent a new message',
+          },
+          {
+            id: 'second',
+            snippet: 'Second guest ping',
+            authorName: 'Dante',
+            timestampISO: '2026-02-17T00:26:00Z',
+            href: '/chat/second',
+            helperText: 'Dante needs a reply',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('First guest ping')).toBeInTheDocument();
+    expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/first');
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(screen.getByText('Second guest ping')).toBeInTheDocument();
+    expect(screen.getByText('2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/second');
   });
 });

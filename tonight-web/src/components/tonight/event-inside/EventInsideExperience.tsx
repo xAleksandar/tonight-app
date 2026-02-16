@@ -62,6 +62,15 @@ type EventChatPreview = {
   hostActivityLastSeenAt?: string | null;
 };
 
+export type EventChatAttentionPayload = {
+  id: string;
+  snippet: string;
+  authorName?: string | null;
+  timestampISO?: string | null;
+  helperText?: string | null;
+  href?: string | null;
+};
+
 export type EventInsideExperienceProps = {
   event: {
     id: string;
@@ -123,7 +132,7 @@ export type EventInsideExperienceProps = {
   /** Controls the chat CTA attention indicator (true = pulse) */
   chatAttentionActive?: boolean;
   /** Fired when realtime events request the attention indicator to toggle */
-  onChatAttentionChange?: (active: boolean) => void;
+  onChatAttentionChange?: (active: boolean, payload?: EventChatAttentionPayload) => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -386,7 +395,10 @@ export function EventInsideExperience({
   const socketEnabled = realtimeChatUpdatesEnabled || realtimeJoinApprovalEnabled;
   const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
   const eventInviteShareText = useMemo(() => buildEventInviteShareText(event), [event]);
-  const requestChatAttention = useCallback(() => onChatAttentionChange?.(true), [onChatAttentionChange]);
+  const requestChatAttention = useCallback(
+    (payload?: EventChatAttentionPayload) => onChatAttentionChange?.(true, payload),
+    [onChatAttentionChange]
+  );
   const acknowledgeChatAttention = useCallback(() => onChatAttentionChange?.(false), [onChatAttentionChange]);
 
   useEffect(() => {
@@ -1112,7 +1124,15 @@ export function EventInsideExperience({
         });
 
         if (isHostSender) {
-          requestChatAttention();
+          const attentionId = payload.id ?? `${guestJoinRequestId ?? 'guest'}-${createdAtISO}`;
+          requestChatAttention({
+            id: attentionId,
+            snippet: payload.content,
+            authorName: host.displayName ?? host.email ?? "Host",
+            timestampISO: payload.createdAt ?? createdAtISO,
+            helperText: "Host just shared a new update",
+            href: guestJoinRequestId ? `/chat/${guestJoinRequestId}` : chatPreview?.ctaHref ?? undefined,
+          });
         }
 
         if (!isHostSender || !realtimeHostActivityEnabled) {
@@ -1144,6 +1164,7 @@ export function EventInsideExperience({
 
       if (hostRealtimeChatEnabled && hostChatJoinRequestIdSet.has(payload.joinRequestId)) {
         const participant = hostChatParticipantMap.get(payload.joinRequestId);
+        const participantDisplayName = participant?.displayName ?? 'Guest';
         if (isHostSender) {
           setChatPreviewState((prev) => {
             const reference = prev ?? initialChatPreview;
@@ -1174,7 +1195,7 @@ export function EventInsideExperience({
           return {
             ...reference,
             lastMessageSnippet: payload.content,
-            lastMessageAuthorName: participant?.displayName ?? "Guest",
+            lastMessageAuthorName: participantDisplayName,
             lastMessageAtISO: createdAtISO,
             unreadCount: totalUnread,
             ctaLabel: totalUnread > 0 ? "Reply to guests" : reference.ctaLabel,
@@ -1182,7 +1203,14 @@ export function EventInsideExperience({
           };
         });
 
-        requestChatAttention();
+        requestChatAttention({
+          id: payload.id ?? `${payload.joinRequestId}-${createdAtISO}`,
+          snippet: payload.content,
+          authorName: participantDisplayName,
+          timestampISO: payload.createdAt ?? createdAtISO,
+          helperText: participant?.displayName ? `${participantDisplayName} sent a new message` : "Guest sent a new message",
+          href: `/chat/${payload.joinRequestId}`,
+        });
 
         setHostUnreadThreads((prev) => {
           const participant = hostChatParticipantMap.get(payload.joinRequestId);

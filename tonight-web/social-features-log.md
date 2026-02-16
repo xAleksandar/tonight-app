@@ -334,3 +334,10 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx tests/components/EventInsideExperience.test.tsx`
 - Next: queue multiple attention pings (and cycle through their snippets) so the floating toast can surface every fresh guest thread instead of only the last one.
 
+
+## 2026-02-17 01:05 EET — Attention toast rotates through queued chat pings
+- Introduced structured `EventChatAttentionPayload`s from `EventInsideExperience` so every realtime socket ping ships its snippet, author, timestamp, and CTA target, then taught the chat attention handler to build a timed queue instead of overwriting the last alert.
+- Passed the queue into `EventLayout`/`EventChatAttentionToast`, added a rotating presenter that cycles through each queued snippet (with helper copy, sender, timestamp, and per-item CTA href), and updated the toast specs to cover the new behavior + timer handling.
+- Extended `EventInsidePageClient` to keep the queue alive, extend the attention timeout based on queue size, and clear everything when the user interacts so mobile/desktop CTAs stay in sync.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx tests/components/EventInsideExperience.test.tsx`
+- Next: propagate the queued attention payload into the hero/mobile chat CTA badges so the inline chips show which thread pinged (and how many are waiting) even if the toast is dismissed.

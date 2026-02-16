@@ -6,6 +6,7 @@ import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { MobileActionBar, type MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 import { EventChatAttentionToast } from "@/components/tonight/EventChatAttentionToast";
+import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { CategoryId } from "@/lib/categories";
 
 type EventLayoutProps = {
@@ -15,7 +16,8 @@ type EventLayoutProps = {
   userDisplayName: string | null;
   userEmail: string | null;
   userPhotoUrl: string | null;
-  chatAction?: MobileActionBarProps["chatAction"];
+  chatAction?: MobileActionBarProps['chatAction'];
+  chatAttentionQueue?: EventChatAttentionPayload[];
 };
 
 export function EventLayout({
@@ -26,10 +28,11 @@ export function EventLayout({
   userEmail,
   userPhotoUrl,
   chatAction,
+  chatAttentionQueue,
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const showChatAttentionToast = Boolean(chatAction?.attentionActive && chatAction?.href);
+  const showChatAttentionToast = Boolean(chatAction?.attentionActive && chatAction?.href && chatAttentionQueue?.length);
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -72,6 +75,7 @@ export function EventLayout({
           snippetSender={chatAction?.lastMessageAuthorName}
           snippetTimestamp={chatAction?.lastMessageAtISO}
           onInteract={chatAction?.onInteract}
+          attentionQueue={chatAttentionQueue}
         />
       ) : null}
 

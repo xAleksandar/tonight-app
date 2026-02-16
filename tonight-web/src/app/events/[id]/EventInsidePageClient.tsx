@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventLayout } from "./EventLayout";
-import type { EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
+import type { EventChatAttentionPayload, EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
 import { EventInsideExperience } from "@/components/tonight/event-inside/EventInsideExperience";
 import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 
@@ -24,10 +24,29 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
     experience.chatPreview
   );
   const [chatAttentionActive, setChatAttentionActive] = useState(false);
+  const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
   const chatAttentionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startAttentionTimeout = useCallback((queueLength = 1) => {
+    const baseDuration = 10_000;
+    const extraPerItem = 3_500;
+    const extraItems = Math.max(Math.min(queueLength - 1, 4), 0);
+    const duration = baseDuration + extraItems * extraPerItem;
+
+    if (chatAttentionTimeoutRef.current) {
+      clearTimeout(chatAttentionTimeoutRef.current);
+    }
+
+    chatAttentionTimeoutRef.current = setTimeout(() => {
+      setChatAttentionActive(false);
+      setChatAttentionQueue([]);
+      chatAttentionTimeoutRef.current = null;
+    }, duration);
+  }, []);
 
   const clearChatAttention = useCallback(() => {
     setChatAttentionActive(false);
+    setChatAttentionQueue([]);
     if (chatAttentionTimeoutRef.current) {
       clearTimeout(chatAttentionTimeoutRef.current);
       chatAttentionTimeoutRef.current = null;
@@ -35,21 +54,30 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   }, []);
 
   const handleChatAttentionChange = useCallback(
-    (active: boolean) => {
+    (active: boolean, payload?: EventChatAttentionPayload) => {
       if (active) {
         setChatAttentionActive(true);
-        if (chatAttentionTimeoutRef.current) {
-          clearTimeout(chatAttentionTimeoutRef.current);
+        if (payload) {
+          setChatAttentionQueue((prev) => {
+            const existingIndex = prev.findIndex((entry) => entry.id === payload.id);
+            let next: EventChatAttentionPayload[];
+            if (existingIndex >= 0) {
+              next = [...prev];
+              next[existingIndex] = { ...next[existingIndex], ...payload };
+            } else {
+              next = [...prev, payload];
+            }
+            startAttentionTimeout(next.length);
+            return next;
+          });
+        } else {
+          startAttentionTimeout(Math.max(chatAttentionQueue.length, 1));
         }
-        chatAttentionTimeoutRef.current = setTimeout(() => {
-          setChatAttentionActive(false);
-          chatAttentionTimeoutRef.current = null;
-        }, 10_000);
         return;
       }
       clearChatAttention();
     },
-    [clearChatAttention]
+    [chatAttentionQueue.length, clearChatAttention, startAttentionTimeout]
   );
 
   useEffect(() => {
@@ -88,6 +116,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       userEmail={layoutProps.userEmail}
       userPhotoUrl={layoutProps.userPhotoUrl}
       chatAction={chatAction}
+      chatAttentionQueue={chatAttentionQueue}
     >
       <EventInsideExperience
         {...experience}
