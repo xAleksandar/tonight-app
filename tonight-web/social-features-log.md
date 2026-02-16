@@ -297,3 +297,15 @@ Each run should:
 - Updated `EventInsideExperience` so the "Latest guest pings" module now swaps to a "Recent guest activity" state with the same timestamps/links, ensuring the rail never disappears for caught-up hosts while keeping the actionable "Guests needing replies" list gated to real unreads.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
 - Next: promote the unread/recent chat summary into the event hero CTA (badge + chip) so hosts and guests see the chat state the moment they land on `/events/[id]`.
+
+## 2026-02-16 22:10 EET — Hero chat CTA surfaces live status
+- Threaded the chat preview into the event hero so hosts/guests immediately see the latest snippet, unread badge, and participant/time chips before scrolling, plus mirrored the CTA/disabled states up top.
+- Added a hero-specific CTA layout that respects join-request/public flows and exercised the new badge/chip behavior with dedicated component tests.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`
+- Next: extend the Event layout’s sticky mobile action bar with the same unread badge + CTA so chat state follows you while scrolling the event detail.
+
+## 2026-02-16 22:42 EET — Mobile action bar mirrors the chat CTA
+- Added a chat-action builder in `/events/[id]/page.tsx` that derives the right label, helper text, and badge tone/count for hosts, accepted guests, pending viewers, and anonymous visitors.
+- Threaded the derived action into `EventLayout` → `MobileActionBar`, expanded the bar with a new “Event chat” panel that surfaces the unread badge plus helper copy, and polished the CTA accessibility states.
+- Extended the MobileActionBar test suite (self shim + new assertions) and reran `cd tonight-web && npx vitest run tests/components/MobileActionBar.test.tsx` to keep the mobile nav covered.
+- Next: listen for chat socket events on the event page and auto-refresh the hero/action-bar badge + helper text when new messages arrive, so the mobile CTA stays live without a reload.

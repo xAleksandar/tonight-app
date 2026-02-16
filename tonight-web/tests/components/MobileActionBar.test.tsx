@@ -25,6 +25,7 @@ const ensureDomGlobals = () => {
     document: { configurable: true, value: window.document, writable: true },
     navigator: { configurable: true, value: window.navigator, writable: true },
     HTMLElement: { configurable: true, value: window.HTMLElement, writable: true },
+    self: { configurable: true, value: window, writable: true },
   });
 };
 
@@ -48,6 +49,7 @@ afterAll(() => {
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).self;
 });
 
 describe('MobileActionBar', () => {
@@ -112,4 +114,29 @@ describe('MobileActionBar', () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onOpenProfile).toHaveBeenCalledTimes(1);
   });
+
+  it('renders chat action details when provided', () => {
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          helperText: 'Latest note from the host',
+          badgeLabel: '2 unread',
+          badgeTone: 'highlight',
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/abc');
+    expect(screen.getByText('2 unread')).toBeInTheDocument();
+    expect(screen.getByText('Latest note from the host')).toBeInTheDocument();
+  });
+
 });

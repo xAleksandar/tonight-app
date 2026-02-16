@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
-import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import { MobileActionBar, type MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 import type { CategoryId } from "@/lib/categories";
 
 type EventLayoutProps = {
@@ -14,6 +14,7 @@ type EventLayoutProps = {
   userDisplayName: string | null;
   userEmail: string | null;
   userPhotoUrl: string | null;
+  chatAction?: MobileActionBarProps["chatAction"];
 };
 
 export function EventLayout({
@@ -23,6 +24,7 @@ export function EventLayout({
   userDisplayName,
   userEmail,
   userPhotoUrl,
+  chatAction,
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
@@ -64,6 +66,7 @@ export function EventLayout({
         onNavigateMessages={() => router.push('/messages')}
         onCreate={() => router.push('/events/create')}
         onOpenProfile={() => router.push('/profile')}
+        chatAction={chatAction}
       />
     </div>
   );
