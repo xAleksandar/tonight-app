@@ -580,6 +580,11 @@ export default function ChatConversation({
       'inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border/60 px-4 py-3 text-sm font-semibold transition',
       disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-background/80'
     );
+  const inlineChipClass = (disabled?: boolean) =>
+    classNames(
+      'inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs font-semibold transition',
+      disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-background/80'
+    );
 
   const handleCopyAddress = useCallback(async () => {
     if (!hasLocationDetails || !context.event.locationName) {
@@ -725,6 +730,43 @@ export default function ChatConversation({
           >
             View plan
           </Link>
+        </div>
+        <div className="mx-auto w-full max-w-4xl px-4 pb-3">
+          <div
+            className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            data-testid="chat-inline-actions"
+          >
+            <button
+              type="button"
+              onClick={handleCopyAddress}
+              disabled={!hasLocationDetails || isCopyingLocation}
+              className={inlineChipClass(!hasLocationDetails || isCopyingLocation)}
+              title={!hasLocationDetails ? 'Location details coming soon' : undefined}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {isCopyingLocation ? 'Copying…' : 'Copy address'}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenMaps}
+              disabled={!mapsUrl}
+              className={inlineChipClass(!mapsUrl)}
+              title={!mapsUrl ? 'Maps unlock once the host confirms the venue.' : undefined}
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              Open in Maps
+            </button>
+            <button
+              type="button"
+              onClick={handleAddToCalendar}
+              disabled={!eventStartDate || isCalendarExporting}
+              className={inlineChipClass(!eventStartDate || isCalendarExporting)}
+              title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
+            </button>
+          </div>
         </div>
       </header>
 

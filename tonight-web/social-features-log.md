@@ -266,3 +266,9 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: surface the high-frequency event actions (copy address/map/add-to-calendar) as inline chips under the chat header so mobile guests can act without opening the sheet.
 
+
+## 2026-02-16 20:26 EET — Chat header quick-action chips
+- Added a second row under the sticky chat header that surfaces Copy address, Open in Maps, and Add to calendar chips so mobile guests can act on plan details without opening the event sheet; states mirror the sheet (loading, disabled, tooltips) and respect the same error handling.
+- Introduced a shared inline chip style to keep the new row lightweight, hid scrollbars for horizontal swipe use, and wired the actions into the existing handlers so there’s no duplicated logic.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: add host-only share chips (copy invite link + Web Share) next to the new action row so hosts can blast the plan straight from chat without reopening the sheet.
