@@ -26,18 +26,19 @@ type SocketData = {
 type AuthenticatedSocket = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>;
 
 class SocketService {
-  private static instance: SocketService;
-
   private io?: SocketIOServer;
   private httpServer?: HTTPServer;
 
   private constructor() {}
 
   public static getInstance(): SocketService {
-    if (!SocketService.instance) {
-      SocketService.instance = new SocketService();
+    const globalSocket = globalThis as typeof globalThis & { __socketService?: SocketService };
+    if (globalSocket.__socketService) {
+      return globalSocket.__socketService;
     }
-    return SocketService.instance;
+    const instance = new SocketService();
+    globalSocket.__socketService = instance;
+    return instance;
   }
 
   public initialize(server: HTTPServer): SocketIOServer {
@@ -68,9 +69,17 @@ class SocketService {
     return this.io;
   }
 
+  private isInitialized(): boolean {
+    return this.io !== undefined;
+  }
+
   public emitMessage(joinRequestId: string, payload: SocketMessagePayload): void {
     if (!joinRequestId) {
       throw new Error('joinRequestId is required');
+    }
+    if (!this.isInitialized()) {
+      console.warn('[SocketService] Cannot emit message: Socket.IO not initialized');
+      return;
     }
     this.getIO().to(this.getRoomName(joinRequestId)).emit(JOIN_REQUEST_MESSAGE_EVENT, payload);
   }
@@ -78,6 +87,10 @@ class SocketService {
   public emitReadReceipt(payload: SocketReadReceiptEventPayload): void {
     if (!payload.joinRequestId) {
       throw new Error('joinRequestId is required for read receipt events');
+    }
+    if (!this.isInitialized()) {
+      console.warn('[SocketService] Cannot emit read receipt: Socket.IO not initialized');
+      return;
     }
     this.getIO().to(this.getRoomName(payload.joinRequestId)).emit(JOIN_REQUEST_READ_RECEIPT_EVENT, payload);
   }

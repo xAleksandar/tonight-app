@@ -261,6 +261,15 @@ export default function ChatConversation({
     };
   }, [fetchMessages]);
 
+  const handleIncomingMessage = useCallback(
+    (payload: SerializedMessage) => {
+      if (payload.joinRequestId === joinRequestId) {
+        appendMessage(payload);
+      }
+    },
+    [joinRequestId, appendMessage]
+  );
+
   const {
     connectionState,
     isConnected,
@@ -272,11 +281,7 @@ export default function ChatConversation({
   } = useSocket({
     token: socketToken,
     readinessEndpoint: '/api/socket/io',
-    onMessage: (payload) => {
-      if (payload.joinRequestId === joinRequestId) {
-        appendMessage(payload);
-      }
-    },
+    onMessage: handleIncomingMessage,
     onError: (error) => {
       console.error('Socket connection error', error);
       setSocketNotice('Real-time updates are unavailable. Sending messages will still work.');
@@ -958,14 +963,22 @@ export default function ChatConversation({
                 ref={composerRef}
                 value={composerValue}
                 onChange={handleInputChange}
-                placeholder="Type a message"
+                placeholder={
+                  hasBlockedCounterpart
+                    ? "Blocked"
+                    : connectionState === 'connected'
+                    ? "Type a message"
+                    : connectionState === 'connecting'
+                    ? "Connecting..."
+                    : "Reconnecting..."
+                }
                 rows={1}
-                disabled={hasBlockedCounterpart}
+                disabled={hasBlockedCounterpart || connectionState !== 'connected'}
                 className="max-h-48 min-h-[52px] w-full flex-1 resize-none rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
               />
               <button
                 type="submit"
-                disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
+                disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart || connectionState !== 'connected'}
                 className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
                 aria-label="Send message"
               >
