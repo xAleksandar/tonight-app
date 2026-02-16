@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Flag, Info, Send } from 'lucide-react';
+import { ArrowLeft, Flag, Info, Send, X } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
@@ -115,6 +116,7 @@ export default function ChatConversation({
   context,
 }: ChatConversationProps) {
   const router = useRouter();
+  const eventSheetTitleId = useId();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [messagesStatus, setMessagesStatus] = useState<MessagesStatus>('loading');
   const [messagesError, setMessagesError] = useState<string | null>(null);
@@ -126,6 +128,7 @@ export default function ChatConversation({
   const [queuedMessageCount, setQueuedMessageCount] = useState(0);
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
   const [isCurrentlyTyping, setIsCurrentlyTyping] = useState(false);
+  const [isEventSheetOpen, setIsEventSheetOpen] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
@@ -579,12 +582,21 @@ export default function ChatConversation({
           </div>
           <button
             type="button"
-            title="Event details coming soon"
-            className="rounded-xl border border-border/60 bg-card/60 p-2 text-muted-foreground"
+            onClick={() => setIsEventSheetOpen(true)}
+            className="rounded-xl border border-border/60 bg-card/60 p-2 text-muted-foreground transition hover:text-foreground"
             aria-label="Event info"
           >
             <Info className="h-4 w-4" />
           </button>
+          <Link
+            href={`/events/${context.event.id}`}
+            prefetch
+            target="_blank"
+            rel="noreferrer"
+            className="hidden items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/20 sm:inline-flex"
+          >
+            View plan
+          </Link>
         </div>
       </header>
 
@@ -700,6 +712,86 @@ export default function ChatConversation({
           </form>
         </div>
       </footer>
+
+      {isEventSheetOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={eventSheetTitleId}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 py-6 sm:items-center"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 h-full w-full"
+            aria-label="Close event info"
+            onClick={() => setIsEventSheetOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-3xl border border-border/70 bg-card/95 p-6 shadow-[0_35px_120px_rgba(0,0,0,0.55)] backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setIsEventSheetOpen(false)}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="space-y-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Tonight's plan</p>
+                <h2 id={eventSheetTitleId} className="mt-2 text-2xl font-semibold text-foreground">
+                  {context.event.title}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ') || 'Details coming soon'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/40 p-3">
+                <UserAvatar
+                  size="sm"
+                  displayName={context.host.displayName ?? undefined}
+                  email={context.host.email}
+                  photoUrl={context.host.photoUrl ?? undefined}
+                />
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Hosted by</p>
+                  <p className="text-sm font-semibold">{context.host.displayName ?? context.host.email}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-2xl border border-border/60 bg-background/40 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Where</span>
+                  <span className="font-medium text-foreground">{context.event.locationName ?? 'TBA'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">When</span>
+                  <span className="font-medium text-foreground">{eventTimeLabel ?? 'TBA'}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href={`/events/${context.event.id}`}
+                  prefetch
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                >
+                  Open full event
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsEventSheetOpen(false)}
+                  className="inline-flex flex-1 items-center justify-center rounded-2xl border border-border/60 px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-background/80"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

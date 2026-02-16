@@ -253,3 +253,9 @@ Each run should:
 - Upgraded the metadata row to only appear at the end of a burst, restyled the delivery states, and introduced a pill-style “Seen” badge that mirrors the new read receipts from `/chat/[joinRequestId]`.
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: add the event-detail shortcuts inside the dedicated chat header (info sheet + CTA) so guests can peek Tonight plan details without leaving the conversation.
+
+## 2026-02-16 19:40 EET — Chat header exposes event info shortcuts
+- Replaced the placeholder info button on `/chat/[joinRequestId]` with a live Tonight Plan sheet that shows the host, location, and timing details without leaving the conversation, plus an inline CTA to open the full event page in a new tab.
+- Added a persistent "View plan" button in the header for desktop, wired new overlay state + accessibility labels, and kept the new UI consistent with the glassmorphic chat shell.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: enrich the sheet with actionable shortcuts (copy address, open maps, add-to-calendar) so guests can act on the event details straight from chat.
