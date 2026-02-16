@@ -10,6 +10,57 @@ import { classNames } from "@/lib/classNames";
 import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
+type EventChatPreview = {
+  lastMessageSnippet?: string | null;
+  lastMessageAtISO?: string | null;
+  unreadCount?: number | null;
+  participantCount?: number | null;
+  ctaLabel?: string | null;
+  ctaHref?: string | null;
+  ctaDisabledReason?: string | null;
+  latestHostActivity?: {
+    message: string;
+    postedAtISO?: string | null;
+    authorName?: string | null;
+  };
+  latestHostActivityFeed?: Array<{
+    id: string;
+    message: string;
+    postedAtISO?: string | null;
+    authorName?: string | null;
+  }>;
+  hostUnreadThreads?: Array<{
+    joinRequestId: string;
+    displayName: string;
+    lastMessageSnippet: string;
+    lastMessageAtISO?: string | null;
+    unreadCount?: number | null;
+  }>;
+  hostRecentThreads?: Array<{
+    joinRequestId: string;
+    displayName: string;
+    lastMessageSnippet: string;
+    lastMessageAtISO?: string | null;
+  }>;
+  guestComposer?: {
+    joinRequestId?: string | null;
+    disabledReason?: string | null;
+  };
+  guestMessagePreview?: Array<{
+    id: string;
+    authorName: string;
+    authorAvatarUrl?: string | null;
+    content: string;
+    postedAtISO?: string | null;
+    isViewer?: boolean;
+  }>;
+  hostActivityFeedPagination?: {
+    hasMore: boolean;
+    nextCursor?: string | null;
+  };
+  hostActivityLastSeenAt?: string | null;
+};
+
 export type EventInsideExperienceProps = {
   event: {
     id: string;
@@ -44,56 +95,7 @@ export type EventInsideExperienceProps = {
     mutualFriends?: number | null;
   }>;
   viewerRole: "host" | "guest" | "pending" | "public";
-  chatPreview?: {
-    lastMessageSnippet?: string | null;
-    lastMessageAtISO?: string | null;
-    unreadCount?: number | null;
-    participantCount?: number | null;
-    ctaLabel?: string | null;
-    ctaHref?: string | null;
-    ctaDisabledReason?: string | null;
-    latestHostActivity?: {
-      message: string;
-      postedAtISO?: string | null;
-      authorName?: string | null;
-    };
-    latestHostActivityFeed?: Array<{
-      id: string;
-      message: string;
-      postedAtISO?: string | null;
-      authorName?: string | null;
-    }>;
-    hostUnreadThreads?: Array<{
-      joinRequestId: string;
-      displayName: string;
-      lastMessageSnippet: string;
-      lastMessageAtISO?: string | null;
-      unreadCount?: number | null;
-    }>;
-    hostRecentThreads?: Array<{
-      joinRequestId: string;
-      displayName: string;
-      lastMessageSnippet: string;
-      lastMessageAtISO?: string | null;
-    }>;
-    guestComposer?: {
-      joinRequestId?: string | null;
-      disabledReason?: string | null;
-    };
-    guestMessagePreview?: Array<{
-      id: string;
-      authorName: string;
-      authorAvatarUrl?: string | null;
-      content: string;
-      postedAtISO?: string | null;
-      isViewer?: boolean;
-    }>;
-    hostActivityFeedPagination?: {
-      hasMore: boolean;
-      nextCursor?: string | null;
-    };
-    hostActivityLastSeenAt?: string | null;
-  };
+  chatPreview?: EventChatPreview;
   hostFriendInvites?: Array<{
     joinRequestId: string;
     userId: string;
@@ -105,10 +107,18 @@ export type EventInsideExperienceProps = {
     nextInviteAvailableAtISO?: string | null;
     currentEventInviteAtISO?: string | null;
   }>;
+  hostChatParticipants?: Array<{
+    joinRequestId: string;
+    userId: string;
+    displayName: string;
+    avatarUrl?: string | null;
+  }>;
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;
   /** Join request ID for pending guests to receive approval notifications */
   pendingJoinRequestId?: string | null;
+  /** Callback fired whenever the chat preview snapshot changes (e.g., realtime events) */
+  onChatPreviewRefresh?: (next: EventChatPreview | undefined) => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -138,6 +148,7 @@ const HOST_ANNOUNCEMENT_MAX_LENGTH = 1000;
 const HOST_ACTIVITY_SCROLL_THRESHOLD = 16;
 
 const HOST_FRIEND_INVITE_COOLDOWN_MS = 15 * 60 * 1000;
+const GUEST_CHAT_PREVIEW_LIMIT = 3;
 
 type HostFriendInviteTemplateId = "save-spot" | "last-minute" | "vibe-match";
 
@@ -218,9 +229,9 @@ type HostFriendSelectionEligibility = {
 };
 
 type JoinRequestActionState = "approving" | "rejecting";
-type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
+type HostUnreadThread = NonNullable<NonNullable<EventChatPreview["hostUnreadThreads"]>[number]>;
 
-type HostRecentThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostRecentThreads"]>[number];
+type HostRecentThread = NonNullable<NonNullable<EventChatPreview["hostRecentThreads"]>[number]>;
 
 type HostFriendInviteDispatchResult = { joinRequestId: string; status: "sent" | "failed"; error?: string };
 
@@ -239,11 +250,15 @@ export function EventInsideExperience({
   attendees,
   joinRequests,
   viewerRole,
-  chatPreview,
+  chatPreview: initialChatPreview,
   hostFriendInvites,
+  hostChatParticipants: hostChatParticipantsProp,
   socketToken,
   pendingJoinRequestId,
+  onChatPreviewRefresh,
 }: EventInsideExperienceProps) {
+  const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
+  const chatPreview = chatPreviewState ?? initialChatPreview;
   const [pendingRequests, setPendingRequests] = useState(joinRequests);
   const [roster, setRoster] = useState(attendees);
   const [requestActionState, setRequestActionState] = useState<Record<string, JoinRequestActionState | undefined>>({});
@@ -303,6 +318,29 @@ export function EventInsideExperience({
     () => (isHostViewer ? hostFriendInvites ?? [] : []),
     [isHostViewer, hostFriendInvites]
   );
+  const hostChatParticipants = useMemo(
+    () => (isHostViewer ? hostChatParticipantsProp ?? [] : []),
+    [hostChatParticipantsProp, isHostViewer]
+  );
+  const hostChatParticipantMap = useMemo(() => {
+    if (!hostChatParticipants.length) {
+      return new Map<string, { displayName: string; avatarUrl?: string | null }>();
+    }
+    return new Map(
+      hostChatParticipants.map((participant) => [
+        participant.joinRequestId,
+        {
+          displayName: participant.displayName,
+          avatarUrl: participant.avatarUrl ?? null,
+        },
+      ])
+    );
+  }, [hostChatParticipants]);
+  const hostChatJoinRequestIds = useMemo(
+    () => hostChatParticipants.map((participant) => participant.joinRequestId).filter((value): value is string => Boolean(value)),
+    [hostChatParticipants]
+  );
+  const hostChatJoinRequestIdSet = useMemo(() => new Set(hostChatJoinRequestIds), [hostChatJoinRequestIds]);
   const hostActivityListRef = useRef<HTMLUListElement | null>(null);
   const [hasHostActivityNotice, setHasHostActivityNotice] = useState(false);
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
@@ -332,12 +370,25 @@ export function EventInsideExperience({
   const [hostAnnouncementValue, setHostAnnouncementValue] = useState("");
   const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
   const guestJoinRequestId = guestComposerConfig?.joinRequestId?.trim() || null;
-  const realtimeHostActivityEnabled = Boolean(socketToken && isGuestViewer && guestJoinRequestId);
+  const guestRealtimeChatEnabled = Boolean(socketToken && guestJoinRequestId);
+  const hostRealtimeChatEnabled = Boolean(socketToken && isHostViewer && hostChatJoinRequestIds.length > 0);
+  const realtimeChatUpdatesEnabled = guestRealtimeChatEnabled || hostRealtimeChatEnabled;
+  const realtimeHostActivityEnabled = Boolean(guestRealtimeChatEnabled && isGuestViewer);
   const realtimeJoinApprovalEnabled = Boolean(socketToken && isPendingViewer && pendingJoinRequestId);
   const activeJoinRequestId = guestJoinRequestId || pendingJoinRequestId || null;
-  const socketEnabled = realtimeHostActivityEnabled || realtimeJoinApprovalEnabled;
+  const socketEnabled = realtimeChatUpdatesEnabled || realtimeJoinApprovalEnabled;
   const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
   const eventInviteShareText = useMemo(() => buildEventInviteShareText(event), [event]);
+
+  useEffect(() => {
+    setChatPreviewState(initialChatPreview);
+  }, [initialChatPreview]);
+
+  useEffect(() => {
+    if (onChatPreviewRefresh) {
+      onChatPreviewRefresh(chatPreview);
+    }
+  }, [chatPreview, onChatPreviewRefresh]);
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -999,45 +1050,153 @@ export function EventInsideExperience({
     setHasHostActivityNotice(false);
   }, []);
 
-  const handleRealtimeHostActivity = useCallback(
+  const handleRealtimeChatMessage = useCallback(
     (payload: SocketMessagePayload) => {
-      if (!realtimeHostActivityEnabled || !guestJoinRequestId) {
+      if (!realtimeChatUpdatesEnabled) {
         return;
       }
 
-      if (payload.joinRequestId !== guestJoinRequestId || payload.senderId !== host.id) {
+      const createdAtISO = payload.createdAt ?? new Date().toISOString();
+      const isHostSender = payload.senderId === host.id;
+
+      if (guestRealtimeChatEnabled && guestJoinRequestId && payload.joinRequestId === guestJoinRequestId) {
+        setChatPreviewState((prev) => {
+          const reference = prev ?? initialChatPreview;
+          if (!reference) {
+            return prev ?? reference;
+          }
+
+          const nextPreview: EventChatPreview = {
+            ...reference,
+            lastMessageSnippet: payload.content,
+            lastMessageAtISO: createdAtISO,
+          };
+
+          if (isHostSender) {
+            const previousUnread = typeof reference.unreadCount === "number" ? reference.unreadCount : 0;
+            nextPreview.unreadCount = previousUnread + 1;
+          } else {
+            nextPreview.unreadCount = null;
+          }
+
+          const existingPreview = reference.guestMessagePreview ?? [];
+          if (!existingPreview.some((entry) => entry.id === payload.id)) {
+            const nextEntry = {
+              id: payload.id,
+              content: payload.content,
+              postedAtISO: createdAtISO,
+              authorName: isHostSender ? host.displayName ?? host.email ?? "Host" : "You",
+              authorAvatarUrl: isHostSender ? host.avatarUrl ?? null : null,
+              isViewer: !isHostSender,
+            };
+            const normalized = [...existingPreview, nextEntry];
+            if (normalized.length > GUEST_CHAT_PREVIEW_LIMIT) {
+              normalized.splice(0, normalized.length - GUEST_CHAT_PREVIEW_LIMIT);
+            }
+            nextPreview.guestMessagePreview = normalized;
+          } else {
+            nextPreview.guestMessagePreview = existingPreview;
+          }
+
+          return nextPreview;
+        });
+
+        if (!isHostSender || !realtimeHostActivityEnabled) {
+          return;
+        }
+
+        setHostActivityEntries((prev) => {
+          if (prev.some((entry) => entry.id === payload.id)) {
+            return prev;
+          }
+          const nextEntry = {
+            id: payload.id,
+            message: payload.content,
+            postedAtISO: payload.createdAt,
+            authorName: host.displayName ?? host.email ?? "Host",
+          };
+          const listEl = hostActivityListRef.current;
+          const scrolledAway = listEl ? listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD : false;
+          if (scrolledAway) {
+            setHasHostActivityNotice(true);
+          } else {
+            scrollHostActivityToTop();
+            void acknowledgeHostActivityUpdates(payload.createdAt ?? latestHostActivityTimestamp);
+          }
+          return [nextEntry, ...prev];
+        });
         return;
       }
 
-      setHostActivityEntries((prev) => {
-        if (prev.some((entry) => entry.id === payload.id)) {
-          return prev;
+      if (hostRealtimeChatEnabled && hostChatJoinRequestIdSet.has(payload.joinRequestId)) {
+        if (isHostSender) {
+          setChatPreviewState((prev) => {
+            const reference = prev ?? initialChatPreview;
+            if (!reference) {
+              return prev ?? reference;
+            }
+
+            return {
+              ...reference,
+              lastMessageSnippet: payload.content,
+              lastMessageAtISO: createdAtISO,
+              ctaHref: `/chat/${payload.joinRequestId}`,
+            };
+          });
+          return;
         }
-        const nextEntry = {
-          id: payload.id,
-          message: payload.content,
-          postedAtISO: payload.createdAt,
-          authorName: host.displayName ?? host.email ?? "Host",
-        };
-        const listEl = hostActivityListRef.current;
-        const scrolledAway = listEl ? listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD : false;
-        if (scrolledAway) {
-          setHasHostActivityNotice(true);
-        } else {
-          scrollHostActivityToTop();
-          void acknowledgeHostActivityUpdates(payload.createdAt ?? latestHostActivityTimestamp);
-        }
-        return [nextEntry, ...prev];
-      });
+
+        setChatPreviewState((prev) => {
+          const reference = prev ?? initialChatPreview;
+          if (!reference) {
+            return prev ?? reference;
+          }
+
+          const previousUnread = typeof reference.unreadCount === "number" ? reference.unreadCount : 0;
+          const totalUnread = previousUnread + 1;
+
+          return {
+            ...reference,
+            lastMessageSnippet: payload.content,
+            lastMessageAtISO: createdAtISO,
+            unreadCount: totalUnread,
+            ctaLabel: totalUnread > 0 ? "Reply to guests" : reference.ctaLabel,
+            ctaHref: `/chat/${payload.joinRequestId}`,
+          };
+        });
+
+        setHostUnreadThreads((prev) => {
+          const participant = hostChatParticipantMap.get(payload.joinRequestId);
+          const existingEntry = prev.find((thread) => thread.joinRequestId === payload.joinRequestId);
+          const previousUnread = typeof existingEntry?.unreadCount === "number" ? existingEntry.unreadCount : 0;
+          const normalizedEntry: HostUnreadThread = {
+            joinRequestId: payload.joinRequestId,
+            displayName: participant?.displayName ?? "Guest",
+            lastMessageSnippet: payload.content,
+            lastMessageAtISO: createdAtISO,
+            unreadCount: previousUnread + 1,
+          };
+          const filtered = prev.filter((thread) => thread.joinRequestId !== payload.joinRequestId);
+          return [normalizedEntry, ...filtered];
+        });
+      }
     },
     [
       acknowledgeHostActivityUpdates,
       guestJoinRequestId,
+      guestRealtimeChatEnabled,
+      host.avatarUrl,
       host.displayName,
       host.email,
       host.id,
+      hostChatJoinRequestIdSet,
+      hostChatParticipantMap,
+      hostRealtimeChatEnabled,
+      initialChatPreview,
       latestHostActivityTimestamp,
+      realtimeChatUpdatesEnabled,
       realtimeHostActivityEnabled,
+      scrollHostActivityToTop,
     ]
   );
 
@@ -1150,16 +1309,42 @@ export function EventInsideExperience({
     token: socketEnabled ? socketToken ?? undefined : undefined,
     autoConnect: socketEnabled,
     readinessEndpoint: "/api/socket/io",
-    onMessage: realtimeHostActivityEnabled ? handleRealtimeHostActivity : undefined,
+    onMessage: realtimeChatUpdatesEnabled ? handleRealtimeChatMessage : undefined,
     onJoinRequestStatusChanged: socketEnabled ? handleJoinRequestStatusChanged : undefined,
   });
 
   useEffect(() => {
-    if (!socketEnabled || !isConnected || !activeJoinRequestId) {
+    if (!socketEnabled || !isConnected) {
       return;
     }
-    joinRoom(activeJoinRequestId);
-  }, [activeJoinRequestId, isConnected, joinRoom, socketEnabled]);
+
+    const rooms = new Set<string>();
+    if (guestRealtimeChatEnabled && guestJoinRequestId) {
+      rooms.add(guestJoinRequestId);
+    }
+    if (hostRealtimeChatEnabled) {
+      hostChatJoinRequestIds.forEach((id) => rooms.add(id));
+    }
+    if (realtimeJoinApprovalEnabled && pendingJoinRequestId) {
+      rooms.add(pendingJoinRequestId);
+    }
+
+    rooms.forEach((roomId) => {
+      if (roomId) {
+        joinRoom(roomId);
+      }
+    });
+  }, [
+    socketEnabled,
+    isConnected,
+    joinRoom,
+    guestRealtimeChatEnabled,
+    guestJoinRequestId,
+    hostRealtimeChatEnabled,
+    hostChatJoinRequestIds,
+    realtimeJoinApprovalEnabled,
+    pendingJoinRequestId,
+  ]);
 
   const handleMarkThreadAsRead = async (joinRequestId: string) => {
     const fallback = "Unable to mark this thread as read.";

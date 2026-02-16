@@ -847,13 +847,14 @@ describe('EventInsideExperience', () => {
       lastSocketOptions?.onMessage?.(payload);
     });
 
-    expect(screen.getByText(/Doors now open/i)).toBeInTheDocument();
+    const hostUpdatesList = screen.getByTestId('host-updates-list');
+    expect(within(hostUpdatesList as HTMLElement).getByText(/Doors now open/i)).toBeInTheDocument();
 
     await act(async () => {
       lastSocketOptions?.onMessage?.(payload);
     });
 
-    expect(screen.getAllByText(/Doors now open/i)).toHaveLength(1);
+    expect(within(hostUpdatesList as HTMLElement).getAllByText(/Doors now open/i)).toHaveLength(1);
   });
 
   it('shows a new update indicator when guests are mid-scroll', async () => {

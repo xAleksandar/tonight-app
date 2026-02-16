@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { JoinRequestStatus } from "@/generated/prisma/client";
 import { EventInsideExperience, type EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
+import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 import { fetchEventById } from "@/lib/events";
 import { listJoinRequestsForEvent, type SerializedJoinRequestWithUser } from "@/lib/join-requests";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/middleware/auth";
-import { EventLayout } from "./EventLayout";
+import { EventInsidePageClient } from "./EventInsidePageClient";
 
 interface PageParams {
   params: Promise<{
@@ -600,49 +601,7 @@ const buildChatPreviewForHost = async ({
   };
 };
 
-const buildMobileChatAction = (
-  viewerRole: EventInsideExperienceProps["viewerRole"],
-  chatPreview: EventInsideExperienceProps["chatPreview"]
-): MobileActionBarProps["chatAction"] => {
-  if (!chatPreview?.ctaHref) {
-    return null;
-  }
 
-  const label = chatPreview.ctaLabel && chatPreview.ctaLabel.trim().length > 0 ? chatPreview.ctaLabel.trim() : "Open chat";
-  const summary =
-    chatPreview.lastMessageSnippet ??
-    (viewerRole === "host"
-      ? "Guest pings will show up here once someone reaches out."
-      : viewerRole === "guest"
-        ? "Host updates will surface here once the thread gets activity."
-        : viewerRole === "pending"
-          ? "Chat unlocks right after the host approves you."
-          : "Request access to unlock this chat.");
-
-  type ChatActionConfig = NonNullable<MobileActionBarProps["chatAction"]>;
-  let badgeTone: NonNullable<ChatActionConfig["badgeTone"]> = "muted";
-  let badgeLabel: string | null = null;
-
-  if (typeof chatPreview.unreadCount === "number" && chatPreview.unreadCount > 0) {
-    badgeLabel = `${chatPreview.unreadCount} unread`;
-    badgeTone = "highlight";
-  } else if (viewerRole === "host" || viewerRole === "guest") {
-    badgeLabel = "You're caught up";
-    badgeTone = "success";
-  } else if (viewerRole === "pending") {
-    badgeLabel = "Approval required";
-  } else {
-    badgeLabel = "Login required";
-  }
-
-  return {
-    href: chatPreview.ctaHref,
-    label,
-    helperText: summary,
-    badgeLabel,
-    badgeTone,
-  };
-};
 
 export default async function EventInsidePage({ params }: PageParams) {
   const resolvedParams = await params;
@@ -737,6 +696,17 @@ export default async function EventInsidePage({ params }: PageParams) {
   const pendingRequests = isHostViewer ? mapPendingJoinRequests(joinRequests) : [];
   const attendeeUserIds = attendees.map((attendee) => attendee.id);
 
+  const hostChatParticipants = isHostViewer
+    ? joinRequests
+        .filter((request) => request.status === JoinRequestStatus.ACCEPTED)
+        .map((request) => ({
+          joinRequestId: request.id,
+          userId: request.user.id,
+          displayName: request.user.displayName ?? request.user.email ?? "Guest",
+          avatarUrl: request.user.photoUrl,
+        }))
+    : undefined;
+
   let hostFriendInvites: EventInsideExperienceProps["hostFriendInvites"];
   if (isHostViewer) {
     hostFriendInvites = await buildHostFriendInviteCandidates({
@@ -810,11 +780,27 @@ export default async function EventInsidePage({ params }: PageParams) {
     viewerRole,
     chatPreview,
     hostFriendInvites,
+    hostChatParticipants,
     socketToken: authenticatedUser?.token,
     pendingJoinRequestId: viewerRole === "pending" && viewerJoinRequest ? viewerJoinRequest.id : null,
   };
 
-  // Content that appears in both authenticated and unauthenticated views
+  if (authenticatedUser && currentUserProfile) {
+    return (
+      <EventInsidePageClient
+        experience={experience}
+        layoutProps={{
+          eventTitle: eventRecord.title,
+          eventLocation: eventRecord.locationName,
+          userDisplayName: currentUserProfile.displayName,
+          userEmail: currentUserProfile.email,
+          userPhotoUrl: currentUserProfile.photoUrl,
+        }}
+        initialChatAction={mobileChatAction}
+      />
+    );
+  }
+
   const content = (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <EventInsideExperience {...experience} />
@@ -824,23 +810,6 @@ export default async function EventInsidePage({ params }: PageParams) {
     </div>
   );
 
-  // Authenticated users get full layout with sidebar, header, and mobile action bar
-  if (authenticatedUser && currentUserProfile) {
-    return (
-      <EventLayout
-        eventTitle={eventRecord.title}
-        eventLocation={eventRecord.locationName}
-        userDisplayName={currentUserProfile.displayName}
-        userEmail={currentUserProfile.email}
-        userPhotoUrl={currentUserProfile.photoUrl}
-        chatAction={mobileChatAction}
-      >
-        {content}
-      </EventLayout>
-    );
-  }
-
-  // Unauthenticated users get minimal view for public sharing
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-0">
       {content}
