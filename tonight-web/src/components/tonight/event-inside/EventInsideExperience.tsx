@@ -265,6 +265,8 @@ export function EventInsideExperience({
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
   const guestMessagePreviewEntries = viewerRole === "guest" ? chatPreview?.guestMessagePreview ?? [] : [];
+  const hostUnreadPreviewEntries = viewerRole === "host" ? hostUnreadThreads.slice(0, 3) : [];
+  const hostUnreadPreviewOverflow = viewerRole === "host" ? Math.max(hostUnreadThreads.length - hostUnreadPreviewEntries.length, 0) : 0;
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
   const [joinRequestStatus, setJoinRequestStatus] = useState<"idle" | "submitting" | "submitted">("idle");
@@ -2492,6 +2494,39 @@ export function EventInsideExperience({
                       </li>
                     ))}
                   </ul>
+                </div>
+              ) : null}
+              {isHostViewer && hostUnreadPreviewEntries.length > 0 ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Latest guest pings</p>
+                  <ul className="mt-2 space-y-2">
+                    {hostUnreadPreviewEntries.map((thread) => (
+                      <li key={thread.joinRequestId}>
+                        <Link
+                          href={`/chat/${thread.joinRequestId}`}
+                          className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-black/30 p-3 text-left transition hover:border-primary/40"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-white line-clamp-1">{thread.displayName}</p>
+                            <p className="text-xs text-white/70 line-clamp-2">{thread.lastMessageSnippet}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
+                            <span>{formatRelativeTime(thread.lastMessageAtISO)}</span>
+                            {thread.unreadCount ? (
+                              <span className="rounded-full bg-primary/30 px-2 py-0.5 text-primary">{thread.unreadCount} new</span>
+                            ) : null}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  {hostUnreadPreviewOverflow > 0 ? (
+                    <p className="mt-2 text-[11px] text-white/60">
+                      {hostUnreadPreviewOverflow === 1
+                        ? "1 more guest is waiting in the replies list below."
+                        : `${hostUnreadPreviewOverflow} more guests are waiting in the replies list below.`}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               {chatCtaHref ? (

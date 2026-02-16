@@ -257,10 +257,12 @@ describe('EventInsideExperience', () => {
 
     render(<EventInsideExperience {...props} />);
 
-    expect(screen.getByText(/Guests needing replies/i)).toBeInTheDocument();
-    expect(screen.getByText('Lena')).toBeInTheDocument();
-    expect(screen.getByText(/quick question/i)).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: /Lena/i });
+    const repliesSection = screen.getByText(/Guests needing replies/i).closest('div');
+    expect(repliesSection).not.toBeNull();
+    const repliesScope = within(repliesSection as HTMLElement);
+    expect(repliesScope.getByText('Lena')).toBeInTheDocument();
+    expect(repliesScope.getByText(/quick question/i)).toBeInTheDocument();
+    const link = repliesScope.getByRole('link', { name: /Lena/i });
     expect(link).toHaveAttribute('href', '/chat/jr-thread-1');
   });
 
@@ -391,6 +393,39 @@ describe('EventInsideExperience', () => {
     await waitFor(() => {
       expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('shows the latest guest pings preview for hosts when unread threads exist', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [
+          {
+            joinRequestId: 'jr-latest-1',
+            displayName: 'Sonia',
+            lastMessageSnippet: 'Could you share the door code?',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 3,
+          },
+          {
+            joinRequestId: 'jr-latest-2',
+            displayName: 'Alex',
+            lastMessageSnippet: 'Landing at the venue in 5.',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 1,
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const previewSection = screen.getByText(/Latest guest pings/i).closest('div');
+    expect(previewSection).not.toBeNull();
+    const previewScope = within(previewSection as HTMLElement);
+    expect(previewScope.getByText(/Could you share the door code/i)).toBeInTheDocument();
+    expect(previewScope.getByText(/Landing at the venue in 5/i)).toBeInTheDocument();
   });
 
   it('shows a chat preview for guests when recent messages are provided', () => {

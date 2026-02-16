@@ -284,3 +284,10 @@ Each run should:
 - Updated `EventInsideExperience` with a "Latest in chat" rail that displays those snippets (oldest → newest) plus relative timestamps, giving confirmed guests context before they hit the "Open chat" CTA.
 - Added coverage to `tests/components/EventInsideExperience.test.tsx` for the new preview and reran the suite (`cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`).
 - Next: surface the same chat preview affordance for hosts (e.g., top unread snippets) so they can jump into `/chat` from the event screen with equal context.
+
+## 2026-02-16 21:24 EET — Host chat preview parity
+- Highlighted the host's top unread guest threads directly inside the Event chat card, mirroring the guest-facing preview with inline snippets, timestamps, unread badges, and deep links into `/chat/[joinRequestId]`.
+- Reused the existing host unread state so the preview and the Guests needing replies toolbox stay in sync, and tightened the component spec to cover the new block without breaking the host actions suite.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`.
+- Next: when hosts are fully caught up, fall back to the latest guest activity (even if read) so the preview still shows context instead of disappearing entirely.
+
