@@ -219,6 +219,7 @@ export function EventInsideExperience({
   const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
   const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
   const [hostFriendEventInviteState, setHostFriendEventInviteState] = useState<Record<string, string | null>>({});
+  const [hostFriendEventInviteOverrides, setHostFriendEventInviteOverrides] = useState<Record<string, string | null>>({});
 
   const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
 
@@ -423,6 +424,26 @@ export function EventInsideExperience({
   }, [hostFriendInviteEntries]);
 
   useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendEventInviteOverrides({});
+      return;
+    }
+
+    setHostFriendEventInviteOverrides((prev) => {
+      const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+      let mutated = false;
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (!activeIds.has(key)) {
+          delete next[key];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
     if (!Object.keys(hostFriendInviteGuardrails).length) {
       return;
     }
@@ -439,6 +460,22 @@ export function EventInsideExperience({
       return mutated ? next : prev;
     });
   }, [hostFriendInviteGuardrails]);
+
+  useEffect(() => {
+    setHostFriendSelectionState((prev) => {
+      let mutated = false;
+      const next = { ...prev };
+      for (const joinRequestId of Object.keys(prev)) {
+        const currentEventInviteAtISO = hostFriendEventInviteState[joinRequestId];
+        const overrideToken = hostFriendEventInviteOverrides[joinRequestId];
+        if (currentEventInviteAtISO && overrideToken !== currentEventInviteAtISO) {
+          delete next[joinRequestId];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendEventInviteOverrides, hostFriendEventInviteState]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location) {
@@ -639,6 +676,14 @@ export function EventInsideExperience({
           ...prev,
           [friend.joinRequestId]: invitedAtISO,
         }));
+        setHostFriendEventInviteOverrides((prev) => {
+          if (!prev[friend.joinRequestId]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[friend.joinRequestId];
+          return next;
+        });
       } catch (error) {
         console.error("Failed to log event invite", error);
       }
@@ -1196,6 +1241,22 @@ export function EventInsideExperience({
     });
   };
 
+  const handleHostFriendEventInviteOverride = (joinRequestId: string, invitedAtISO?: string | null) => {
+    if (!invitedAtISO) {
+      return;
+    }
+    if (isEventInviteCooldownActive(invitedAtISO)) {
+      showErrorToast("Still cooling down", "Give them a little more time before re-inviting.");
+      return;
+    }
+
+    setHostFriendEventInviteOverrides((prev) => ({
+      ...prev,
+      [joinRequestId]: invitedAtISO,
+    }));
+    showSuccessToast("Re-invite enabled", "You can nudge this friend again.");
+  };
+
   const handleHostFriendSelectionClear = () => {
     setHostFriendSelectionState((prev) => {
       if (Object.keys(prev).length === 0) {
@@ -1213,7 +1274,16 @@ export function EventInsideExperience({
 
     const eligibleEntries = hostFriendSelectedEntries.filter((friend) => {
       const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
-      return !isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO);
+      if (isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO)) {
+        return false;
+      }
+      const currentEventInviteAtISO =
+        hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
+      if (!currentEventInviteAtISO) {
+        return true;
+      }
+      const overrideToken = hostFriendEventInviteOverrides[friend.joinRequestId];
+      return overrideToken === currentEventInviteAtISO;
     });
 
     if (!eligibleEntries.length) {
@@ -1274,6 +1344,21 @@ export function EventInsideExperience({
     if (isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO)) {
       showErrorToast("Invite cooling down", "Give them a moment before sending another DM.");
       return;
+    }
+
+    const friend = hostFriendInviteEntries.find((entry) => entry.joinRequestId === joinRequestId);
+    const currentEventInviteAtISO = hostFriendEventInviteState[joinRequestId] ?? friend?.currentEventInviteAtISO ?? null;
+    if (currentEventInviteAtISO) {
+      const overrideToken = hostFriendEventInviteOverrides[joinRequestId];
+      const overrideActive = overrideToken === currentEventInviteAtISO;
+      if (!overrideActive) {
+        if (isEventInviteCooldownActive(currentEventInviteAtISO)) {
+          showErrorToast("Invite cooling down", "Give them a little more time before nudging this event again.");
+        } else {
+          showErrorToast("Already invited", '"Re-invite anyway" unlocks this friend once you\'re sure.');
+        }
+        return;
+      }
     }
 
     const entry = hostFriendComposerState[joinRequestId];
@@ -1837,19 +1922,33 @@ export function EventInsideExperience({
                           const lastInviteAtISO = guardrail.lastInviteAtISO;
                           const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO;
                           const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
-                          const sendDisabled = composerBusy || composerValue.trim().length === 0 || inviteGuardrailActive;
+                          const currentEventInviteAtISO =
+                            hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
+                          const eventInviteOverrideToken = hostFriendEventInviteOverrides[friend.joinRequestId] ?? null;
+                          const eventInviteOverrideActive =
+                            Boolean(currentEventInviteAtISO) && eventInviteOverrideToken === currentEventInviteAtISO;
+                          const eventInviteCooldownUntilISO = getEventInviteCooldownUntil(currentEventInviteAtISO);
+                          const eventInviteCoolingDown =
+                            Boolean(currentEventInviteAtISO) && isInviteGuardrailActive(eventInviteCooldownUntilISO);
+                          const eventInviteLocked = Boolean(currentEventInviteAtISO && !eventInviteOverrideActive);
+                          const eventInviteOverrideAvailable = eventInviteLocked && !eventInviteCoolingDown;
+                          const sendDisabled =
+                            composerBusy || composerValue.trim().length === 0 || inviteGuardrailActive || eventInviteLocked;
                           const lastActiveLabel = friend.lastInteractionAtISO
                             ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
                             : "Recently active";
                           const inviteHistoryLabel = lastInviteAtISO ? `Invited ${formatRelativeTime(lastInviteAtISO)}` : null;
-                          const currentEventInviteAtISO =
-                            hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
                           const inviteCooldownLabel =
                             inviteGuardrailActive && nextInviteAvailableAtISO
                               ? `Give them a moment — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
                               : null;
                           const alreadyInvitedLabel = currentEventInviteAtISO
                             ? `Already invited to ${event.title} · ${formatRelativeTime(currentEventInviteAtISO)}`
+                            : null;
+                          const eventInviteLockLabel = eventInviteLocked
+                            ? eventInviteCoolingDown && eventInviteCooldownUntilISO
+                              ? `Already pinged for this event — try again ${formatRelativeTime(eventInviteCooldownUntilISO)}.`
+                              : "Already invited to this event. Re-enable below if you truly need to re-invite."
                             : null;
                           const isSelected = Boolean(hostFriendSelectionState[friend.joinRequestId]);
 
@@ -1873,6 +1972,24 @@ export function EventInsideExperience({
                                   {alreadyInvitedLabel ? (
                                     <p className="text-[11px] font-semibold text-primary/80">{alreadyInvitedLabel}</p>
                                   ) : null}
+                                  {eventInviteLocked && alreadyInvitedLabel ? (
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                      {eventInviteLockLabel ? (
+                                        <p className="text-[11px] font-semibold text-amber-200">{eventInviteLockLabel}</p>
+                                      ) : null}
+                                      {eventInviteOverrideAvailable && currentEventInviteAtISO ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleHostFriendEventInviteOverride(friend.joinRequestId, currentEventInviteAtISO)
+                                          }
+                                          className="rounded-full border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-white/40"
+                                        >
+                                          Re-invite anyway
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                   {inviteCooldownLabel ? (
                                     <p className="text-[11px] font-semibold text-amber-300">{inviteCooldownLabel}</p>
                                   ) : null}
@@ -1884,7 +2001,7 @@ export function EventInsideExperience({
                                       handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName, hostFriendTemplateId)
                                     }
                                     className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
-                                    disabled={composerBusy || inviteGuardrailActive}
+                                    disabled={composerBusy || inviteGuardrailActive || eventInviteLocked}
                                   >
                                     Use template
                                   </button>
@@ -1895,7 +2012,7 @@ export function EventInsideExperience({
                                       checked={isSelected}
                                       onChange={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
                                       aria-label={`Select ${friend.displayName}`}
-                                      disabled={hostFriendSelectionStatus === "sending" || inviteGuardrailActive}
+                                      disabled={hostFriendSelectionStatus === "sending" || inviteGuardrailActive || eventInviteLocked}
                                     />
                                     <span>{isSelected ? "Selected" : "Select"}</span>
                                   </label>
@@ -1907,7 +2024,7 @@ export function EventInsideExperience({
                                 onChange={(event) => handleHostFriendComposerChange(friend.joinRequestId, event.target.value)}
                                 placeholder={`Tell ${friend.displayName.split(' ')[0] ?? friend.displayName} why this night fits them`}
                                 className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                disabled={composerBusy || inviteGuardrailActive}
+                                disabled={composerBusy || inviteGuardrailActive || eventInviteLocked}
                               />
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <button
@@ -1922,7 +2039,7 @@ export function EventInsideExperience({
                                   type="button"
                                   onClick={() => handleHostFriendComposerClear(friend.joinRequestId)}
                                   className="text-[11px] font-semibold text-white/60 transition hover:text-white"
-                                  disabled={composerBusy || composerValue.length === 0}
+                                  disabled={composerBusy || composerValue.length === 0 || eventInviteLocked}
                                 >
                                   Clear
                                 </button>
@@ -2202,6 +2319,22 @@ const SectionHeading = ({
 const isInviteGuardrailActive = (value?: string | null) => {
   const timestamp = parseIsoTimestamp(value);
   return typeof timestamp === "number" && timestamp > Date.now();
+};
+
+const getEventInviteCooldownUntil = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+  const timestamp = parseIsoTimestamp(value);
+  if (typeof timestamp !== "number") {
+    return null;
+  }
+  return new Date(timestamp + HOST_FRIEND_INVITE_COOLDOWN_MS).toISOString();
+};
+
+const isEventInviteCooldownActive = (value?: string | null) => {
+  const cooldownUntil = getEventInviteCooldownUntil(value);
+  return isInviteGuardrailActive(cooldownUntil);
 };
 
 const groupAttendees = (

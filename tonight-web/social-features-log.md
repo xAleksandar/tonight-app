@@ -210,3 +210,10 @@ Each run should:
 - Threaded the loader + EventInsideExperience through the new data: host friend tiles now show an “Already invited to this event” badge, and every DM/multi-send call logs the invite asynchronously so the UI immediately reflects it.
 - Extended the EventInsideExperience test suite to cover the new badge + API calls (Vitest run still hangs in this sandbox; killed after no output, see summary).
 - Next: use the event-specific invite log to tighten guardrails (auto-disable already invited friends from multi-send / selection or add a “Re-invite anyway” override once the event-specific cooldown expires).
+
+## 2026-02-16 16:42 EET — Event-invite guardrails lock multi-send
+- Threaded the per-event invite log through selection/compose state so anyone already pinged for this event is auto-disabled across checkboxes, template buttons, and multi-send CTA until the cooldown expires.
+- Added an explicit “Re-invite anyway” override that unlocks friends once the event-specific cooldown finishes, wires into both bulk sends and single DMs, and clears itself after logging a fresh invite.
+- Surfaced clearer inline copy (“Already invited to this event” + cooldown timing) so hosts understand why a friend can’t be selected, and reran the EventInsideExperience Vitest suite.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx`
+- Next: bubble the auto-disable reasoning into the multi-send summary (show how many selections were skipped + offer a one-tap override list) so hosts know why their send count shrank.
