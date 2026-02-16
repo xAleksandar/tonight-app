@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
-import { CheckCircle2, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Sparkles, Users } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
@@ -300,6 +300,7 @@ export function EventInsideExperience({
   const [hostFriendSelectionSummary, setHostFriendSelectionSummary] = useState<HostFriendSelectionSummary | null>(null);
 
   const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
+  const [chatAttentionPickerOpen, setChatAttentionPickerOpen] = useState(false);
 
   const hostFriendTemplateSelectId = "host-friend-template-select";
   const hostFriendSearchInputId = "host-friend-search-input";
@@ -960,11 +961,33 @@ export function EventInsideExperience({
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
-  const chatAttentionLabels = buildChatAttentionLabels(chatAttentionQueue);
+  const chatAttentionQueueEntries = useMemo(
+    () => (chatAttentionQueue ?? []).filter((entry): entry is EventChatAttentionPayload => Boolean(entry && entry.id)),
+    [chatAttentionQueue]
+  );
+  const chatAttentionLabels = buildChatAttentionLabels(chatAttentionQueueEntries);
+  const chatAttentionPickerEntries = useMemo(
+    () =>
+      chatAttentionQueueEntries.filter(
+        (entry): entry is EventChatAttentionPayload & { href: string } =>
+          typeof entry?.href === "string" && entry.href.trim().length > 0
+      ),
+    [chatAttentionQueueEntries]
+  );
+  const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
   const heroChatAttentionLeadChip = chatAttentionLabels.leadLabel;
   const heroChatAttentionWaitingChip = chatAttentionLabels.waitingLabel;
   const heroChatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? "New chat ping";
   const heroChatAttentionHasQueue = (chatAttentionQueue?.length ?? 0) > 0;
+  const heroChatAttentionLeadEntry = chatAttentionLabels.leadEntry;
+  const heroChatAttentionLeadHref = heroChatAttentionLeadEntry?.href ?? chatCtaHref;
+  const heroChatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(heroChatAttentionLeadEntry);
+
+  useEffect(() => {
+    if (!chatAttentionPickerAvailable && chatAttentionPickerOpen) {
+      setChatAttentionPickerOpen(false);
+    }
+  }, [chatAttentionPickerAvailable, chatAttentionPickerOpen]);
 
   const heroChatSummaryCopy =
     chatPreview?.lastMessageSnippet ??
@@ -1255,6 +1278,11 @@ export function EventInsideExperience({
       scrollHostActivityToTop,
     ]
   );
+
+  const handleChatAttentionNavigation = useCallback(() => {
+    acknowledgeChatAttention();
+    setChatAttentionPickerOpen(false);
+  }, [acknowledgeChatAttention]);
 
   const handleJoinRequestStatusChanged = useCallback(
     (payload: JoinRequestStatusChangedPayload) => {
@@ -2131,14 +2159,47 @@ export function EventInsideExperience({
                     </span>
                   ) : null}
                   {heroChatAttentionLeadChip ? (
-                    <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                      {heroChatAttentionLeadChip}
-                    </span>
+                    heroChatAttentionLeadHref ? (
+                      <Link
+                        href={heroChatAttentionLeadHref}
+                        prefetch={false}
+                        onClick={handleChatAttentionNavigation}
+                        aria-label={heroChatAttentionLeadAriaLabel}
+                        className="inline-flex items-center justify-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:bg-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      >
+                        {heroChatAttentionLeadChip}
+                        <span aria-hidden className="text-[10px]">↗</span>
+                      </Link>
+                    ) : (
+                      <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                        {heroChatAttentionLeadChip}
+                      </span>
+                    )
                   ) : null}
                   {heroChatAttentionWaitingChip ? (
-                    <span className="rounded-full border border-primary/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                      {heroChatAttentionWaitingChip}
-                    </span>
+                    chatAttentionPickerAvailable ? (
+                      <button
+                        type="button"
+                        onClick={() => setChatAttentionPickerOpen((prev) => !prev)}
+                        aria-expanded={chatAttentionPickerOpen}
+                        aria-controls="chat-attention-picker"
+                        aria-label={`View queued guests (${heroChatAttentionWaitingChip})`}
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary/80 transition hover:border-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      >
+                        {heroChatAttentionWaitingChip}
+                        <ChevronDown
+                          className={classNames(
+                            "h-3 w-3 transition-transform",
+                            chatAttentionPickerOpen ? "rotate-180" : undefined
+                          )}
+                          aria-hidden
+                        />
+                      </button>
+                    ) : (
+                      <span className="rounded-full border border-primary/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+                        {heroChatAttentionWaitingChip}
+                      </span>
+                    )
                   ) : null}
                 </div>
               </div>
@@ -2186,6 +2247,54 @@ export function EventInsideExperience({
                 )}
               </div>
             </div>
+            {chatAttentionPickerAvailable && chatAttentionPickerOpen ? (
+              <div
+                id="chat-attention-picker"
+                className="mt-4 rounded-2xl border border-primary/30 bg-primary/5 p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Queued guests</p>
+                  <button
+                    type="button"
+                    onClick={() => setChatAttentionPickerOpen(false)}
+                    className="text-[11px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
+                  >
+                    Hide list
+                  </button>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {chatAttentionPickerEntries.map((entry) => {
+                    const label = buildChatAttentionLinkLabel(entry);
+                    const relativeTime = formatRelativeTime(entry.timestampISO);
+                    const href = entry.href.trim();
+                    return (
+                      <li key={entry.id}>
+                        <Link
+                          href={href}
+                          prefetch={false}
+                          onClick={handleChatAttentionNavigation}
+                          aria-label={label}
+                          className="block rounded-2xl border border-white/5 bg-white/5 px-3 py-2 text-left text-white/80 transition hover:border-primary/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-white">{entry.authorName ?? 'Guest thread'}</span>
+                            {relativeTime ? (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/60">{relativeTime}</span>
+                            ) : null}
+                          </div>
+                          {entry.snippet ? (
+                            <p className="mt-1 text-sm text-white/70 line-clamp-2">{entry.snippet}</p>
+                          ) : null}
+                          {entry.helperText ? (
+                            <p className="mt-1 text-[11px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
+                          ) : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
             {!chatCtaHref && chatCtaDisabledReason ? (
               <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
             ) : null}
@@ -3318,6 +3427,22 @@ const formatDateTime = (value?: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(date);
+};
+
+const buildChatAttentionLinkLabel = (entry?: EventChatAttentionPayload | null): string => {
+  const name = entry?.authorName?.trim();
+  if (name) {
+    return `Open chat with ${name}`;
+  }
+  const helper = entry?.helperText?.trim();
+  if (helper) {
+    return helper;
+  }
+  const snippet = entry?.snippet?.trim();
+  if (snippet) {
+    return snippet.length > 60 ? `${snippet.slice(0, 57)}…` : snippet;
+  }
+  return "Open chat thread";
 };
 
 const formatRelativeTime = (value?: string | null) => {

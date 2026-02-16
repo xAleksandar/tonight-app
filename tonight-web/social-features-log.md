@@ -347,3 +347,9 @@ Each run should:
 - Added a shared label builder, pushed the queue context into `buildMobileChatAction`, and surfaced new badge chips (lead guest + “more waiting”) across hero, desktop, and mobile CTAs; tests cover the new UI rails plus the hero chip rendering.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/MobileActionBar.test.tsx tests/components/DesktopHeader.test.tsx`
 - Next: make the lead attention chip actionable (tapping the chip jumps straight into that guest’s `/chat/[joinRequestId]` and exposes a quick picker when multiple guests are queued) so hosts can respond to the right thread without opening the toast carousel.
+
+## 2026-02-17 01:52 EET — Chat attention chips now actionable
+- Converted the hero chat attention badge into a live link that jumps straight into the queued guest thread (with proper aria labels + attention clearing) and restyled the waiting badge as a toggle button.
+- Added a compact “Queued guests” picker that expands inline, lists every live attention payload with timestamps/snippets, and lets hosts jump directly into any `/chat/[joinRequestId]` without waiting for the toast carousel.
+- Updated the EventInsideExperience test suite to cover the new link + picker behavior (`npx vitest run tests/components/EventInsideExperience.test.tsx`).
+- Next: Port the clickable attention chips + picker affordance into the desktop header/mobile action bar so every surface shares the same quick-jump controls.

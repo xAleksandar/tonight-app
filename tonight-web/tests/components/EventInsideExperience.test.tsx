@@ -210,6 +210,75 @@ describe('EventInsideExperience', () => {
     expect(screen.getByText('Jess pinged · +1 waiting')).toBeInTheDocument();
   });
 
+  it('links the chat attention lead chip to its queued thread', () => {
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Second pending guest',
+            authorName: 'Aaron',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+        ]}
+      />
+    );
+
+    const leadLink = screen.getByRole('link', { name: /open chat with jess/i });
+    expect(leadLink).toHaveAttribute('href', '/chat/jr-2');
+  });
+
+  it('exposes a quick picker for queued chat attention entries', () => {
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Second pending guest',
+            authorName: 'Aaron',
+            helperText: 'Aaron pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+          {
+            id: 'msg-3',
+            snippet: 'Another guest waiting',
+            authorName: 'Maya',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-4',
+          },
+        ]}
+      />
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggleButton);
+
+    const pickerLink = screen.getByRole('link', { name: /open chat with aaron/i });
+    expect(pickerLink).toHaveAttribute('href', '/chat/jr-3');
+  });
+
   it('shows a disabled chat explanation when no CTA href is present', () => {
     const props: EventInsideExperienceProps = {
       ...baseProps,
