@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Flag, Info, Send } from 'lucide-react';
 
@@ -130,6 +130,7 @@ export default function ChatConversation({
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const counterpart = useMemo(() => {
     return context.requesterRole === 'host' ? context.participant : context.host;
@@ -325,6 +326,16 @@ export default function ChatConversation({
       sendTypingStop(joinRequestId);
     }
   }, [isCurrentlyTyping, joinRequestId, sendTypingStart, sendTypingStop]);
+
+  useLayoutEffect(() => {
+    if (!composerRef.current) {
+      return;
+    }
+    const textarea = composerRef.current;
+    textarea.style.height = '0px';
+    const nextHeight = Math.min(textarea.scrollHeight, 220);
+    textarea.style.height = `${nextHeight}px`;
+  }, [composerValue]);
 
   const queueMessageForSend = useCallback(
     (content: string) => {
@@ -548,13 +559,13 @@ export default function ChatConversation({
           : null);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3">
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-full border border-border/60 p-2 text-muted-foreground transition hover:text-foreground"
+            className="rounded-full border border-border/60 bg-background/50 p-2 text-muted-foreground transition hover:bg-background/80 hover:text-foreground"
             aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -578,29 +589,31 @@ export default function ChatConversation({
       </header>
 
       <main className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-3 px-4 pt-4">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/70 px-4 py-1 text-xs font-semibold text-emerald-900">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Join request accepted
-          </div>
-          <div className="rounded-2xl border border-border bg-card/70 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground">Tonight&apos;s plan</p>
-                <p className="text-base font-semibold text-foreground">{context.event.title}</p>
-                <p className="text-xs text-muted-foreground">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
-              </div>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-semibold">
-                <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
-                {connectionLabel}
-              </span>
+        <section className="mx-auto w-full max-w-3xl px-4 pt-5">
+          <div className="flex flex-col gap-4">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/80 px-4 py-1 text-xs font-semibold text-emerald-900 shadow-inner shadow-emerald-900/30">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              Join request accepted
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{connectionHelperText}</p>
-            {derivedNotice ? <p className="mt-2 text-xs text-amber-600">{derivedNotice}</p> : null}
+            <div className="rounded-3xl border border-border/60 bg-card/70 px-5 py-4 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Tonight&apos;s plan</p>
+                  <p className="text-base font-semibold text-foreground">{context.event.title}</p>
+                  <p className="text-xs text-muted-foreground">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
+                </div>
+                <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold backdrop-blur', connectionAccent)}>
+                  <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
+                  {connectionLabel}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">{connectionHelperText}</p>
+              {derivedNotice ? <p className="mt-2 text-xs text-amber-400">{derivedNotice}</p> : null}
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="flex flex-1 flex-col px-4 pb-28 pt-2">
+        <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-48 pt-4">
           <MessageList
             status={messagesStatus}
             error={messagesError}
@@ -611,73 +624,82 @@ export default function ChatConversation({
             className="!px-0"
           />
           {isOtherUserTyping && (
-            <div className="px-4 py-2 text-sm text-muted-foreground italic">
+            <div className="mt-4 rounded-2xl border border-border/60 bg-card/70 px-4 py-2 text-xs italic text-muted-foreground" aria-live="polite">
               {counterpart.displayName || counterpart.email.split('@')[0]} is typing...
             </div>
           )}
-        </div>
+        </section>
       </main>
 
-      <div className="flex items-center justify-center gap-4 border-t border-border bg-card/60 px-4 py-2 text-[10px] text-muted-foreground">
-        <BlockUserButton
-          targetUserId={counterpart.id}
-          targetDisplayName={counterpart.displayName ?? counterpart.email}
-          className="items-center text-[10px]"
-          label="Block"
-          confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
-          confirmMessage="They won’t be able to message you, join your events, or see your plans."
-          disabled={hasBlockedCounterpart}
-          onBlocked={() => {
-            setHasBlockedCounterpart(true);
-            setComposerValue('');
-            setSendError('You blocked this user. Messages are now disabled.');
-          }}
-        />
-        <span className="h-3 w-px bg-border" />
-        <button
-          type="button"
-          title="Reporting will be available soon"
-          className="flex items-center gap-1 text-[10px] text-muted-foreground"
-          disabled
-        >
-          <Flag className="h-3 w-3" />
-          Report
-        </button>
-      </div>
+      <footer className="sticky bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur">
+        <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
+            <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold', connectionAccent)}>
+              <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
+              {connectionLabel}
+            </span>
+            <div className="flex items-center gap-4">
+              <BlockUserButton
+                targetUserId={counterpart.id}
+                targetDisplayName={counterpart.displayName ?? counterpart.email}
+                className="items-center text-[11px]"
+                label="Block"
+                confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
+                confirmMessage="They won’t be able to message you, join your events, or see your plans."
+                disabled={hasBlockedCounterpart}
+                onBlocked={() => {
+                  setHasBlockedCounterpart(true);
+                  setComposerValue('');
+                  setSendError('You blocked this user. Messages are now disabled.');
+                }}
+              />
+              <span className="hidden h-3 w-px bg-border/70 sm:block" />
+              <button
+                type="button"
+                title="Reporting will be available soon"
+                className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                disabled
+              >
+                <Flag className="h-3 w-3" />
+                Report
+              </button>
+            </div>
+          </div>
 
-      <div className="border-t border-border bg-background px-4 py-3">
-        <form onSubmit={handleSend} className="flex items-end gap-2">
-          <label htmlFor="chat-message" className="sr-only">
-            Message
-          </label>
-          <textarea
-            id="chat-message"
-            value={composerValue}
-            onChange={handleInputChange}
-            placeholder="Type a message"
-            rows={1}
-            disabled={hasBlockedCounterpart}
-            className="min-h-[48px] flex-1 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
-            aria-label="Send message"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </form>
-        {hasBlockedCounterpart ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            You blocked this user. Manage safety settings from your profile if you change your mind.
-          </p>
-        ) : null}
-        {queuedHelperText ? (
-          <p className="mt-2 text-xs text-amber-600">{queuedHelperText}</p>
-        ) : null}
-        {sendError ? <p className="mt-2 text-xs text-destructive">{sendError}</p> : null}
-      </div>
+          <form onSubmit={handleSend} className="flex flex-col gap-3 rounded-3xl border border-border/80 bg-card/80 p-4 shadow-[0_25px_120px_rgba(0,0,0,0.45)]">
+            <div className="flex items-end gap-3">
+              <label htmlFor="chat-message" className="sr-only">
+                Message
+              </label>
+              <textarea
+                id="chat-message"
+                ref={composerRef}
+                value={composerValue}
+                onChange={handleInputChange}
+                placeholder="Type a message"
+                rows={1}
+                disabled={hasBlockedCounterpart}
+                className="max-h-48 min-h-[52px] w-full flex-1 resize-none rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
+                aria-label="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+              {hasBlockedCounterpart ? (
+                <p>You blocked this user. Manage safety settings from your profile if you change your mind.</p>
+              ) : null}
+              {queuedHelperText ? <p className="text-amber-400">{queuedHelperText}</p> : null}
+              {sendError ? <p className="text-destructive">{sendError}</p> : null}
+            </div>
+          </form>
+        </div>
+      </footer>
     </div>
   );
 }

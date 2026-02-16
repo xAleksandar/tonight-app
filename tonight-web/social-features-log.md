@@ -241,3 +241,9 @@ Each run should:
 - Added a read-receipt listener in `useSocket`, updated the `/chat/[joinRequestId]` page to merge those events in real time, and refreshed the message list UI with a “Seen” badge on your own bubbles once the counterpart catches up.
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: continue polishing `/chat/[joinRequestId]` (chat layout refinements, composer ergonomics, desktop/mobile spacing) so the page matches the new Tonight aesthetic before hooking in event detail shortcuts.
+
+## 2026-02-16 19:08 EET — Chat shell + composer polish
+- Restyled `/chat/[joinRequestId]` with a centered, glassy shell (radial background, sticky header, refined host/event card) so the dedicated chat page now mirrors the new Tonight aesthetic across desktop + mobile.
+- Reworked the footer into a sticky, glowing composer bar that keeps safety actions + connection status in one place, added an auto-resizing textarea, and improved the typing indicator treatment for better ergonomics on small screens.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: continue polishing the dedicated chat page by tightening the message list visuals (bubble spacing/read badges) and threading in the upcoming event-detail shortcuts.
