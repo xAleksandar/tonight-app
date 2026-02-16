@@ -259,3 +259,10 @@ Each run should:
 - Added a persistent "View plan" button in the header for desktop, wired new overlay state + accessibility labels, and kept the new UI consistent with the glassmorphic chat shell.
 - Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: enrich the sheet with actionable shortcuts (copy address, open maps, add-to-calendar) so guests can act on the event details straight from chat.
+
+## 2026-02-16 20:08 EET — Event info sheet quick actions live
+- Added a quick-actions block to the chat event sheet with copy address, Open in Maps, and Add to calendar controls, complete with disabled states/guardrails for missing data.
+- Built clipboard + map helpers plus a client-side ICS exporter (2h default duration) so guests can grab directions or save the plan without leaving the chat.
+- Tests: `cd tonight-web && npx vitest run tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: surface the high-frequency event actions (copy address/map/add-to-calendar) as inline chips under the chat header so mobile guests can act without opening the sheet.
+

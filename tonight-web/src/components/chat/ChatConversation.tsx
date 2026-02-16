@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Flag, Info, Send, X } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, Copy, Flag, Info, MapPin, Send, X } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
@@ -11,7 +11,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
 import type { SocketReadReceiptEventPayload } from '@/lib/socket-shared';
-import { showErrorToast } from '@/lib/toast';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 export type ChatParticipantSummary = {
   id: string;
@@ -129,6 +129,8 @@ export default function ChatConversation({
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
   const [isCurrentlyTyping, setIsCurrentlyTyping] = useState(false);
   const [isEventSheetOpen, setIsEventSheetOpen] = useState(false);
+  const [isCopyingLocation, setIsCopyingLocation] = useState(false);
+  const [isCalendarExporting, setIsCalendarExporting] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
@@ -141,6 +143,17 @@ export default function ChatConversation({
   const counterpartId = counterpart.id;
 
   const eventTimeLabel = useMemo(() => formatDateTime(context.event.datetime), [context.event.datetime]);
+  const eventStartDate = useMemo(() => {
+    const date = new Date(context.event.datetime);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }, [context.event.datetime]);
+  const mapsUrl = useMemo(() => {
+    if (!context.event.locationName) {
+      return null;
+    }
+    const query = encodeURIComponent(context.event.locationName);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+  }, [context.event.locationName]);
 
   const appendMessage = useCallback((message: SerializedMessage) => {
     setMessages((previous) => {
@@ -561,6 +574,121 @@ export default function ChatConversation({
           ? 'Realtime is unavailable, but you can keep chatting.'
           : null);
 
+  const hasLocationDetails = Boolean(context.event.locationName && context.event.locationName.trim().length > 0);
+  const quickActionButtonClass = (disabled?: boolean) =>
+    classNames(
+      'inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border/60 px-4 py-3 text-sm font-semibold transition',
+      disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-background/80'
+    );
+
+  const handleCopyAddress = useCallback(async () => {
+    if (!hasLocationDetails || !context.event.locationName) {
+      showErrorToast('Location coming soon', 'The host will drop the full address shortly.');
+      return;
+    }
+    try {
+      setIsCopyingLocation(true);
+      const value = context.event.locationName.trim();
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } else {
+        throw new Error('Clipboard unavailable');
+      }
+      showSuccessToast('Address copied', value);
+    } catch (error) {
+      console.error('Failed to copy address', error);
+      showErrorToast('Unable to copy the address', 'Please copy it manually for now.');
+    } finally {
+      setIsCopyingLocation(false);
+    }
+  }, [context.event.locationName, hasLocationDetails]);
+
+  const handleOpenMaps = useCallback(() => {
+    if (!mapsUrl) {
+      showErrorToast('Location coming soon', 'Maps will unlock once the host shares the venue.');
+      return;
+    }
+    if (typeof window === 'undefined') {
+      showErrorToast('Maps unavailable in this view', 'Open this chat in a browser to launch maps.');
+      return;
+    }
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  }, [mapsUrl]);
+
+  const handleAddToCalendar = useCallback(() => {
+    if (!eventStartDate) {
+      showErrorToast('Schedule not ready', 'Add to calendar will unlock once the host locks the time.');
+      return;
+    }
+    if (typeof document === 'undefined') {
+      showErrorToast('Export unavailable', 'Open this chat in a browser to save the invite.');
+      return;
+    }
+    const formatForICS = (value: Date) => value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const escapeForICS = (value: string) =>
+      value
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\n/g, '\\n');
+    try {
+      setIsCalendarExporting(true);
+      const defaultDurationMs = 2 * 60 * 60 * 1000;
+      const endsAt = new Date(eventStartDate.getTime() + defaultDurationMs);
+      const title = (context.event.title || 'Tonight plan').trim();
+      const locationLabel = context.event.locationName?.trim() ?? '';
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tonight.app';
+      const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Tonight//Chat//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:${joinRequestId}@tonight.app`,
+        `DTSTAMP:${formatForICS(new Date())}`,
+        `DTSTART:${formatForICS(eventStartDate)}`,
+        `DTEND:${formatForICS(endsAt)}`,
+        `SUMMARY:${escapeForICS(title)}`,
+      ];
+      if (locationLabel) {
+        lines.push(`LOCATION:${escapeForICS(locationLabel)}`);
+      }
+      lines.push(
+        `DESCRIPTION:${escapeForICS(`Chat thread: ${origin}/chat/${joinRequestId}`)}`,
+        `URL:${origin}/events/${context.event.id}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+      );
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const trigger = document.createElement('a');
+      trigger.href = url;
+      const fileTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tonight-plan';
+      trigger.download = `${fileTitle}.ics`;
+      document.body.appendChild(trigger);
+      trigger.click();
+      document.body.removeChild(trigger);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      showSuccessToast('Calendar invite ready', 'Import it to block off your night.');
+    } catch (error) {
+      console.error('Failed to generate calendar invite', error);
+      showErrorToast('Unable to create calendar invite', 'Please try again in a moment.');
+    } finally {
+      setIsCalendarExporting(false);
+    }
+  }, [context.event.id, context.event.locationName, context.event.title, eventStartDate, joinRequestId]);
+
   return (
     <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
@@ -767,6 +895,42 @@ export default function ChatConversation({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">When</span>
                   <span className="font-medium text-foreground">{eventTimeLabel ?? 'TBA'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-background/40 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick actions</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={handleCopyAddress}
+                    disabled={!hasLocationDetails || isCopyingLocation}
+                    className={quickActionButtonClass(!hasLocationDetails || isCopyingLocation)}
+                    title={!hasLocationDetails ? 'Location details coming soon' : undefined}
+                  >
+                    <Copy className="h-4 w-4" />
+                    {isCopyingLocation ? 'Copying…' : 'Copy address'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenMaps}
+                    disabled={!mapsUrl}
+                    className={quickActionButtonClass(!mapsUrl)}
+                    title={!mapsUrl ? 'Maps unlock once the host confirms the venue.' : undefined}
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Open in Maps
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddToCalendar}
+                    disabled={!eventStartDate || isCalendarExporting}
+                    className={quickActionButtonClass(!eventStartDate || isCalendarExporting)}
+                    title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
+                  >
+                    <CalendarPlus className="h-4 w-4" />
+                    {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
+                  </button>
                 </div>
               </div>
 
