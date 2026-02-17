@@ -436,3 +436,9 @@ Each run should:
 - Synced the chat header’s snooze state with the event layout so snooze timers, preferences, and queue updates remain bidirectional between the event and chat experiences.
 - Tests: `cd tonight-web && npx vitest run tests/lib/chatAttentionQueueStorage.test.ts tests/app/events/EventInsidePageClient.test.tsx`
 - Next: port the floating chat-attention toast (queue carousel + mark-handled controls) into `/chat/[joinRequestId]` so hosts get the same multi-thread triage without jumping back to the event page.
+## 2026-02-17 07:50 EET — Chat attention toast lands inside /chat
+- Threaded the shared EventChatAttentionToast into the dedicated chat conversation so hosts now see the same rotating queue, snooze/resume controls, and mark-handled affordances without leaving their DM view; the toast hydrates from the persisted queue, honors dismissals per session, and deep-links directly into queued guest threads.
+- Updated ChatConversation to derive helper copy/snippets from the queue, reuse the existing snooze storage + picker state, and gate the toast behind the same host-only checks so the UX stays consistent with the event layout.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: bubble the chat-attention queue into the /messages inbox list (badges + mark-handled affordances) so hosts can triage waiting guests straight from the thread overview.
+

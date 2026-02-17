@@ -8,6 +8,7 @@ import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Flag, Info, MapPin, Send, S
 import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
+import { EventChatAttentionToast } from '@/components/tonight/EventChatAttentionToast';
 import { useSnoozeCountdown } from '@/hooks/useSnoozeCountdown';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
@@ -171,6 +172,7 @@ export default function ChatConversation({
   const [hasHydratedChatAttentionSnooze, setHasHydratedChatAttentionSnooze] = useState(false);
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
   const [chatAttentionPickerOpen, setChatAttentionPickerOpen] = useState(false);
+  const [chatAttentionToastDismissed, setChatAttentionToastDismissed] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
@@ -229,6 +231,15 @@ export default function ChatConversation({
   const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
   const chatAttentionQueueLength = chatAttentionEntries.length;
   const chatAttentionHasEntries = chatAttentionQueueLength > 0;
+  const chatAttentionQueueSignature = useMemo(
+    () => chatAttentionEntries.map((entry) => entry.id).join('|'),
+    [chatAttentionEntries]
+  );
+
+  useEffect(() => {
+    setChatAttentionToastDismissed(false);
+  }, [chatAttentionQueueSignature]);
+
   const counterpart = useMemo(() => {
     return isHostViewer ? context.participant : context.host;
   }, [context, isHostViewer]);
@@ -825,6 +836,24 @@ export default function ChatConversation({
       ? `Snoozed · ${chatAttentionSnoozeCountdownLabel}`
       : 'Snoozed'
     : null;
+  const chatAttentionToastHelperText = (() => {
+    const helper = chatAttentionLeadEntry?.helperText?.trim();
+    if (helper?.length) {
+      return helper;
+    }
+    if (!chatAttentionHasEntries) {
+      return null;
+    }
+    if (chatAttentionQueueLength > 1) {
+      return `${chatAttentionQueueLength} guests are waiting across your chats.`;
+    }
+    return 'A guest is waiting for a reply in another chat thread.';
+  })();
+  const chatAttentionToastLabel = chatAttentionLeadEntry?.authorName
+    ? `Jump to ${chatAttentionLeadEntry.authorName}`
+    : 'Jump into chat';
+  const chatAttentionToastHref = chatAttentionLeadHref ?? `/chat/${joinRequestId}`;
+  const showChatAttentionToast = isHostViewer && chatAttentionHasEntries && !chatAttentionToastDismissed;
 
   const applyChatAttentionQueueUpdate = useCallback(
     (updater: (prev: EventChatAttentionPayload[]) => EventChatAttentionPayload[]) => {
@@ -1072,6 +1101,11 @@ export default function ChatConversation({
       setIsCalendarExporting(false);
     }
   }, [context.event.id, context.event.locationName, context.event.title, eventStartDate, joinRequestId]);
+
+  const handleChatAttentionToastInteract = useCallback(() => {
+    setChatAttentionToastDismissed(true);
+    setChatAttentionPickerOpen(false);
+  }, []);
 
   return (
     <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
@@ -1575,6 +1609,26 @@ export default function ChatConversation({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {showChatAttentionToast ? (
+        <EventChatAttentionToast
+          href={chatAttentionToastHref}
+          label={chatAttentionToastLabel}
+          helperText={chatAttentionToastHelperText}
+          attentionLabel={chatAttentionIndicatorLabel}
+          snippet={chatAttentionLeadEntry?.snippet}
+          snippetSender={chatAttentionLeadEntry?.authorName ?? undefined}
+          snippetTimestamp={chatAttentionLeadEntry?.timestampISO}
+          onInteract={handleChatAttentionToastInteract}
+          attentionQueue={chatAttentionQueue}
+          chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+          chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+          onMarkHandled={handleChatAttentionEntryHandled}
+          onMarkAllHandled={handleChatAttentionClearAll}
+          onSnooze={handleChatAttentionSnooze}
+          onResume={handleChatAttentionResume}
+        />
       ) : null}
     </div>
   );
