@@ -3,6 +3,7 @@ import React from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ConversationList } from '@/components/chat/ConversationList';
+import { CHAT_DRAFTS_STORAGE_KEY } from '@/lib/chatDraftStorage';
 import type { ConversationPreview } from '@/components/chat/conversations';
 
 type TestingLibrary = typeof import('@testing-library/react');
@@ -11,6 +12,7 @@ let render: TestingLibrary['render'];
 let screen: TestingLibrary['screen'];
 let fireEvent: TestingLibrary['fireEvent'];
 let cleanup: TestingLibrary['cleanup'];
+let waitFor: TestingLibrary['waitFor'];
 
 let jsdomInstance: JSDOM | null = null;
 
@@ -19,7 +21,7 @@ const ensureDomGlobals = () => {
     return;
   }
 
-  jsdomInstance = new JSDOM('<!doctype html><html><body></body></html>');
+  jsdomInstance = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://tonight.test' });
   const { window } = jsdomInstance;
   Object.defineProperties(globalThis, {
     window: { configurable: true, value: window, writable: true },
@@ -39,6 +41,7 @@ beforeAll(async () => {
   screen = testingLibrary.screen;
   fireEvent = testingLibrary.fireEvent;
   cleanup = testingLibrary.cleanup;
+  waitFor = testingLibrary.waitFor;
 });
 
 afterAll(() => {
@@ -78,6 +81,9 @@ describe('ConversationList', () => {
 
   afterEach(() => {
     cleanup();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.clear();
+    }
     vi.restoreAllMocks();
   });
 
@@ -129,4 +135,53 @@ describe('ConversationList', () => {
     expect(onHandled).toHaveBeenCalledTimes(1);
     expect(onHandled).toHaveBeenCalledWith('jr-1');
   });
+
+  it('surfaces saved drafts when enabled', async () => {
+    const timestamp = new Date('2026-02-17T09:00:00Z').toISOString();
+    window.localStorage.setItem(
+      CHAT_DRAFTS_STORAGE_KEY,
+      JSON.stringify({
+        'jr-1': { content: 'Draft reply for Nina', updatedAt: timestamp },
+      })
+    );
+
+    render(
+      <ConversationList
+        conversations={baseConversations}
+        showDraftIndicators
+      />
+    );
+
+    expect(await screen.findByText(/draft ready/i)).toBeInTheDocument();
+    expect(screen.getByText('Draft reply for Nina')).toBeInTheDocument();
+
+    const clearButton = screen.getByRole('button', { name: /clear draft/i });
+    fireEvent.click(clearButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Draft reply for Nina')).not.toBeInTheDocument();
+    });
+    expect(window.localStorage.getItem(CHAT_DRAFTS_STORAGE_KEY)).toBeNull();
+  });
+
+  it('hides draft indicators when disabled', async () => {
+    const timestamp = new Date('2026-02-17T09:05:00Z').toISOString();
+    window.localStorage.setItem(
+      CHAT_DRAFTS_STORAGE_KEY,
+      JSON.stringify({
+        'jr-1': { content: 'Draft reply for Nina', updatedAt: timestamp },
+      })
+    );
+
+    render(
+      <ConversationList
+        conversations={baseConversations}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/draft ready/i)).not.toBeInTheDocument();
+    });
+  });
+
 });

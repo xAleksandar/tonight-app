@@ -726,6 +726,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                       emptyStateAction={emptyStateAction}
                       attentionQueue={chatAttentionQueue}
                       onAttentionEntryHandled={handleChatAttentionEntryHandled}
+                      showDraftIndicators
                     />
                   </div>
                 </section>

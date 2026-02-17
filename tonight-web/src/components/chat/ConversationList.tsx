@@ -1,9 +1,12 @@
-import { useMemo, type KeyboardEvent } from "react";
-import { AlertTriangle, BadgeCheck, Clock, MessageCircle, Sparkles } from "lucide-react";
+'use client';
+
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { AlertTriangle, BadgeCheck, Clock, Edit3, MessageCircle, Sparkles } from "lucide-react";
 
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import { classNames } from "@/lib/classNames";
+import { clearChatDraftFromStorage, readChatDraftMapFromStorage, subscribeToChatDraftStorage, type ChatDraftMap } from "@/lib/chatDraftStorage";
 import type { ConversationPreview } from "@/components/chat/conversations";
 
 type ConversationListProps = {
@@ -19,6 +22,7 @@ type ConversationListProps = {
   };
   attentionQueue?: EventChatAttentionPayload[];
   onAttentionEntryHandled?: (entryId: string) => void;
+  showDraftIndicators?: boolean;
 };
 
 const buildAttentionLookup = (entries?: EventChatAttentionPayload[] | null) => {
@@ -38,7 +42,35 @@ export function ConversationList({
   emptyStateAction,
   attentionQueue,
   onAttentionEntryHandled,
+  showDraftIndicators = false,
 }: ConversationListProps) {
+  const [draftMap, setDraftMap] = useState<ChatDraftMap>({});
+
+  useEffect(() => {
+    if (!showDraftIndicators) {
+      setDraftMap({});
+      return;
+    }
+    setDraftMap(readChatDraftMapFromStorage());
+    const unsubscribe = subscribeToChatDraftStorage((next) => {
+      setDraftMap(next);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [showDraftIndicators]);
+
+  const removeDraftLocally = (conversationId: string) => {
+    setDraftMap((previous) => {
+      if (!previous[conversationId]) {
+        return previous;
+      }
+      const next = { ...previous };
+      delete next[conversationId];
+      return next;
+    });
+  };
+
   const hasConversations = conversations.length > 0;
   const attentionLookup = useMemo(() => buildAttentionLookup(attentionQueue), [attentionQueue]);
 
@@ -71,6 +103,10 @@ export function ConversationList({
   return (
     <ul className="space-y-2">
       {conversations.map((conversation) => {
+        const draftEntry = showDraftIndicators ? draftMap[conversation.id] : undefined;
+        const draftContent = draftEntry?.content?.trim() ?? "";
+        const hasDraft = draftContent.length > 0;
+        const draftUpdatedLabel = hasDraft && draftEntry?.updatedAt ? formatRelativeTime(draftEntry.updatedAt) : null;
         const attentionEntry = attentionLookup.get(conversation.id);
         const attentionTimestamp = attentionEntry?.timestampISO ? formatRelativeTime(attentionEntry.timestampISO) : null;
 
@@ -130,6 +166,11 @@ export function ConversationList({
                         <AlertTriangle className="h-3 w-3" /> Needs reply
                       </span>
                     ) : null}
+                    {hasDraft ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
+                        <Edit3 className="h-3 w-3" /> Draft saved
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">{conversation.eventTitle}</p>
                   <p
@@ -140,6 +181,32 @@ export function ConversationList({
                   >
                     {conversation.messageSnippet}
                   </p>
+                  {hasDraft ? (
+                    <div className="mt-2 rounded-2xl border border-border/50 bg-background/60 p-3">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-primary">
+                          <Edit3 className="h-3 w-3" /> Draft ready
+                        </span>
+                        {draftUpdatedLabel ? <span>{draftUpdatedLabel}</span> : null}
+                      </div>
+                      {draftContent ? (
+                        <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{draftContent}</p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            clearChatDraftFromStorage(conversation.id);
+                            removeDraftLocally(conversation.id);
+                          }}
+                          className="rounded-full border border-border/60 px-3 py-1 text-muted-foreground transition hover:border-border hover:text-foreground"
+                        >
+                          Clear draft
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   {attentionEntry ? (
                     <div className="mt-1 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm text-primary">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide">

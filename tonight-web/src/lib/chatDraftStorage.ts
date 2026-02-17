@@ -1,4 +1,5 @@
 const CHAT_DRAFTS_STORAGE_KEY = "tonight.chatDrafts";
+const CHAT_DRAFTS_STORAGE_EVENT = "tonight:chatDraftsUpdated";
 const MAX_STORED_CHAT_DRAFTS = 25;
 
 type ChatDraftPayload = {
@@ -6,9 +7,21 @@ type ChatDraftPayload = {
   updatedAt: string;
 };
 
-type ChatDraftMap = Record<string, ChatDraftPayload>;
+export type ChatDraftSnapshot = ChatDraftPayload;
+export type ChatDraftMap = Record<string, ChatDraftSnapshot>;
 
 const hasBrowserStorage = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+const emitChatDraftStorageEvent = () => {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+    return;
+  }
+  try {
+    window.dispatchEvent(new Event(CHAT_DRAFTS_STORAGE_EVENT));
+  } catch {
+    // Ignore environments without Event constructor support.
+  }
+};
 
 const normalizeDraftMap = (value: unknown): ChatDraftMap => {
   if (!value || typeof value !== "object") {
@@ -54,6 +67,7 @@ const writeDraftMap = (map: ChatDraftMap) => {
   const entries = Object.entries(map);
   if (!entries.length) {
     window.localStorage.removeItem(CHAT_DRAFTS_STORAGE_KEY);
+    emitChatDraftStorageEvent();
     return;
   }
   let workingMap: ChatDraftMap = map;
@@ -70,6 +84,7 @@ const writeDraftMap = (map: ChatDraftMap) => {
     }, {});
   }
   window.localStorage.setItem(CHAT_DRAFTS_STORAGE_KEY, JSON.stringify(workingMap));
+  emitChatDraftStorageEvent();
 };
 
 export const readChatDraftFromStorage = (joinRequestId: string): string => {
@@ -106,6 +121,28 @@ export const clearChatDraftFromStorage = (joinRequestId: string): void => {
   }
   delete drafts[joinRequestId];
   writeDraftMap(drafts);
+};
+
+export const readChatDraftMapFromStorage = (): ChatDraftMap => readDraftMap();
+
+export const subscribeToChatDraftStorage = (callback: (map: ChatDraftMap) => void): (() => void) => {
+  if (typeof window === "undefined" || typeof window.addEventListener !== "function") {
+    return () => {};
+  }
+  const handler = () => {
+    callback(readDraftMap());
+  };
+  const storageHandler = (event: StorageEvent) => {
+    if (event.key === CHAT_DRAFTS_STORAGE_KEY) {
+      callback(readDraftMap());
+    }
+  };
+  window.addEventListener(CHAT_DRAFTS_STORAGE_EVENT, handler);
+  window.addEventListener("storage", storageHandler);
+  return () => {
+    window.removeEventListener(CHAT_DRAFTS_STORAGE_EVENT, handler);
+    window.removeEventListener("storage", storageHandler);
+  };
 };
 
 export const __unsafeReadDraftMap = (): ChatDraftMap => readDraftMap();
