@@ -7,6 +7,7 @@ import { classNames } from "@/lib/classNames";
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime as formatQueueRelativeTime } from "@/lib/chatAttentionHelpers";
+import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 
 export type EventChatAttentionToastProps = {
   href: string;
@@ -18,9 +19,11 @@ export type EventChatAttentionToastProps = {
   snippetTimestamp?: string | null;
   onInteract?: () => void;
   attentionQueue?: EventChatAttentionPayload[];
+  chatAttentionSnoozedUntil?: string | null;
   onMarkHandled?: (entryId: string) => void;
   onMarkAllHandled?: () => void;
   onSnooze?: () => void;
+  onResume?: () => void;
 };
 
 const TOAST_CONTAINER_CLASS =
@@ -37,9 +40,11 @@ export function EventChatAttentionToast({
   snippetTimestamp,
   onInteract,
   attentionQueue,
+  chatAttentionSnoozedUntil,
   onMarkHandled,
   onMarkAllHandled,
   onSnooze,
+  onResume,
 }: EventChatAttentionToastProps) {
   const attentionItems = useMemo(() => {
     if (!attentionQueue?.length) {
@@ -101,6 +106,10 @@ export function EventChatAttentionToast({
     [attentionItems]
   );
   const attentionPickerAvailable = attentionPickerEntries.length > 1;
+  const { isActive: attentionSnoozed, label: snoozeCountdownLabel } = useSnoozeCountdown(chatAttentionSnoozedUntil);
+  const snoozeBadgeLabel = attentionSnoozed
+    ? `Snoozed${snoozeCountdownLabel ? ` · ${snoozeCountdownLabel}` : ""}`
+    : null;
 
   useEffect(() => {
     if (!attentionPickerAvailable && attentionPickerOpen) {
@@ -171,14 +180,35 @@ export function EventChatAttentionToast({
                   {onMarkAllHandled || (onMarkHandled && activeItem?.id) || onSnooze ? (
                     <div className="mt-3 flex flex-wrap justify-end gap-3">
                       {onSnooze ? (
-                        <button
-                          type="button"
-                          onClick={onSnooze}
-                          className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                          aria-label="Snooze chat attention alerts for five minutes"
-                        >
-                          Snooze 5 min
-                        </button>
+                        attentionSnoozed ? (
+                          <div className="inline-flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70">
+                            {snoozeBadgeLabel ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-white/80">
+                                <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
+                                {snoozeBadgeLabel}
+                              </span>
+                            ) : null}
+                            {onResume ? (
+                              <button
+                                type="button"
+                                onClick={onResume}
+                                className="text-primary/70 underline-offset-2 hover:text-primary"
+                                aria-label="Resume chat attention alerts"
+                              >
+                                Resume alerts
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={onSnooze}
+                            className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                            aria-label="Snooze chat attention alerts for five minutes"
+                          >
+                            Snooze 5 min
+                          </button>
+                        )
                       ) : null}
                       {onMarkAllHandled ? (
                         <button

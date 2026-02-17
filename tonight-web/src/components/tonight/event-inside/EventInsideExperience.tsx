@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronDown, Clock3, Copy, MapPin, MessageCircle, Share2,
 
 import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
+import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 import { classNames } from "@/lib/classNames";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
@@ -1004,10 +1005,12 @@ export function EventInsideExperience({
   const heroChatAttentionWaitingChip = chatAttentionLabels.waitingLabel;
   const heroChatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? "New chat ping";
   const heroChatAttentionHasQueue = (chatAttentionQueue?.length ?? 0) > 0;
-  const chatAttentionSnoozedUntilTimestamp = useMemo(() => parseIsoTimestamp(chatAttentionSnoozedUntil), [chatAttentionSnoozedUntil]);
-  const chatAttentionIsSnoozed = Boolean(chatAttentionSnoozedUntilTimestamp && chatAttentionSnoozedUntilTimestamp > Date.now());
-  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed && chatAttentionSnoozedUntil
-    ? `Resumes ${formatRelativeTime(chatAttentionSnoozedUntil)}`
+  const { isActive: chatAttentionIsSnoozed, label: chatAttentionSnoozeCountdownLabel } = useSnoozeCountdown(chatAttentionSnoozedUntil);
+  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed
+    ? chatAttentionSnoozeCountdownLabel ?? (chatAttentionSnoozedUntil ? `Resumes ${formatRelativeTime(chatAttentionSnoozedUntil)}` : "Snoozed")
+    : null;
+  const chatAttentionSnoozeBadgeText = chatAttentionIsSnoozed
+    ? `Snoozed${chatAttentionSnoozeLabel ? ` · ${chatAttentionSnoozeLabel}` : ""}`
     : null;
   const heroChatAttentionLeadEntry = chatAttentionLabels.leadEntry;
   const heroChatAttentionLeadHref = heroChatAttentionLeadEntry?.href ?? chatCtaHref;
@@ -2262,7 +2265,12 @@ export function EventInsideExperience({
                   {heroChatAttentionHasQueue && onChatAttentionSnooze ? (
                     chatAttentionIsSnoozed ? (
                       <div className="inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
-                        <span>{chatAttentionSnoozeLabel ?? "Snoozed"}</span>
+                        {chatAttentionSnoozeBadgeText ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-white/25 px-3 py-1 text-white/80">
+                            <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
+                            {chatAttentionSnoozeBadgeText}
+                          </span>
+                        ) : null}
                         {onChatAttentionResume ? (
                           <button
                             type="button"
@@ -2393,13 +2401,18 @@ export function EventInsideExperience({
                   <div className="mt-3 flex flex-wrap items-center justify-end gap-3 text-right">
                     {heroChatAttentionHasQueue && onChatAttentionSnooze ? (
                       chatAttentionIsSnoozed ? (
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">
-                          <span>{chatAttentionSnoozeLabel ?? "Snoozed"}</span>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                          {chatAttentionSnoozeBadgeText ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-white/25 px-3 py-1 text-white/80">
+                              <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
+                              {chatAttentionSnoozeBadgeText}
+                            </span>
+                          ) : null}
                           {onChatAttentionResume ? (
                             <button
                               type="button"
                               onClick={onChatAttentionResume}
-                              className="ml-2 text-primary/70 underline-offset-2 hover:text-primary"
+                              className="text-primary/70 underline-offset-2 hover:text-primary"
                               aria-label="Resume chat attention alerts"
                             >
                               Resume alerts

@@ -398,3 +398,9 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/app/events/EventInsidePageClient.test.tsx`.
 - Next: surface a visible snooze countdown badge (hero/header/mobile/toast) so hosts know exactly when alerts will resume and can unsnooze early from any surface.
 
+
+## 2026-02-17 05:24 EET — Snooze countdown badges everywhere
+- Added a reusable `useSnoozeCountdown` hook and threaded it through EventInsideExperience, the desktop header, mobile action bar, and the floating toast so every surface now shows a live “Snoozed · mm:ss left” badge with a resume control.
+- Kept the chat toast visible while snoozed, propagated the countdown into Desktop/Mobile/Toast UIs, and updated the Event layout plumbing so snoozed queues can still surface mark-all/mark-handled actions.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx tests/app/events/EventInsidePageClient.test.tsx`.
+- Next: let hosts pick the snooze duration (e.g., 5/10/20 minutes) from any surface so they can pause alerts for longer focus blocks without hitting snooze repeatedly.

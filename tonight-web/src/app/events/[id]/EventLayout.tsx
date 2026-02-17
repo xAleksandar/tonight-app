@@ -42,7 +42,11 @@ export function EventLayout({
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const showChatAttentionToast = Boolean(chatAction?.attentionActive && chatAction?.href && chatAttentionQueue?.length);
+  const showChatAttentionToast = Boolean(
+    chatAction?.href &&
+    chatAttentionQueue?.length &&
+    (chatAction?.attentionActive || chatAttentionSnoozedUntil)
+  );
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -92,9 +96,11 @@ export function EventLayout({
           snippetTimestamp={chatAction?.lastMessageAtISO}
           onInteract={chatAction?.onInteract}
           attentionQueue={chatAttentionQueue}
+          chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
           onMarkHandled={onChatAttentionEntryHandled}
           onMarkAllHandled={onChatAttentionClearAll}
           onSnooze={onChatAttentionSnooze}
+          onResume={onChatAttentionResume}
         />
       ) : null}
 

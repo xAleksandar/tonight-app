@@ -8,6 +8,7 @@ import type { EventChatAttentionPayload } from "@/components/tonight/event-insid
 import { classNames } from "@/lib/classNames";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
+import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 
 export type MobileNavTarget = "discover" | "people" | "create" | "messages" | "profile";
 
@@ -108,11 +109,12 @@ export function MobileActionBar({
   );
   const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
   const chatAttentionHasEntries = chatAttentionEntries.length > 0;
-  const chatAttentionSnoozedTimestamp = chatAttentionSnoozedUntil ? Date.parse(chatAttentionSnoozedUntil) : NaN;
-  const chatAttentionIsSnoozed = Number.isFinite(chatAttentionSnoozedTimestamp) && chatAttentionSnoozedTimestamp > Date.now();
-  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed && chatAttentionSnoozedUntil
-    ? `Resumes ${formatRelativeTime(chatAttentionSnoozedUntil)}`
-    : null;
+  const { isActive: chatAttentionIsSnoozed, label: chatAttentionSnoozeCountdownLabel } = useSnoozeCountdown(chatAttentionSnoozedUntil);
+  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed && chatAttentionSnoozeCountdownLabel
+    ? `Snoozed · ${chatAttentionSnoozeCountdownLabel}`
+    : chatAttentionIsSnoozed
+      ? "Snoozed"
+      : null;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -239,19 +241,24 @@ export function MobileActionBar({
           ) : null}
           {chatAttentionHasEntries && onChatAttentionSnooze ? (
             chatAttentionIsSnoozed ? (
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-white/60">
-                {chatAttentionSnoozeLabel ?? "Snoozed"}
+              <div className="mt-2 inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                {chatAttentionSnoozeLabel ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/25 px-3 py-1 text-white/80">
+                    <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
+                    {chatAttentionSnoozeLabel}
+                  </span>
+                ) : null}
                 {onChatAttentionResume ? (
                   <button
                     type="button"
                     onClick={onChatAttentionResume}
-                    className="ml-2 text-primary/70 underline-offset-2 hover:text-primary"
+                    className="text-primary/70 underline-offset-2 hover:text-primary"
                     aria-label="Resume chat attention alerts"
                   >
                     Resume alerts
                   </button>
                 ) : null}
-              </p>
+              </div>
             ) : (
               <button
                 type="button"
