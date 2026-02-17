@@ -327,8 +327,11 @@ describe('DesktopHeader', () => {
     const toggle = screen.getByRole('button', { name: /view remaining guests/i });
     fireEvent.click(toggle);
     expect(screen.getByRole('link', { name: /open chat with noah/i })).toBeInTheDocument();
-  });  it('surfaces draft quick picker entries inside the header', () => {
+  });
+
+  it('surfaces draft quick picker entries inside the header', () => {
     const now = new Date().toISOString();
+    const onClearDraft = vi.fn();
 
     render(
       <DesktopHeader
@@ -343,13 +346,18 @@ describe('DesktopHeader', () => {
           { conversationId: 'jr_3', participantName: 'Noah', href: '/chat/jr_3', updatedAtISO: now },
           { conversationId: 'jr_4', participantName: 'Rina', href: '/chat/jr_4', updatedAtISO: now },
         ]}
+        onClearDraft={onClearDraft}
       />
     );
 
     expect(screen.getByRole('link', { name: /open drafted chat with jess/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /clear draft for jess/i }));
+    expect(onClearDraft).toHaveBeenCalledWith('jr_1');
+
     const toggle = screen.getByRole('button', { name: /view remaining drafts/i });
     fireEvent.click(toggle);
     expect(screen.getByRole('link', { name: /open drafted chat with rina/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear draft for rina/i })).toBeInTheDocument();
   });
 
 

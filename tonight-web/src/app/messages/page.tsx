@@ -31,7 +31,7 @@ import {
   CHAT_ATTENTION_SNOOZE_STORAGE_KEY,
 } from "@/lib/chatAttentionStorage";
 import { showSuccessToast } from "@/lib/toast";
-import { readChatDraftMapFromStorage, subscribeToChatDraftStorage, type ChatDraftMap } from "@/lib/chatDraftStorage";
+import { clearChatDraftFromStorage, readChatDraftMapFromStorage, subscribeToChatDraftStorage, type ChatDraftMap } from "@/lib/chatDraftStorage";
 import type { SocketMessagePayload } from "@/lib/socket-shared";
 
 export default function MessagesPage() {
@@ -467,6 +467,25 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     setPendingAttentionScrollTarget(draftJumpTarget.conversationId);
   }, [draftJumpTarget, setStatusFilter, setPendingAttentionScrollTarget]);
 
+  const handleClearDraft = useCallback(
+    (conversationId: string) => {
+      if (!conversationId) {
+        return;
+      }
+      clearChatDraftFromStorage(conversationId);
+      setChatDraftMap((current) => {
+        if (!current[conversationId]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[conversationId];
+        return next;
+      });
+      showSuccessToast("Draft cleared", "We'll keep your other saved replies untouched.");
+    },
+    [showSuccessToast]
+  );
+
   const handleChatAttentionEntryHandled = useCallback((entryId: string) => {
     if (!entryId) {
       return;
@@ -616,6 +635,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               draftsWaitingCount={draftsWaitingCount}
               onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
               draftQuickPickEntries={draftQuickPickEntries}
+              onClearDraft={handleClearDraft}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -664,6 +684,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               draftsWaitingCount={draftsWaitingCount}
               onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
               draftQuickPickEntries={draftQuickPickEntries}
+              onClearDraft={handleClearDraft}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -804,6 +825,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                       draftsWaitingCount={draftsWaitingCount}
                       onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
                       draftQuickPickEntries={draftQuickPickEntries}
+                      onClearDraft={handleClearDraft}
                     />
                   ) : null}
 
@@ -1083,6 +1105,7 @@ type MessagesAttentionSummaryProps = {
   draftsWaitingCount?: number;
   onJumpToDrafts?: () => void;
   draftQuickPickEntries?: DraftQuickPickEntry[] | null;
+  onClearDraft?: (conversationId: string) => void;
 };
 
 export function MessagesAttentionSummary({
@@ -1097,6 +1120,7 @@ export function MessagesAttentionSummary({
   draftsWaitingCount,
   onJumpToDrafts,
   draftQuickPickEntries,
+  onClearDraft,
 }: MessagesAttentionSummaryProps) {
   if (!Array.isArray(queue) || queue.length === 0) {
     return null;
@@ -1175,17 +1199,29 @@ export function MessagesAttentionSummary({
           <div className="mt-2 flex flex-wrap gap-2">
             {draftQuickPickerTopEntries.map((entry) => {
               const relativeTime = formatRelativeTime(entry.updatedAtISO);
+              const clearLabel = `Clear draft for ${entry.participantName}`;
               return (
-                <button
-                  type="button"
-                  key={entry.conversationId}
-                  onClick={() => handleSelectDraft(entry.conversationId)}
-                  className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/15 px-3 py-1 text-[11px] font-semibold text-sky-50 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
-                  aria-label={`Open drafted chat with ${entry.participantName}`}
-                >
-                  <span>{entry.participantName}</span>
-                  {relativeTime ? <span className="text-[9px] text-sky-100/70">{relativeTime}</span> : null}
-                </button>
+                <div key={entry.conversationId} className="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDraft(entry.conversationId)}
+                    className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/15 px-3 py-1 text-[11px] font-semibold text-sky-50 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                    aria-label={`Open drafted chat with ${entry.participantName}`}
+                  >
+                    <span>{entry.participantName}</span>
+                    {relativeTime ? <span className="text-[9px] text-sky-100/70">{relativeTime}</span> : null}
+                  </button>
+                  {onClearDraft ? (
+                    <button
+                      type="button"
+                      onClick={() => onClearDraft(entry.conversationId)}
+                      className="text-[9px] font-semibold uppercase tracking-wide text-sky-100/80 underline-offset-2 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                      aria-label={clearLabel}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -1205,8 +1241,9 @@ export function MessagesAttentionSummary({
               <ul className="space-y-2">
                 {draftQuickPickEntriesSafe.map((entry) => {
                   const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                  const clearLabel = `Clear draft for ${entry.participantName}`;
                   return (
-                    <li key={`${entry.conversationId}-summary`}>
+                    <li key={`${entry.conversationId}-summary`} className="space-y-1">
                       <button
                         type="button"
                         onClick={() => handleSelectDraft(entry.conversationId)}
@@ -1221,6 +1258,18 @@ export function MessagesAttentionSummary({
                         </div>
                         {entry.snippet ? <p className="mt-1 text-sm text-sky-50/80 line-clamp-2">{entry.snippet}</p> : null}
                       </button>
+                      {onClearDraft ? (
+                        <div className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => onClearDraft(entry.conversationId)}
+                            className="text-[10px] font-semibold uppercase tracking-wide text-sky-100/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                            aria-label={clearLabel}
+                          >
+                            Clear draft
+                          </button>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}

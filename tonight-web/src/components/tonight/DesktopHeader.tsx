@@ -37,6 +37,7 @@ export type DesktopHeaderProps = {
   draftsWaitingCount?: number | null;
   onJumpToDrafts?: () => void;
   draftQuickPickEntries?: DraftQuickPickEntry[] | null;
+  onClearDraft?: (conversationId: string) => void;
 };
 
 type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
@@ -71,6 +72,7 @@ export function DesktopHeader({
   draftsWaitingCount,
   onJumpToDrafts,
   draftQuickPickEntries,
+  onClearDraft,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -221,17 +223,29 @@ export function DesktopHeader({
         <div className="mt-2 flex flex-wrap gap-2">
           {draftQuickPickerTopEntries.map((entry) => {
             const relativeTime = formatRelativeTime(entry.updatedAtISO);
+            const clearLabel = `Clear draft for ${entry.participantName}`;
             return (
-              <Link
-                key={entry.conversationId}
-                href={entry.href}
-                prefetch={false}
-                aria-label={`Open drafted chat with ${entry.participantName}`}
-                className="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-sky-400/15 px-3 py-1 text-[11px] text-sky-50/90 transition hover:border-sky-200/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
-              >
-                <span>{entry.participantName}</span>
-                {relativeTime ? <span className="text-[9px] text-sky-100/70">{relativeTime}</span> : null}
-              </Link>
+              <div key={entry.conversationId} className="inline-flex items-center gap-1">
+                <Link
+                  href={entry.href}
+                  prefetch={false}
+                  aria-label={`Open drafted chat with ${entry.participantName}`}
+                  className="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-sky-400/15 px-3 py-1 text-[11px] text-sky-50/90 transition hover:border-sky-200/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                >
+                  <span>{entry.participantName}</span>
+                  {relativeTime ? <span className="text-[9px] text-sky-100/70">{relativeTime}</span> : null}
+                </Link>
+                {onClearDraft ? (
+                  <button
+                    type="button"
+                    onClick={() => onClearDraft(entry.conversationId)}
+                    className="text-[9px] font-semibold uppercase tracking-wide text-sky-100/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                    aria-label={clearLabel}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
             );
           })}
         </div>
@@ -251,8 +265,9 @@ export function DesktopHeader({
             <ul className="space-y-2">
               {draftQuickPickEntriesSafe.map((entry) => {
                 const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                const clearLabel = `Clear draft for ${entry.participantName}`;
                 return (
-                  <li key={`${entry.conversationId}-draft`}>
+                  <li key={`${entry.conversationId}-draft`} className="space-y-1">
                     <Link
                       href={entry.href}
                       prefetch={false}
@@ -267,6 +282,18 @@ export function DesktopHeader({
                       </div>
                       {entry.snippet ? <p className="mt-1 text-sm text-sky-50/80 line-clamp-2">{entry.snippet}</p> : null}
                     </Link>
+                    {onClearDraft ? (
+                      <div className="text-right">
+                        <button
+                          type="button"
+                          onClick={() => onClearDraft(entry.conversationId)}
+                          className="text-[10px] font-semibold uppercase tracking-wide text-sky-100/75 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                          aria-label={clearLabel}
+                        >
+                          Clear draft
+                        </button>
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}

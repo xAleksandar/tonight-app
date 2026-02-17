@@ -129,8 +129,11 @@ describe('MessagesAttentionSummary', () => {
     expect(chip).toBeInTheDocument();
     fireEvent.click(chip);
     expect(onJumpToDrafts).toHaveBeenCalledTimes(1);
-  });  it('lets hosts jump directly into drafted chats via the quick picker', () => {
+  });
+
+  it('lets hosts jump directly into drafted chats via the quick picker', () => {
     const onSelect = vi.fn();
+    const onClearDraft = vi.fn();
     const now = new Date().toISOString();
 
     render(
@@ -145,6 +148,7 @@ describe('MessagesAttentionSummary', () => {
           { conversationId: 'jr_789', participantName: 'Noah', href: '/chat/jr_789', updatedAtISO: now },
           { conversationId: 'jr_101', participantName: 'Rina', href: '/chat/jr_101', updatedAtISO: now, snippet: 'Saved reply' },
         ]}
+        onClearDraft={onClearDraft}
       />
     );
 
@@ -152,9 +156,13 @@ describe('MessagesAttentionSummary', () => {
     fireEvent.click(quickButton);
     expect(onSelect).toHaveBeenCalledWith('jr_123');
 
+    fireEvent.click(screen.getByRole('button', { name: /clear draft for jess/i }));
+    expect(onClearDraft).toHaveBeenCalledWith('jr_123');
+
     const toggle = screen.getByRole('button', { name: /view remaining drafts/i });
     fireEvent.click(toggle);
     expect(screen.getByText('Saved reply')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear draft for rina/i })).toBeInTheDocument();
   });
 
 

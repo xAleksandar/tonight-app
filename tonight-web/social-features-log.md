@@ -541,3 +541,9 @@ Each run should:
 - Upgraded `MessagesAttentionSummary` with the identical quick picker treatment, wiring the selector to the existing jump handler so the Guests needing replies rail now doubles as a draft hub; refreshed the `/messages` page wiring plus Desktop/Mobile specs to cover the new props.
 - Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/app/messages/messages-attention-summary.test.tsx`.
 - Next: add inline “Clear draft” controls to each quick-picker entry so hosts can drop stale drafts directly from the header/attention summary without opening the conversation.
+
+## 2026-02-17 13:45 EET — Draft quick pick entries can clear in place
+- Added a shared `handleClearDraft` flow that wipes localStorage, trims the in-memory draft map, and surfaces a toast so clearing a saved reply doesn't require opening the conversation.
+- Threaded the handler through `DesktopHeader` + `MessagesAttentionSummary`, giving every quick-picker chip/list entry a nearby “Clear draft” control (matching hover/focus states) so hosts can drop stale replies right from the header or Guests needing replies rail.
+- Updated the Vitest suites covering both components to assert the new buttons + callbacks (`cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/app/messages/messages-attention-summary.test.tsx`).
+- Next: mirror the inline clear-draft controls inside the Mobile Action Bar quick picker so mobile hosts get the same management affordance.
