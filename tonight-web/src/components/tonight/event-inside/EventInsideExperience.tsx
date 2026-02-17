@@ -332,6 +332,7 @@ export function EventInsideExperience({
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
+  const [mapStyle, setMapStyle] = useState<"light" | "dark">("dark");
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
   const guestMessagePreviewEntries = viewerRole === "guest" ? chatPreview?.guestMessagePreview ?? [] : [];
   const hostUnreadPreviewEntries = viewerRole === "host" ? hostUnreadThreads.slice(0, 3) : [];
@@ -2169,7 +2170,32 @@ export function EventInsideExperience({
 
             {/* Event map */}
             {event.location && (
-              <div className="mt-6">
+              <div className="mt-6 relative">
+                {/* Map style toggle button */}
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-2 rounded-lg bg-black/80 backdrop-blur-sm border border-white/20 px-3 py-1.5 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setMapStyle("light")}
+                    className={classNames(
+                      "text-xs font-semibold uppercase tracking-wide transition-colors",
+                      mapStyle === "light" ? "text-white" : "text-white/50 hover:text-white/70"
+                    )}
+                  >
+                    Light
+                  </button>
+                  <span className="h-3 w-px bg-white/30" aria-hidden />
+                  <button
+                    type="button"
+                    onClick={() => setMapStyle("dark")}
+                    className={classNames(
+                      "text-xs font-semibold uppercase tracking-wide transition-colors",
+                      mapStyle === "dark" ? "text-white" : "text-white/50 hover:text-white/70"
+                    )}
+                  >
+                    Dark
+                  </button>
+                </div>
+
                 <EventMapView
                   events={[
                     {
@@ -2183,7 +2209,7 @@ export function EventInsideExperience({
                   selectedEventId={event.id}
                   height={360}
                   className="w-full rounded-xl overflow-hidden border border-white/10"
-                  mapStyle="mapbox://styles/mapbox/dark-v11"
+                  mapStyle={mapStyle === "light" ? "mapbox://styles/mapbox/streets-v12" : "mapbox://styles/mapbox/dark-v11"}
                 />
               </div>
             )}
