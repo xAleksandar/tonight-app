@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarPlus, Copy, Flag, Info, MapPin, Send, Share2, X } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Flag, Info, MapPin, Send, Share2, X } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
@@ -21,6 +21,14 @@ import {
   CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
   CHAT_ATTENTION_SNOOZE_STORAGE_KEY,
 } from '@/lib/chatAttentionStorage';
+import { buildChatAttentionLabels } from '@/lib/buildChatAttentionLabels';
+import { buildChatAttentionLinkLabel, formatRelativeTime } from '@/lib/chatAttentionHelpers';
+import {
+  readChatAttentionQueueFromStorage,
+  subscribeToChatAttentionQueueStorage,
+  writeChatAttentionQueueToStorage,
+} from '@/lib/chatAttentionQueueStorage';
+import type { EventChatAttentionPayload } from '@/components/tonight/event-inside/EventInsideExperience';
 import type { SocketReadReceiptEventPayload } from '@/lib/socket-shared';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
@@ -120,6 +128,16 @@ const createClientMessageId = () => {
 const classNames = (...classes: Array<string | boolean | null | undefined>) =>
   classes.filter(Boolean).join(' ');
 
+const chatAttentionQueuesMatch = (
+  a: EventChatAttentionPayload[],
+  b: EventChatAttentionPayload[]
+): boolean => {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((entry, index) => entry.id === b[index]?.id);
+};
+
 export default function ChatConversation({
   joinRequestId,
   currentUserId,
@@ -151,12 +169,15 @@ export default function ChatConversation({
     DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES
   );
   const [hasHydratedChatAttentionSnooze, setHasHydratedChatAttentionSnooze] = useState(false);
+  const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
+  const [chatAttentionPickerOpen, setChatAttentionPickerOpen] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatAttentionSnoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingChatAttentionWriteRef = useRef<EventChatAttentionPayload[] | null>(null);
 
   const clearChatAttentionSnoozeTimeout = useCallback(() => {
     if (chatAttentionSnoozeTimeoutRef.current) {
@@ -186,9 +207,38 @@ export default function ChatConversation({
   );
 
   const isHostViewer = context.requesterRole === 'host';
+  const chatAttentionEntries = useMemo(
+    () => (chatAttentionQueue ?? []).filter((entry): entry is EventChatAttentionPayload => Boolean(entry && entry.id)),
+    [chatAttentionQueue]
+  );
+  const chatAttentionLabels = useMemo(() => buildChatAttentionLabels(chatAttentionEntries), [chatAttentionEntries]);
+  const chatAttentionLeadEntry = chatAttentionLabels.leadEntry;
+  const chatAttentionLeadLabel = chatAttentionLabels.leadLabel;
+  const chatAttentionLeadHref = chatAttentionLeadEntry?.href?.trim();
+  const chatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(chatAttentionLeadEntry ?? null);
+  const chatAttentionWaitingLabel = chatAttentionLabels.waitingLabel;
+  const chatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? 'New chat ping';
+  const chatAttentionPickerEntries = useMemo(
+    () =>
+      chatAttentionEntries.filter(
+        (entry): entry is EventChatAttentionPayload & { href: string } =>
+          typeof entry.href === 'string' && entry.href.trim().length > 0
+      ),
+    [chatAttentionEntries]
+  );
+  const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
+  const chatAttentionQueueLength = chatAttentionEntries.length;
+  const chatAttentionHasEntries = chatAttentionQueueLength > 0;
   const counterpart = useMemo(() => {
     return isHostViewer ? context.participant : context.host;
   }, [context, isHostViewer]);
+
+  useEffect(() => {
+    if (!chatAttentionPickerAvailable && chatAttentionPickerOpen) {
+      setChatAttentionPickerOpen(false);
+    }
+  }, [chatAttentionPickerAvailable, chatAttentionPickerOpen]);
+
   const counterpartId = counterpart.id;
 
   const eventTimeLabel = useMemo(() => formatDateTime(context.event.datetime), [context.event.datetime]);
@@ -219,6 +269,30 @@ export default function ChatConversation({
   useEffect(() => {
     setEventShareSupported(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
   }, []);
+
+  useEffect(() => {
+    if (!isHostViewer) {
+      setChatAttentionQueue([]);
+      setChatAttentionPickerOpen(false);
+      pendingChatAttentionWriteRef.current = null;
+      return;
+    }
+    setChatAttentionQueue(readChatAttentionQueueFromStorage());
+    return subscribeToChatAttentionQueueStorage((nextQueue) => {
+      setChatAttentionQueue((current) => (chatAttentionQueuesMatch(current, nextQueue) ? current : nextQueue));
+    });
+  }, [isHostViewer]);
+
+  useEffect(() => {
+    if (!isHostViewer) {
+      pendingChatAttentionWriteRef.current = null;
+      return;
+    }
+    if (pendingChatAttentionWriteRef.current) {
+      writeChatAttentionQueueToStorage(pendingChatAttentionWriteRef.current);
+      pendingChatAttentionWriteRef.current = null;
+    }
+  }, [chatAttentionQueue, isHostViewer]);
 
   useEffect(() => {
     if (!isHostViewer) {
@@ -752,7 +826,28 @@ export default function ChatConversation({
       : 'Snoozed'
     : null;
 
+  const applyChatAttentionQueueUpdate = useCallback(
+    (updater: (prev: EventChatAttentionPayload[]) => EventChatAttentionPayload[]) => {
+      if (!isHostViewer) {
+        return null;
+      }
+      let updatedQueue: EventChatAttentionPayload[] | null = null;
+      setChatAttentionQueue((previous) => {
+        const next = updater(previous);
+        if (chatAttentionQueuesMatch(previous, next)) {
+          return previous;
+        }
+        updatedQueue = next;
+        pendingChatAttentionWriteRef.current = next;
+        return next;
+      });
+      return updatedQueue;
+    },
+    [isHostViewer]
+  );
+
   const handleChatAttentionSnooze = useCallback(
+
     (durationMinutes: number = quickSnoozeMinutes) => {
       if (!isHostViewer) {
         return;
@@ -778,6 +873,47 @@ export default function ChatConversation({
     setChatAttentionSnoozedUntil(null);
     showSuccessToast('Chat alerts back on', "We'll nudge you again when guests reach out.");
   }, [chatAttentionSnoozedUntil, clearChatAttentionSnoozeTimeout, isHostViewer, showSuccessToast]);
+
+  const handleChatAttentionEntryHandled = useCallback(
+    (entryId?: string | null) => {
+      if (!entryId) {
+        return;
+      }
+      const nextQueue = applyChatAttentionQueueUpdate((previous) => previous.filter((entry) => entry.id !== entryId));
+      if (nextQueue) {
+        const remaining = nextQueue.length;
+        const helperCopy = remaining > 0
+          ? `Keeping ${remaining === 1 ? 'one guest' : `${remaining} guests`} on your radar.`
+          : 'No more guests are waiting right now.';
+        showSuccessToast('Marked handled', helperCopy);
+      }
+    },
+    [applyChatAttentionQueueUpdate, showSuccessToast]
+  );
+
+  const handleChatAttentionClearAll = useCallback(() => {
+    if (!chatAttentionHasEntries) {
+      return;
+    }
+    const queueLength = chatAttentionQueueLength;
+    const confirmMessage = queueLength === 1
+      ? 'Mark the current chat ping as handled? This will clear the attention alert.'
+      : `Mark all ${queueLength} chat pings as handled? This will clear every attention alert.`;
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(confirmMessage);
+      if (!confirmed) {
+        return;
+      }
+    }
+    const clearedQueue = applyChatAttentionQueueUpdate(() => []);
+    if (clearedQueue) {
+      setChatAttentionPickerOpen(false);
+      const helperCopy = queueLength === 1
+        ? 'Cleared the pending attention alert.'
+        : `Cleared ${queueLength} queued attention alerts.`;
+      showSuccessToast('Attention queue cleared', helperCopy);
+    }
+  }, [applyChatAttentionQueueUpdate, chatAttentionHasEntries, chatAttentionQueueLength, showSuccessToast]);
 
   const handleCopyAddress = useCallback(async () => {
     if (!hasLocationDetails || !context.event.locationName) {
@@ -1039,6 +1175,116 @@ export default function ChatConversation({
               </>
             ) : null}
           </div>
+          {isHostViewer && chatAttentionHasEntries ? (
+            <div className="mt-3 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-primary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                  {chatAttentionIndicatorLabel}
+                </span>
+                {chatAttentionLeadLabel ? (
+                  chatAttentionLeadHref ? (
+                    <Link
+                      href={chatAttentionLeadHref}
+                      prefetch={false}
+                      aria-label={chatAttentionLeadAriaLabel}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-primary transition hover:border-primary/60"
+                      onClick={() => setChatAttentionPickerOpen(false)}
+                    >
+                      {chatAttentionLeadLabel}
+                      <span aria-hidden className="text-[10px]">↗</span>
+                    </Link>
+                  ) : (
+                    <span className="rounded-full border border-primary/20 px-3 py-1 text-primary">{chatAttentionLeadLabel}</span>
+                  )
+                ) : null}
+                {chatAttentionLeadEntry?.id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleChatAttentionEntryHandled(chatAttentionLeadEntry.id)}
+                    className="text-primary/80 underline-offset-2 transition hover:underline"
+                    aria-label={`Mark handled${chatAttentionLeadEntry.authorName ? ` for ${chatAttentionLeadEntry.authorName}` : ''}`}
+                  >
+                    Mark handled
+                  </button>
+                ) : null}
+                {chatAttentionWaitingLabel ? (
+                  chatAttentionPickerAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => setChatAttentionPickerOpen((previous) => !previous)}
+                      aria-expanded={chatAttentionPickerOpen}
+                      aria-controls="chat-header-attention-picker"
+                      aria-label={`View queued guests (${chatAttentionWaitingLabel})`}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-primary transition hover:border-primary/60"
+                    >
+                      {chatAttentionWaitingLabel}
+                      <ChevronDown
+                        className={classNames('h-3 w-3 transition-transform', chatAttentionPickerOpen ? 'rotate-180' : undefined)}
+                        aria-hidden
+                      />
+                    </button>
+                  ) : (
+                    <span className="rounded-full border border-primary/20 px-3 py-1 text-primary/80">{chatAttentionWaitingLabel}</span>
+                  )
+                ) : null}
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  onClick={handleChatAttentionClearAll}
+                  className="text-primary/80 underline-offset-2 transition hover:underline"
+                  aria-label="Mark all chat attention entries as handled"
+                >
+                  Mark all handled
+                </button>
+              </div>
+              {chatAttentionPickerAvailable && chatAttentionPickerOpen ? (
+                <div id="chat-header-attention-picker" className="mt-3 space-y-2">
+                  {chatAttentionPickerEntries.map((entry) => {
+                    const href = entry.href?.trim();
+                    const relativeTime = formatRelativeTime(entry.timestampISO);
+                    const entryLabel = buildChatAttentionLinkLabel(entry);
+                    return (
+                      <div key={entry.id} className="rounded-xl border border-border/60 bg-background/60 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {href ? (
+                            <Link
+                              href={href}
+                              prefetch={false}
+                              aria-label={entryLabel}
+                              className="text-sm font-semibold text-foreground transition hover:text-primary"
+                              onClick={() => setChatAttentionPickerOpen(false)}
+                            >
+                              {entry.authorName ?? 'Guest thread'}
+                            </Link>
+                          ) : (
+                            <span className="text-sm font-semibold text-foreground">{entry.authorName ?? 'Guest thread'}</span>
+                          )}
+                          {relativeTime ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{relativeTime}</span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleChatAttentionEntryHandled(entry.id)}
+                            className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
+                            aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
+                          >
+                            Mark handled
+                          </button>
+                        </div>
+                        {entry.snippet ? (
+                          <p className="mt-1 text-xs text-muted-foreground">{entry.snippet}</p>
+                        ) : null}
+                        {entry.helperText ? (
+                          <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {isHostViewer && hasHydratedChatAttentionSnooze ? (
             chatAttentionIsSnoozed ? (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground">

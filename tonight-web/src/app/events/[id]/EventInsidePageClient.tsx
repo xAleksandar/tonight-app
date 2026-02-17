@@ -17,6 +17,10 @@ import {
   CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
   CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE,
 } from "@/lib/chatAttentionStorage";
+import {
+  subscribeToChatAttentionQueueStorage,
+  writeChatAttentionQueueToStorage,
+} from "@/lib/chatAttentionQueueStorage";
 
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
@@ -29,6 +33,13 @@ type EventInsidePageClientProps = {
     userEmail: string | null;
     userPhotoUrl: string | null;
   };
+};
+
+const chatAttentionQueuesMatch = (a: EventChatAttentionPayload[], b: EventChatAttentionPayload[]): boolean => {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((entry, index) => entry.id === b[index]?.id);
 };
 
 export function EventInsidePageClient({ experience, layoutProps }: EventInsidePageClientProps) {
@@ -58,6 +69,27 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   useEffect(() => {
     chatAttentionQueueRef.current = chatAttentionQueue;
   }, [chatAttentionQueue]);
+
+  useEffect(() => {
+    if (experience.viewerRole !== "host") {
+      return;
+    }
+    writeChatAttentionQueueToStorage(chatAttentionQueue);
+  }, [chatAttentionQueue, experience.viewerRole]);
+
+  useEffect(() => {
+    if (experience.viewerRole !== "host") {
+      return;
+    }
+    return subscribeToChatAttentionQueueStorage((nextQueue) => {
+      setChatAttentionQueue((current) => {
+        if (chatAttentionQueuesMatch(current, nextQueue)) {
+          return current;
+        }
+        return nextQueue;
+      });
+    });
+  }, [experience.viewerRole]);
 
   useEffect(() => {
     if (!hasHydratedSnoozeState) {

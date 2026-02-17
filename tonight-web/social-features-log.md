@@ -429,3 +429,10 @@ Each run should:
 - Threaded the `/chat/[joinRequestId]` header with the same quick-snooze button, duration pills, countdown badge, and resume affordance the event page already exposes, including persistence to localStorage + the root data attribute and the wake timer so snoozes auto-expire.
 - Tests: `cd tonight-web && npx vitest run tests/app/events/EventInsidePageClient.test.tsx tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`
 - Next: surface the queued chat-attention entries inside the chat header (lead guest chip + waiting count + mark-handled controls) so hosts can jump between alerting threads without leaving the DM screen.
+
+## 2026-02-17 07:24 EET — Chat header inherits attention queue
+- Persisted the live chat-attention queue into `localStorage` from the event page client and added a storage subscription so every surface stays in sync when hosts triage alerts elsewhere.
+- Introduced `chatAttentionQueueStorage` helpers plus Vitest coverage, then wired `/chat/[joinRequestId]` to hydrate the queue, show the lead guest chip + waiting-count badge, expose the quick picker, and offer per-entry/mark-all handled controls directly inside the chat header.
+- Synced the chat header’s snooze state with the event layout so snooze timers, preferences, and queue updates remain bidirectional between the event and chat experiences.
+- Tests: `cd tonight-web && npx vitest run tests/lib/chatAttentionQueueStorage.test.ts tests/app/events/EventInsidePageClient.test.tsx`
+- Next: port the floating chat-attention toast (queue carousel + mark-handled controls) into `/chat/[joinRequestId]` so hosts get the same multi-thread triage without jumping back to the event page.
