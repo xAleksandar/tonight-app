@@ -470,3 +470,11 @@ Each run should:
 - Added a focused Vitest suite for the new helper (`tests/app/messages/messages-filter-attention.test.ts`) and reran the Messages attention summary specs to keep the snooze rail coverage intact.
 - Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-filter-attention.test.ts tests/app/messages/messages-attention-summary.test.tsx`
 - Next: add a one-tap “Jump to waiting guests” action near the filter chips that auto-selects the chip with queued pings and scrolls the list to the first attention thread.
+
+## 2026-02-17 09:32 EET — Messages jump CTA locks onto waiting guests
+- Added a storage-aware helper + UI plumbing so /messages now surfaces a “Jump to waiting guests” control beside the filter chips; it auto-selects the correct status filter, scrolls to the first queued conversation, and temporarily highlights the card for quick triage.
+- Introduced a scroll-target ref + visual cue for the ConversationList along with data attributes to anchor the animation, keeping the experience smooth on both desktop and mobile.
+- Expanded the messages filter unit tests to cover the new helper logic and reran the ConversationList suite to keep the attention badges + markup changes covered.
+- Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-filter-attention.test.ts tests/components/ConversationList.test.tsx`
+- Next: mirror the “Jump to waiting guests” affordance inside the Messages mobile action bar so phone users can warp to the queued chat without scrolling.
+

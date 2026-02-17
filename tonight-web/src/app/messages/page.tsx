@@ -85,6 +85,42 @@ export const buildMessagesFilterAttentionCounts = (
   return counts;
 };
 
+export type MessagesAttentionJumpTarget = {
+  conversationId: string;
+  filter: ConversationFilter;
+};
+
+export const findMessagesAttentionJumpTarget = (
+  conversations: ConversationPreview[],
+  queue?: EventChatAttentionPayload[] | null
+): MessagesAttentionJumpTarget | null => {
+  if (!Array.isArray(queue) || queue.length === 0 || !Array.isArray(conversations) || conversations.length === 0) {
+    return null;
+  }
+
+  const conversationById = new Map<string, ConversationPreview>();
+  conversations.forEach((conversation) => {
+    if (conversation?.id) {
+      conversationById.set(conversation.id, conversation);
+    }
+  });
+
+  for (const entry of queue) {
+    if (!entry?.id) {
+      continue;
+    }
+    const conversation = conversationById.get(entry.id);
+    if (conversation) {
+      return {
+        conversationId: conversation.id,
+        filter: conversation.status,
+      };
+    }
+  }
+
+  return null;
+};
+
 const chatAttentionQueuesMatch = (a: EventChatAttentionPayload[], b: EventChatAttentionPayload[]): boolean => {
   if (a.length !== b.length) {
     return false;
@@ -100,6 +136,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ConversationFilter>("all");
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
+  const [pendingAttentionScrollTarget, setPendingAttentionScrollTarget] = useState<string | null>(null);
 
   const [chatAttentionSnoozedUntil, setChatAttentionSnoozedUntil] = useState<string | null>(null);
   const [chatAttentionPreferredSnoozeMinutes, setChatAttentionPreferredSnoozeMinutes] = useState<ChatAttentionSnoozeOptionMinutes>(
@@ -107,6 +144,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   );
   const [hasHydratedSnoozeState, setHasHydratedSnoozeState] = useState(false);
   const chatAttentionSnoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const conversationListWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const clearChatAttentionSnoozeTimeout = useCallback(() => {
     if (chatAttentionSnoozeTimeoutRef.current) {
@@ -288,12 +326,51 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     [conversations, chatAttentionQueue]
   );
 
+  const attentionJumpTarget = useMemo(
+    () => findMessagesAttentionJumpTarget(conversations, chatAttentionQueue),
+    [conversations, chatAttentionQueue]
+  );
+  const canJumpToWaitingGuests = Boolean(attentionJumpTarget);
+
   const filteredConversations = useMemo(() => {
     if (statusFilter === "all") {
       return conversations;
     }
     return conversations.filter((conversation) => conversation.status === statusFilter);
   }, [conversations, statusFilter]);
+
+  useEffect(() => {
+    if (!pendingAttentionScrollTarget) {
+      return;
+    }
+    if (typeof window === "undefined") {
+      return;
+    }
+    const container = conversationListWrapperRef.current;
+    if (!container) {
+      return;
+    }
+    const nodes = Array.from(container.querySelectorAll<HTMLElement>("[data-conversation-id]"));
+    const targetNode = nodes.find((node) => node.dataset.conversationId === pendingAttentionScrollTarget);
+    if (!targetNode) {
+      return;
+    }
+
+    targetNode.scrollIntoView({ behavior: "smooth", block: "center" });
+    const highlightClasses = ["ring-2", "ring-primary/60", "ring-offset-2", "ring-offset-background"];
+    highlightClasses.forEach((className) => targetNode.classList.add(className));
+
+    const timeoutId = window.setTimeout(() => {
+      highlightClasses.forEach((className) => targetNode.classList.remove(className));
+    }, 1600);
+
+    setPendingAttentionScrollTarget(null);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      highlightClasses.forEach((className) => targetNode.classList.remove(className));
+    };
+  }, [pendingAttentionScrollTarget, filteredConversations]);
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -304,6 +381,14 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     },
     [router]
   );
+
+  const handleJumpToWaitingGuests = useCallback(() => {
+    if (!attentionJumpTarget) {
+      return;
+    }
+    setStatusFilter(attentionJumpTarget.filter);
+    setPendingAttentionScrollTarget(attentionJumpTarget.conversationId);
+  }, [attentionJumpTarget, setStatusFilter, setPendingAttentionScrollTarget]);
 
   const handleChatAttentionEntryHandled = useCallback((entryId: string) => {
     if (!entryId) {
@@ -560,46 +645,58 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {filterOptions.map((option) => {
-                      const isActive = statusFilter === option.id;
-                      const attentionCount = option.attentionCount ?? 0;
-                      const showAttention = attentionCount > 0;
-                      const attentionLabel =
-                        attentionCount === 1 ? "1 guest needs a reply" : `${attentionCount} guests need replies`;
+                  <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.map((option) => {
+                        const isActive = statusFilter === option.id;
+                        const attentionCount = option.attentionCount ?? 0;
+                        const showAttention = attentionCount > 0;
+                        const attentionLabel =
+                          attentionCount === 1 ? "1 guest needs a reply" : `${attentionCount} guests need replies`;
 
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setStatusFilter(option.id)}
-                          className={classNames(
-                            "inline-flex flex-col items-start gap-1 rounded-2xl border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition",
-                            isActive
-                              ? "border-primary/50 bg-primary/10 text-primary"
-                              : "border-border/60 text-muted-foreground hover:text-foreground"
-                          )}
-                          aria-pressed={isActive}
-                          aria-label={
-                            showAttention
-                              ? `${option.label} conversations, ${attentionLabel}`
-                              : `${option.label} conversations`
-                          }
-                        >
-                          <span className="inline-flex items-center gap-2">
-                            <span>{option.label}</span>
-                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-foreground/80">
-                              {option.count}
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setStatusFilter(option.id)}
+                            className={classNames(
+                              "inline-flex flex-col items-start gap-1 rounded-2xl border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition",
+                              isActive
+                                ? "border-primary/50 bg-primary/10 text-primary"
+                                : "border-border/60 text-muted-foreground hover:text-foreground"
+                            )}
+                            aria-pressed={isActive}
+                            aria-label={
+                              showAttention
+                                ? `${option.label} conversations, ${attentionLabel}`
+                                : `${option.label} conversations`
+                            }
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <span>{option.label}</span>
+                              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-foreground/80">
+                                {option.count}
+                              </span>
                             </span>
-                          </span>
-                          {showAttention ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary">
-                              <AlertTriangle className="h-3 w-3" /> {attentionLabel}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
+                            {showAttention ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary">
+                                <AlertTriangle className="h-3 w-3" /> {attentionLabel}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {canJumpToWaitingGuests ? (
+                      <button
+                        type="button"
+                        onClick={handleJumpToWaitingGuests}
+                        className="inline-flex items-center gap-2 self-start rounded-2xl border border-primary/40 bg-primary/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40 md:self-auto"
+                        aria-label="Jump to the guests waiting for a reply"
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5" /> Jump to waiting guests
+                      </button>
+                    ) : null}
                   </div>
 
                   {chatAttentionQueue.length ? (
@@ -615,7 +712,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                     />
                   ) : null}
 
-                  <div className="mt-5 rounded-2xl border border-border/50 bg-background/40 p-4">
+                  <div ref={conversationListWrapperRef} className="mt-5 rounded-2xl border border-border/50 bg-background/40 p-4">
                     <ConversationList
                       conversations={filteredConversations}
                       onSelectConversation={handleSelectConversation}

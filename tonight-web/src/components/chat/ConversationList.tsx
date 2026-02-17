@@ -89,6 +89,7 @@ export function ConversationList({
         return (
           <li key={conversation.id}>
             <div
+              data-conversation-id={conversation.id}
               role={isClickable ? "button" : undefined}
               tabIndex={isClickable ? 0 : -1}
               onClick={isClickable && onSelectConversation ? () => onSelectConversation(conversation.id) : undefined}
