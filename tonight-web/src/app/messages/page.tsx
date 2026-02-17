@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, BadgeCheck, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users } from "lucide-react";
 
+import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { ConversationList } from "@/components/chat/ConversationList";
 import { PLACEHOLDER_CONVERSATIONS, hasPlaceholderConversationData, type ConversationPreview } from "@/components/chat/conversations";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
@@ -15,6 +16,9 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useSocket } from "@/hooks/useSocket";
 import type { CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
+import { formatRelativeTime } from "@/lib/chatAttentionHelpers";
+import { readChatAttentionQueueFromStorage, subscribeToChatAttentionQueueStorage, writeChatAttentionQueueToStorage } from "@/lib/chatAttentionQueueStorage";
+import { showSuccessToast } from "@/lib/toast";
 import type { SocketMessagePayload } from "@/lib/socket-shared";
 
 export default function MessagesPage() {
@@ -37,6 +41,13 @@ export default function MessagesPage() {
 
 type ConversationFilter = "all" | "accepted" | "pending";
 
+const chatAttentionQueuesMatch = (a: EventChatAttentionPayload[], b: EventChatAttentionPayload[]): boolean => {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((entry, index) => entry.id === b[index]?.id);
+};
+
 function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
@@ -44,6 +55,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ConversationFilter>("all");
+  const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -71,6 +83,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
       fetchConversations();
     }
   }, [currentUser, fetchConversations]);
+
+  useEffect(() => {
+    setChatAttentionQueue(readChatAttentionQueueFromStorage());
+    return subscribeToChatAttentionQueueStorage((nextQueue) => {
+      setChatAttentionQueue((current) => (chatAttentionQueuesMatch(current, nextQueue) ? current : nextQueue));
+    });
+  }, []);
 
   // Socket.IO connection for real-time updates
   const handleMessage = useCallback((payload: SocketMessagePayload) => {
@@ -130,13 +149,47 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
-      if (conversationId.startsWith("demo-")) {
+      if (!conversationId || conversationId.startsWith("demo-")) {
         return;
       }
       router.push(`/chat/${conversationId}`);
     },
     [router]
   );
+
+  const handleChatAttentionEntryHandled = useCallback((entryId: string) => {
+    if (!entryId) {
+      return;
+    }
+    setChatAttentionQueue((current) => {
+      const next = current.filter((entry) => entry.id !== entryId);
+      if (next.length === current.length) {
+        return current;
+      }
+      writeChatAttentionQueueToStorage(next);
+      showSuccessToast("Marked handled", "We'll keep the rest of the queue for you.");
+      return next;
+    });
+  }, []);
+
+  const handleChatAttentionClearAll = useCallback(() => {
+    setChatAttentionQueue((current) => {
+      if (!current.length) {
+        return current;
+      }
+      const confirmMessage =
+        current.length === 1
+          ? "Mark the current chat ping as handled?"
+          : `Mark all ${current.length} chat pings as handled?`;
+      const confirmed = typeof window === "undefined" ? true : window.confirm(confirmMessage);
+      if (!confirmed) {
+        return current;
+      }
+      writeChatAttentionQueueToStorage([]);
+      showSuccessToast("Attention cleared", "We cleared the inbox alerts from this list.");
+      return [];
+    });
+  }, []);
 
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const handleDiscover = useCallback(() => router.push("/"), [router]);
@@ -331,12 +384,23 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                     ))}
                   </div>
 
+                  {chatAttentionQueue.length ? (
+                    <MessagesAttentionSummary
+                      queue={chatAttentionQueue}
+                      onSelectConversation={handleSelectConversation}
+                      onEntryHandled={handleChatAttentionEntryHandled}
+                      onClearAll={handleChatAttentionClearAll}
+                    />
+                  ) : null}
+
                   <div className="mt-5 rounded-2xl border border-border/50 bg-background/40 p-4">
                     <ConversationList
                       conversations={filteredConversations}
                       onSelectConversation={handleSelectConversation}
                       emptyState={emptyStateByFilter[statusFilter]}
                       emptyStateAction={emptyStateAction}
+                      attentionQueue={chatAttentionQueue}
+                      onAttentionEntryHandled={handleChatAttentionEntryHandled}
                     />
                   </div>
                 </section>
@@ -576,5 +640,106 @@ function MessagesConversationPreview() {
         </div>
       </div>
     </section>
+  );
+}
+
+
+type MessagesAttentionSummaryProps = {
+  queue: EventChatAttentionPayload[];
+  onSelectConversation: (conversationId: string) => void;
+  onEntryHandled?: (entryId: string) => void;
+  onClearAll?: () => void;
+};
+
+function MessagesAttentionSummary({ queue, onSelectConversation, onEntryHandled, onClearAll }: MessagesAttentionSummaryProps) {
+  if (!Array.isArray(queue) || queue.length === 0) {
+    return null;
+  }
+
+  const queueCountLabel = queue.length === 1 ? "1 chat awaiting a reply" : `${queue.length} chats awaiting replies`;
+
+  return (
+    <div className="mt-5 rounded-3xl border border-primary/30 bg-primary/5 p-4 text-primary shadow-inner shadow-black/5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/70">Attention</p>
+          <h3 className="font-serif text-xl font-semibold text-primary">Guests needing replies</h3>
+          <p className="text-xs text-primary/80">{queueCountLabel}</p>
+        </div>
+        {onClearAll ? (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 hover:text-primary/90"
+          >
+            Mark all handled
+          </button>
+        ) : null}
+      </div>
+      <ul className="mt-4 space-y-3">
+        {queue.map((entry) => (
+          <MessagesAttentionEntry
+            key={entry.id ?? `${entry.snippet}-${entry.timestampISO}`}
+            entry={entry}
+            onSelectConversation={onSelectConversation}
+            onEntryHandled={onEntryHandled}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+type MessagesAttentionEntryProps = {
+  entry: EventChatAttentionPayload;
+  onSelectConversation: (conversationId: string) => void;
+  onEntryHandled?: (entryId: string) => void;
+};
+
+function MessagesAttentionEntry({ entry, onSelectConversation, onEntryHandled }: MessagesAttentionEntryProps) {
+  if (!entry?.id) {
+    return null;
+  }
+
+  const label = entry.authorName ?? "Guest thread";
+  const relativeLabel = formatRelativeTime(entry.timestampISO);
+  const snippet = entry.snippet?.trim();
+
+  return (
+    <li className="rounded-2xl border border-primary/25 bg-background/80 p-4 shadow-sm shadow-primary/5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <AlertTriangle className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{label}</p>
+            {entry.helperText ? (
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">{entry.helperText}</p>
+            ) : null}
+          </div>
+        </div>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">{relativeLabel}</span>
+      </div>
+      {snippet ? <p className="mt-2 text-sm text-foreground/90">{snippet}</p> : null}
+      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
+        <button
+          type="button"
+          onClick={() => onSelectConversation(entry.id as string)}
+          className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-primary transition hover:border-primary/50"
+        >
+          Open chat
+        </button>
+        {onEntryHandled ? (
+          <button
+            type="button"
+            onClick={() => onEntryHandled(entry.id as string)}
+            className="rounded-full border border-primary/30 px-3 py-1 text-primary/80 transition hover:border-primary/60"
+          >
+            Mark handled
+          </button>
+        ) : null}
+      </div>
+    </li>
   );
 }
