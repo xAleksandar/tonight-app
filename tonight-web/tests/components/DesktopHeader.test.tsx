@@ -245,4 +245,32 @@ describe('DesktopHeader', () => {
     expect(onResume).toHaveBeenCalledTimes(1);
   });
 
+  it('adds a quick snooze shortcut that uses the preferred duration', () => {
+    const onSnooze = vi.fn();
+    const queue = [
+      {
+        id: 'entry-quick',
+        authorName: 'Lena',
+        snippet: 'Need parking tips',
+        href: '/chat/lena',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <DesktopHeader
+        title='Tonight event'
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        chatAction={{ href: '/chat/demo', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={10}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick snooze chat attention alerts.*10 min/i }));
+    expect(onSnooze).toHaveBeenCalledWith(10);
+  });
+
 });

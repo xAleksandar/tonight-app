@@ -1412,6 +1412,31 @@ describe('EventInsideExperience', () => {
     expect(onResume).toHaveBeenCalledTimes(1);
   });
 
+  it('offers a quick snooze shortcut that respects the preferred duration', () => {
+    const onSnooze = vi.fn();
+    const queue = [
+      {
+        id: 'msg-quick',
+        snippet: 'Need help',
+        authorName: 'Nico',
+        timestampISO: new Date().toISOString(),
+        href: '/chat/jr-quick',
+      },
+    ];
+
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={20}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick snooze chat attention alerts.*20 min/i }));
+    expect(onSnooze).toHaveBeenCalledWith(20);
+  });
+
   it('highlights the preferred snooze duration pill', () => {
     const queue = [
       {

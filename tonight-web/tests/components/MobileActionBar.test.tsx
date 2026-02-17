@@ -313,4 +313,35 @@ describe('MobileActionBar', () => {
     expect(onResume).toHaveBeenCalledTimes(1);
   });
 
+  it('adds a one-tap quick snooze shortcut that uses the preferred duration', () => {
+    const onSnooze = vi.fn();
+    const queue = [
+      {
+        id: 'entry-quick',
+        authorName: 'Maya',
+        snippet: 'Need a parking code',
+        href: '/chat/maya',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{ href: '/chat/abc', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={20}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick snooze chat attention alerts.*20 min/i }));
+    expect(onSnooze).toHaveBeenCalledWith(20);
+  });
+
 });

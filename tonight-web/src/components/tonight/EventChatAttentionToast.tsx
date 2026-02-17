@@ -8,7 +8,7 @@ import type { EventChatAttentionPayload } from "@/components/tonight/event-insid
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime as formatQueueRelativeTime } from "@/lib/chatAttentionHelpers";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
-import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
+import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES, DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
 
 export type EventChatAttentionToastProps = {
   href: string;
@@ -113,6 +113,9 @@ export function EventChatAttentionToast({
   const snoozeBadgeLabel = attentionSnoozed
     ? `Snoozed${snoozeCountdownLabel ? ` · ${snoozeCountdownLabel}` : ""}`
     : null;
+  const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+  const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
+  const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
 
   useEffect(() => {
     if (!attentionPickerAvailable && attentionPickerOpen) {
@@ -204,6 +207,14 @@ export function EventChatAttentionToast({
                           </div>
                         ) : (
                           <div className="inline-flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70">
+                            <button
+                              type="button"
+                              onClick={() => onSnooze(quickSnoozeMinutes)}
+                              className="rounded-full border border-white/25 bg-white/5 px-3 py-1 text-white/85 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                              aria-label={quickSnoozeAriaLabel}
+                            >
+                              {quickSnoozeButtonLabel}
+                            </button>
                             <span className="text-white/50">Snooze:</span>
                             {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
                               const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;

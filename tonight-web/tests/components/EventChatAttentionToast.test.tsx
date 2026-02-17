@@ -280,4 +280,29 @@ describe('EventChatAttentionToast', () => {
     expect(onSnooze).toHaveBeenCalledTimes(1);
   });
 
+  it('adds a quick snooze shortcut that uses the preferred duration inside the toast', () => {
+    const onSnooze = vi.fn();
+
+    render(
+      <EventChatAttentionToast
+        href="/chat/quick"
+        label="Open chat"
+        attentionQueue={[
+          {
+            id: 'entry-quick',
+            snippet: 'Need gate code',
+            authorName: 'Amira',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/amira',
+          },
+        ]}
+        chatAttentionPreferredSnoozeMinutes={10}
+        onSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick snooze chat attention alerts.*10 min/i }));
+    expect(onSnooze).toHaveBeenCalledWith(10);
+  });
+
 });

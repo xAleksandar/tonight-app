@@ -417,3 +417,9 @@ Each run should:
 - Threaded the preference through `EventInsidePageClient` (new storage key, prop plumbing, tests) and refreshed the whole chat-attention test matrix to cover hydration + highlighting.
 - Tests: `cd tonight-web && npx vitest run tests/app/events/EventInsidePageClient.test.tsx tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx`
 - Next: add a one-tap "Snooze for X min" shortcut (using the saved preference) on each surface so hosts can pause alerts with a single press instead of reselecting a pill every time.
+
+## 2026-02-17 06:27 EET — Quick snooze shortcuts everywhere
+- Added a dedicated "Snooze for X min" button to the event hero, desktop header, mobile action bar, and floating toast so hosts can pause chat pings with a single tap that honors their saved duration (falls back to 5 min until a preference exists).
+- Updated all surfaces to share the same aria copy/countdown wiring, tweaked the tests to cover the new control set, and kept the existing duration pills for people who want to switch windows manually.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx tests/app/events/EventInsidePageClient.test.tsx`
+- Next: bring the same quick-snooze/resume affordance into the standalone `/chat/[joinRequestId]` header so hosts can pause alerts without jumping back to the event page.

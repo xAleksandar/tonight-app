@@ -8,7 +8,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 import { classNames } from "@/lib/classNames";
-import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
+import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES, DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
@@ -1019,6 +1019,9 @@ export function EventInsideExperience({
   const heroChatAttentionLeadEntry = chatAttentionLabels.leadEntry;
   const heroChatAttentionLeadHref = heroChatAttentionLeadEntry?.href ?? chatCtaHref;
   const heroChatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(heroChatAttentionLeadEntry);
+  const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+  const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
+  const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && chatAttentionPickerOpen) {
@@ -2288,6 +2291,14 @@ export function EventInsideExperience({
                       </div>
                     ) : (
                       <div className="inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                        <button
+                          type="button"
+                          onClick={() => onChatAttentionSnooze(quickSnoozeMinutes)}
+                          className="rounded-full border border-white/35 bg-white/5 px-3 py-1 text-white/85 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          aria-label={quickSnoozeAriaLabel}
+                        >
+                          {quickSnoozeButtonLabel}
+                        </button>
                         <span className="text-white/50">Snooze:</span>
                         {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
                           const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
@@ -2440,6 +2451,14 @@ export function EventInsideExperience({
                         </div>
                       ) : (
                         <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                          <button
+                            type="button"
+                            onClick={() => onChatAttentionSnooze(quickSnoozeMinutes)}
+                            className="rounded-full border border-white/35 bg-white/5 px-3 py-1 text-white/85 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                            aria-label={quickSnoozeAriaLabel}
+                          >
+                            {quickSnoozeButtonLabel}
+                          </button>
                           <span className="text-white/50">Snooze:</span>
                           {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
                             const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
