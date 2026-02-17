@@ -508,3 +508,17 @@ Each run should:
 - Introduced a clear-draft control that wipes the textarea, purges localStorage, refocuses the composer, and toasts confirmation so people can reset with one tap.
 - Tests: `cd tonight-web && npx vitest run tests/lib/chatDraftStorage.test.ts tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: bubble the saved-draft state into the /messages conversation list (badges + clear affordance) so you can spot and manage drafts without opening each chat.
+
+## 2026-02-17 11:52 EET — Messages list now highlights saved drafts
+- Added a chat-draft storage pub/sub channel and subscription helper so the inbox can react instantly whenever a composer draft is saved or cleared, even across tabs.
+- Upgraded ConversationList with opt-in draft indicators: badges in the header, a detailed draft card with timestamp + snippet, and an inline clear control wired to both local state and storage, so hosts can triage drafts without opening each chat.
+- Passed the new indicators through /messages, plus expanded the Vitest suite (storage + ConversationList) to lock the behavior and prevent regressions.
+- Tests: `cd tonight-web && npx vitest run tests/lib/chatDraftStorage.test.ts tests/components/ConversationList.test.tsx`
+- Next: extend the Guests needing replies rail with a "Drafts waiting" chip so hosts can jump straight to threads that have unsent replies queued up.
+
+## 2026-02-17 12:15 EET — Guests needing replies rail spots saved drafts
+- Hydrated the /messages page with chat-draft storage, tracked which conversations have unsent replies, and taught the Guests needing replies rail to surface a new "Drafts waiting" chip that jumps straight to the freshest draft thread.
+- Hooked the jump action into the existing scroll/highlight helper so draft chats come into view in the inbox, and added React Testing Library coverage for the new chip behavior.
+- Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-attention-summary.test.tsx`
+- Next: mirror the Drafts waiting shortcut in the Messages desktop header + mobile action bar so the quick picker stays accessible even after you scroll past the rail.
+

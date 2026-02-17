@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BadgeCheck, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Edit3, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { ConversationList } from "@/components/chat/ConversationList";
@@ -30,6 +30,7 @@ import {
   CHAT_ATTENTION_SNOOZE_STORAGE_KEY,
 } from "@/lib/chatAttentionStorage";
 import { showSuccessToast } from "@/lib/toast";
+import { readChatDraftMapFromStorage, subscribeToChatDraftStorage, type ChatDraftMap } from "@/lib/chatDraftStorage";
 import type { SocketMessagePayload } from "@/lib/socket-shared";
 
 export default function MessagesPage() {
@@ -90,6 +91,10 @@ export type MessagesAttentionJumpTarget = {
   filter: ConversationFilter;
 };
 
+type DraftConversationTarget = MessagesAttentionJumpTarget & {
+  updatedAt: string;
+};
+
 export const findMessagesAttentionJumpTarget = (
   conversations: ConversationPreview[],
   queue?: EventChatAttentionPayload[] | null
@@ -136,6 +141,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ConversationFilter>("all");
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
+  const [chatDraftMap, setChatDraftMap] = useState<ChatDraftMap>({});
   const [pendingAttentionScrollTarget, setPendingAttentionScrollTarget] = useState<string | null>(null);
 
   const [chatAttentionSnoozedUntil, setChatAttentionSnoozedUntil] = useState<string | null>(null);
@@ -204,6 +210,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     setChatAttentionQueue(readChatAttentionQueueFromStorage());
     return subscribeToChatAttentionQueueStorage((nextQueue) => {
       setChatAttentionQueue((current) => (chatAttentionQueuesMatch(current, nextQueue) ? current : nextQueue));
+    });
+  }, []);
+
+  useEffect(() => {
+    setChatDraftMap(readChatDraftMapFromStorage());
+    return subscribeToChatDraftStorage((next) => {
+      setChatDraftMap(next);
     });
   }, []);
 
@@ -332,6 +345,49 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   );
   const canJumpToWaitingGuests = Boolean(attentionJumpTarget);
 
+  const draftJumpTargets = useMemo(() => {
+    if (!Array.isArray(conversations) || conversations.length === 0) {
+      return [] as DraftConversationTarget[];
+    }
+    const conversationLookup = new Map<string, ConversationPreview>();
+    conversations.forEach((conversation) => {
+      if (conversation?.id) {
+        conversationLookup.set(conversation.id, conversation);
+      }
+    });
+    const parseTime = (value: string | undefined) => {
+      if (!value) {
+        return 0;
+      }
+      const timestamp = Date.parse(value);
+      return Number.isNaN(timestamp) ? 0 : timestamp;
+    };
+    return Object.entries(chatDraftMap)
+      .reduce<DraftConversationTarget[]>((acc, [conversationId, payload]) => {
+        if (!conversationId || conversationId.startsWith("demo-")) {
+          return acc;
+        }
+        const content = payload?.content?.trim();
+        if (!content) {
+          return acc;
+        }
+        const conversation = conversationLookup.get(conversationId);
+        if (!conversation) {
+          return acc;
+        }
+        acc.push({
+          conversationId,
+          filter: conversation.status,
+          updatedAt: payload?.updatedAt ?? new Date().toISOString(),
+        });
+        return acc;
+      }, [])
+      .sort((a, b) => parseTime(b.updatedAt) - parseTime(a.updatedAt));
+  }, [conversations, chatDraftMap]);
+  const draftsWaitingCount = draftJumpTargets.length;
+  const draftJumpTarget = draftJumpTargets[0] ?? null;
+  const canJumpToDrafts = Boolean(draftJumpTarget);
+
   const filteredConversations = useMemo(() => {
     if (statusFilter === "all") {
       return conversations;
@@ -389,6 +445,14 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     setStatusFilter(attentionJumpTarget.filter);
     setPendingAttentionScrollTarget(attentionJumpTarget.conversationId);
   }, [attentionJumpTarget, setStatusFilter, setPendingAttentionScrollTarget]);
+
+  const handleJumpToDrafts = useCallback(() => {
+    if (!draftJumpTarget) {
+      return;
+    }
+    setStatusFilter(draftJumpTarget.filter);
+    setPendingAttentionScrollTarget(draftJumpTarget.conversationId);
+  }, [draftJumpTarget, setStatusFilter, setPendingAttentionScrollTarget]);
 
   const handleChatAttentionEntryHandled = useCallback((entryId: string) => {
     if (!entryId) {
@@ -715,6 +779,8 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                       chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
                       onChatAttentionSnooze={handleChatAttentionSnooze}
                       onChatAttentionResume={handleChatAttentionResume}
+                      draftsWaitingCount={draftsWaitingCount}
+                      onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
                     />
                   ) : null}
 
@@ -988,6 +1054,8 @@ type MessagesAttentionSummaryProps = {
   chatAttentionPreferredSnoozeMinutes?: number | null;
   onChatAttentionSnooze?: (durationMinutes?: number) => void;
   onChatAttentionResume?: () => void;
+  draftsWaitingCount?: number;
+  onJumpToDrafts?: () => void;
 };
 
 export function MessagesAttentionSummary({
@@ -999,12 +1067,16 @@ export function MessagesAttentionSummary({
   chatAttentionPreferredSnoozeMinutes,
   onChatAttentionSnooze,
   onChatAttentionResume,
+  draftsWaitingCount,
+  onJumpToDrafts,
 }: MessagesAttentionSummaryProps) {
   if (!Array.isArray(queue) || queue.length === 0) {
     return null;
   }
 
   const queueCountLabel = queue.length === 1 ? "1 chat awaiting a reply" : `${queue.length} chats awaiting replies`;
+  const showDraftsChip = typeof draftsWaitingCount === "number" && draftsWaitingCount > 0 && typeof onJumpToDrafts === "function";
+  const draftChipLabel = draftsWaitingCount === 1 ? "1 draft waiting" : `${draftsWaitingCount ?? 0} drafts waiting`;
 
   return (
     <div className="mt-5 rounded-3xl border border-primary/30 bg-primary/5 p-4 text-primary shadow-inner shadow-black/5">
@@ -1014,15 +1086,28 @@ export function MessagesAttentionSummary({
           <h3 className="font-serif text-xl font-semibold text-primary">Guests needing replies</h3>
           <p className="text-xs text-primary/80">{queueCountLabel}</p>
         </div>
-        {onClearAll ? (
-          <button
-            type="button"
-            onClick={onClearAll}
-            className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 hover:text-primary/90"
-          >
-            Mark all handled
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {showDraftsChip ? (
+            <button
+              type="button"
+              onClick={() => onJumpToDrafts?.()}
+              className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-400/15 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-100 transition hover:border-sky-300/60 hover:text-white"
+            >
+              <Edit3 className="h-3.5 w-3.5" aria-hidden />
+              <span>Drafts waiting</span>
+              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">{draftsWaitingCount}</span>
+            </button>
+          ) : null}
+          {onClearAll ? (
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 hover:text-primary/90"
+            >
+              Mark all handled
+            </button>
+          ) : null}
+        </div>
       </div>
       <ul className="mt-4 space-y-3">
         {queue.map((entry) => (

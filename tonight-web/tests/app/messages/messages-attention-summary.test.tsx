@@ -112,4 +112,22 @@ describe('MessagesAttentionSummary', () => {
     fireEvent.click(resumeButton);
     expect(onResume).toHaveBeenCalledTimes(1);
   });
+
+  it('renders a drafts waiting chip that jumps to saved drafts', () => {
+    const onJumpToDrafts = vi.fn();
+
+    render(
+      <MessagesAttentionSummary
+        queue={stubQueue()}
+        onSelectConversation={noop}
+        draftsWaitingCount={2}
+        onJumpToDrafts={onJumpToDrafts}
+      />
+    );
+
+    const chip = screen.getByRole('button', { name: /drafts waiting/i });
+    expect(chip).toBeInTheDocument();
+    fireEvent.click(chip);
+    expect(onJumpToDrafts).toHaveBeenCalledTimes(1);
+  });
 });
