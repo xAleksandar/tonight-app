@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { CheckCircle2, ChevronDown, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Sparkles, Users } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const EventMapView = dynamic(() => import("@/components/EventMapView"), { ssr: false });
 
 import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
@@ -82,6 +85,7 @@ export type EventInsideExperienceProps = {
     description?: string | null;
     startDateISO?: string | null;
     locationName?: string | null;
+    location?: { latitude: number; longitude: number } | null;
     vibeTags?: string[];
     entryNotes?: string[];
     capacityLabel?: string;
@@ -758,7 +762,6 @@ export function EventInsideExperience({
   }, [acknowledgeHostActivityUpdates, hasHostActivityNotice, hostActivityEntries.length, latestHostActivityTimestamp]);
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
-  const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
   const eventMomentLabel = useMemo(() => formatEventShareMoment(event.startDateISO), [event.startDateISO]);
   const resolvedEventShareUrl = eventShareUrl ?? `https://tonight.app/events/${event.id}`;
   const hostFriendInviteTemplateOptions = useMemo(
@@ -2139,384 +2142,52 @@ export function EventInsideExperience({
 
   return (
     <section className="space-y-8">
-      <header className="rounded-3xl border border-white/15 bg-white/5 p-6 text-white shadow-2xl shadow-primary/5 backdrop-blur">
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={classNames(
-              "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-              viewerRoleCopy[viewerRole].tone
-            )}
-          >
-            {viewerRoleCopy[viewerRole].label}
-          </span>
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <Clock3 className="h-4 w-4" />
-            <span>{formatDateTime(event.startDateISO) ?? "Time TBA"}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <MapPin className="h-4 w-4" />
-            <span>{event.locationName ?? "Location coming soon"}</span>
-          </div>
-        </div>
-        <div className="mt-6 space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">{event.title}</h1>
-          {event.description ? <p className="text-base text-white/70">{event.description}</p> : null}
-          {event.vibeTags && event.vibeTags.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {event.vibeTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/70"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        {chatPreview ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              <div className="flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Chat status</p>
-                <p className="mt-1 text-sm text-white/80 line-clamp-2">{heroChatSummaryCopy}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {heroChatBadge ? (
-                    <span
-                      className={classNames(
-                        "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
-                        heroChatBadge.tone
-                      )}
-                    >
-                      {heroChatBadge.label}
-                    </span>
-                  ) : null}
-                  {heroChatTimestampChip ? (
-                    <span className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                      {heroChatTimestampChip}
-                    </span>
-                  ) : null}
-                  {heroChatParticipantChip ? (
-                    <span className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                      {heroChatParticipantChip}
-                    </span>
-                  ) : null}
-                  {heroChatFallbackChip ? (
-                    <span className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/70">
-                      {heroChatFallbackChip}
-                    </span>
-                  ) : null}
-                  {heroChatAttentionLeadChip ? (
-                    heroChatAttentionLeadHref ? (
-                      <Link
-                        href={heroChatAttentionLeadHref}
-                        prefetch={false}
-                        onClick={handleChatAttentionNavigation}
-                        aria-label={heroChatAttentionLeadAriaLabel}
-                        className="inline-flex items-center justify-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:bg-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                      >
-                        {heroChatAttentionLeadChip}
-                        <span aria-hidden className="text-[10px]">↗</span>
-                      </Link>
-                    ) : (
-                      <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                        {heroChatAttentionLeadChip}
-                      </span>
-                    )
-                  ) : null}
-                  {heroChatAttentionLeadEntry?.id && onChatAttentionEntryHandled ? (
-                    <button
-                      type="button"
-                      onClick={() => handleChatAttentionEntryHandled(heroChatAttentionLeadEntry.id)}
-                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                      aria-label={`Mark handled${heroChatAttentionLeadEntry.authorName ? ` for ${heroChatAttentionLeadEntry.authorName}` : ''}`}
-                    >
-                      Mark handled
-                    </button>
-                  ) : null}
-                  {heroChatAttentionWaitingChip ? (
-                    chatAttentionPickerAvailable ? (
-                      <button
-                        type="button"
-                        onClick={() => setChatAttentionPickerOpen((prev) => !prev)}
-                        aria-expanded={chatAttentionPickerOpen}
-                        aria-controls="chat-attention-picker"
-                        aria-label={`View queued guests (${heroChatAttentionWaitingChip})`}
-                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary/80 transition hover:border-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                      >
-                        {heroChatAttentionWaitingChip}
-                        <ChevronDown
-                          className={classNames(
-                            "h-3 w-3 transition-transform",
-                            chatAttentionPickerOpen ? "rotate-180" : undefined
-                          )}
-                          aria-hidden
-                        />
-                      </button>
-                    ) : (
-                      <span className="rounded-full border border-primary/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                        {heroChatAttentionWaitingChip}
-                      </span>
-                    )
-                  ) : null}
-                  {heroChatAttentionHasQueue && onChatAttentionClearAll ? (
-                    <button
-                      type="button"
-                      onClick={handleChatAttentionClearAll}
-                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                      aria-label="Mark all chat attention entries as handled"
-                    >
-                      Mark all handled
-                    </button>
-                  ) : null}
-                  {heroChatAttentionHasQueue && onChatAttentionSnooze ? (
-                    chatAttentionIsSnoozed ? (
-                      <div className="inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
-                        {chatAttentionSnoozeBadgeText ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-white/25 px-3 py-1 text-white/80">
-                            <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
-                            {chatAttentionSnoozeBadgeText}
-                          </span>
-                        ) : null}
-                        {onChatAttentionResume ? (
-                          <button
-                            type="button"
-                            onClick={onChatAttentionResume}
-                            className="text-primary/70 underline-offset-2 hover:text-primary"
-                            aria-label="Resume chat attention alerts"
-                          >
-                            Resume alerts
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
-                        <button
-                          type="button"
-                          onClick={() => onChatAttentionSnooze(quickSnoozeMinutes)}
-                          className="rounded-full border border-white/35 bg-white/5 px-3 py-1 text-white/85 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                          aria-label={quickSnoozeAriaLabel}
-                        >
-                          {quickSnoozeButtonLabel}
-                        </button>
-                        <span className="text-white/50">Snooze:</span>
-                        {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
-                          const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
-                          return (
-                            <button
-                              key={minutes}
-                              type="button"
-                              onClick={() => onChatAttentionSnooze(minutes)}
-                              className={classNames(
-                                "rounded-full border px-3 py-1 text-white/80 transition hover:border-white/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
-                                isPreferred
-                                  ? "border-white/80 bg-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.25)]"
-                                  : "border-white/25"
-                              )}
-                              aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                              aria-pressed={isPreferred}
-                            >
-                              {minutes} min
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
-                {heroChatAttentionHasQueue ? (
-                  <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                    <span
-                      className={classNames(
-                        "h-1.5 w-1.5 rounded-full bg-primary",
-                        chatAttentionActive ? "animate-pulse" : null
-                      )}
-                      aria-hidden
-                    />
-                    <span>{heroChatAttentionIndicatorLabel}</span>
-                  </div>
-                ) : null}
-                {chatCtaHref ? (
-                  <Link
-                    href={chatCtaHref}
-                    onClick={acknowledgeChatAttention}
-                    className={classNames(
-                      "inline-flex w-full items-center justify-center rounded-full bg-primary/80 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-                      chatAttentionActive ? "shadow-[0_0_25px_rgba(236,72,153,0.45)] animate-[pulse_1.8s_ease-in-out_infinite]" : null
-                    )}
-                  >
-                    {chatCtaLabel}
-                  </Link>
-                ) : isPublicViewer ? (
-                  <button
-                    type="button"
-                    onClick={handleJoinRequest}
-                    disabled={joinRequestStatus !== "idle"}
-                    className="inline-flex w-full items-center justify-center rounded-full bg-primary/80 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {joinRequestStatus === "submitting" ? "Sending request..." : joinRequestStatus === "submitted" ? "Request sent!" : chatCtaLabel}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="inline-flex w-full items-center justify-center rounded-full bg-primary/60 px-5 py-2 text-sm font-semibold text-white opacity-70"
-                    disabled
-                  >
-                    {chatCtaLabel}
-                  </button>
-                )}
-              </div>
-            </div>
-            {chatAttentionPickerAvailable && chatAttentionPickerOpen ? (
-              <div
-                id="chat-attention-picker"
-                className="mt-4 rounded-2xl border border-primary/30 bg-primary/5 p-4"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Queued guests</p>
-                  <button
-                    type="button"
-                    onClick={() => setChatAttentionPickerOpen(false)}
-                    className="text-[11px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
-                  >
-                    Hide list
-                  </button>
-                </div>
-                <ul className="mt-3 space-y-2">
-                  {chatAttentionPickerEntries.map((entry) => {
-                    const label = buildChatAttentionLinkLabel(entry);
-                    const relativeTime = formatRelativeTime(entry.timestampISO);
-                    const href = entry.href.trim();
-                    return (
-                      <li key={entry.id}>
-                        <Link
-                          href={href}
-                          prefetch={false}
-                          onClick={handleChatAttentionNavigation}
-                          aria-label={label}
-                          className="block rounded-2xl border border-white/5 bg-white/5 px-3 py-2 text-left text-white/80 transition hover:border-primary/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-white">{entry.authorName ?? 'Guest thread'}</span>
-                            {relativeTime ? (
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/60">{relativeTime}</span>
-                            ) : null}
-                          </div>
-                          {entry.snippet ? (
-                            <p className="mt-1 text-sm text-white/70 line-clamp-2">{entry.snippet}</p>
-                          ) : null}
-                          {entry.helperText ? (
-                            <p className="mt-1 text-[11px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
-                          ) : null}
-                        </Link>
-                        {onChatAttentionEntryHandled ? (
-                          <div className="mt-1 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleChatAttentionEntryHandled(entry.id)}
-                              className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                              aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
-                            >
-                              Mark handled
-                            </button>
-                          </div>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {(heroChatAttentionHasQueue && onChatAttentionClearAll) || (heroChatAttentionHasQueue && onChatAttentionSnooze) ? (
-                  <div className="mt-3 flex flex-wrap items-center justify-end gap-3 text-right">
-                    {heroChatAttentionHasQueue && onChatAttentionSnooze ? (
-                      chatAttentionIsSnoozed ? (
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
-                          {chatAttentionSnoozeBadgeText ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-white/25 px-3 py-1 text-white/80">
-                              <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
-                              {chatAttentionSnoozeBadgeText}
-                            </span>
-                          ) : null}
-                          {onChatAttentionResume ? (
-                            <button
-                              type="button"
-                              onClick={onChatAttentionResume}
-                              className="text-primary/70 underline-offset-2 hover:text-primary"
-                              aria-label="Resume chat attention alerts"
-                            >
-                              Resume alerts
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
-                          <button
-                            type="button"
-                            onClick={() => onChatAttentionSnooze(quickSnoozeMinutes)}
-                            className="rounded-full border border-white/35 bg-white/5 px-3 py-1 text-white/85 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                            aria-label={quickSnoozeAriaLabel}
-                          >
-                            {quickSnoozeButtonLabel}
-                          </button>
-                          <span className="text-white/50">Snooze:</span>
-                          {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
-                            const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
-                            return (
-                              <button
-                                key={minutes}
-                                type="button"
-                                onClick={() => onChatAttentionSnooze(minutes)}
-                                className={classNames(
-                                  "rounded-full border px-3 py-1 text-white/80 transition hover:border-white/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
-                                  isPreferred
-                                    ? "border-white/80 bg-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.25)]"
-                                    : "border-white/25"
-                                )}
-                                aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                                aria-pressed={isPreferred}
-                              >
-                                {minutes} min
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )
-                    ) : null}
-                    {heroChatAttentionHasQueue && onChatAttentionClearAll ? (
-                      <button
-                        type="button"
-                        onClick={handleChatAttentionClearAll}
-                        className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                        aria-label="Mark all chat attention entries as handled"
-                      >
-                        Mark all handled
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {!chatCtaHref && chatCtaDisabledReason ? (
-              <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           <Card>
             <SectionHeading icon={Sparkles} title="Tonight's plan" subtitle="Everything guests need once they're inside" />
-            <dl className="grid gap-4 sm:grid-cols-3">
-              {stats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-white/60">{stat.label}</dt>
-                  <dd className="mt-2 text-lg font-semibold text-white">{stat.value}</dd>
-                  {stat.subLabel ? <p className="text-xs text-white/60">{stat.subLabel}</p> : null}
-                </div>
-              ))}
-            </dl>
+
+            {/* Confirmation status moved from header */}
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <span
+                className={classNames(
+                  "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
+                  viewerRoleCopy[viewerRole].tone
+                )}
+              >
+                {viewerRoleCopy[viewerRole].label}
+              </span>
+              <div className="flex items-center gap-2 text-sm text-white/70">
+                <Clock3 className="h-4 w-4" />
+                <span>{formatDateTime(event.startDateISO) ?? "Time TBA"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-white/70">
+                <MapPin className="h-4 w-4" />
+                <span>{event.locationName ?? "Location coming soon"}</span>
+              </div>
+            </div>
+
+            {/* Event map */}
+            {event.location && (
+              <div className="mt-6">
+                <EventMapView
+                  events={[
+                    {
+                      id: event.id,
+                      title: event.title,
+                      locationName: event.locationName ?? "Event location",
+                      location: event.location,
+                      datetimeISO: event.startDateISO ?? new Date().toISOString(),
+                    },
+                  ]}
+                  selectedEventId={event.id}
+                  height={360}
+                  className="w-full rounded-xl overflow-hidden border border-white/10"
+                  mapStyle="mapbox://styles/mapbox/dark-v11"
+                />
+              </div>
+            )}
+
             {event.entryNotes && event.entryNotes.length ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-200">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">Entrance checklist</p>
@@ -2525,91 +2196,6 @@ export function EventInsideExperience({
                     <li key={note}>{note}</li>
                   ))}
                 </ul>
-              </div>
-            ) : null}
-            {hostActivityEntries.length > 0 ? (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
-                    {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
-                  </p>
-                  {isGuestViewer && hostActivityHeaderUnseenLabel ? (
-                    <span
-                      data-testid="host-updates-unseen-count"
-                      className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                    >
-                      {hostActivityHeaderUnseenLabel}
-                    </span>
-                  ) : null}
-                </div>
-                {hasHostActivityNotice ? (
-                  <div className="mt-3 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        scrollHostActivityToTop();
-                        void acknowledgeHostActivityUpdates(latestHostActivityTimestamp);
-                      }}
-                      disabled={hostActivityCursorStatus === "saving"}
-                      className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60 disabled:opacity-60"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                      {hostActivityCursorStatus === "saving" ? "Marking seen…" : `${hostActivityNoticeCtaLabel} · Jump to latest`}
-                    </button>
-                  </div>
-                ) : null}
-                <ul
-                  ref={hostActivityListRef}
-                  data-testid="host-updates-list"
-                  className={hostActivityListClasses}
-                >
-                  {hostActivityEntries.map((activity, index) => {
-                    const entryTimestamp = parseIsoTimestamp(activity?.postedAtISO);
-                    const isNewEntry = Boolean(
-                      isGuestViewer && (!hostActivityLastSeenTimestamp || (entryTimestamp && entryTimestamp > hostActivityLastSeenTimestamp))
-                    );
-
-                    return (
-                      <Fragment key={activity.id}>
-                        {hostActivityDividerIndex === index ? (
-                          <li className="relative flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                            <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
-                            <span>New since you last checked</span>
-                            <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
-                          </li>
-                        ) : null}
-                        <li className="rounded-xl border border-white/5 bg-white/5 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm text-white/80">{activity.message}</p>
-                            {isNewEntry ? (
-                              <span
-                                data-testid="host-update-new-pill"
-                                className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                              >
-                                New
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 text-xs text-white/50">
-                            {activity.authorName ?? host.displayName}
-                            {" · "}
-                            {formatRelativeTime(activity.postedAtISO)}
-                          </p>
-                        </li>
-                      </Fragment>
-                    );
-                  })}
-                </ul>
-                {hostActivityPagination?.hasMore ? (
-                  <button
-                    type="button"
-                    onClick={handleLoadMoreHostUpdates}
-                    className="mt-4 w-full rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={hostActivityLoading}
-                  >
-                    {hostActivityLoading ? "Loading…" : "See earlier updates"}
-                  </button>
-                ) : null}
               </div>
             ) : null}
           </Card>
@@ -3629,43 +3215,6 @@ const formatDateTime = (value?: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(date);
-};
-
-const buildChatAttentionLinkLabel = (entry?: EventChatAttentionPayload | null): string => {
-  const name = entry?.authorName?.trim();
-  if (name) {
-    return `Open chat with ${name}`;
-  }
-  const helper = entry?.helperText?.trim();
-  if (helper) {
-    return helper;
-  }
-  const snippet = entry?.snippet?.trim();
-  if (snippet) {
-    return snippet.length > 60 ? `${snippet.slice(0, 57)}…` : snippet;
-  }
-  return "Open chat thread";
-};
-
-const formatRelativeTime = (value?: string | null) => {
-  if (!value) return "moments ago";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "moments ago";
-  const deltaMs = date.getTime() - Date.now();
-  const deltaMinutes = Math.round(deltaMs / (1000 * 60));
-  if (Math.abs(deltaMinutes) < 1) {
-    return "just now";
-  }
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (Math.abs(deltaMinutes) < 60) {
-    return formatter.format(Math.round(deltaMinutes), "minute");
-  }
-  const deltaHours = Math.round(deltaMinutes / 60);
-  if (Math.abs(deltaHours) < 24) {
-    return formatter.format(deltaHours, "hour");
-  }
-  const deltaDays = Math.round(deltaHours / 24);
-  return formatter.format(deltaDays, "day");
 };
 
 const parseIsoTimestamp = (value?: string | null): number | null => {

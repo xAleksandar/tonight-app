@@ -2,15 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, Edit3, List as ListIcon, Map as MapIcon, MessageCircle } from "lucide-react";
+import { Edit3, List as ListIcon, Map as MapIcon, MessageCircle } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
-import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { classNames } from "@/lib/classNames";
-import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
-import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
-import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
-import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES, DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
+import { formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import type { DraftQuickPickEntry, MobileActionBarProps } from "./MobileActionBar";
 
 export type DesktopHeaderProps = {
@@ -24,8 +20,9 @@ export type DesktopHeaderProps = {
   userDisplayName?: string | null;
   userEmail?: string | null;
   userPhotoUrl?: string | null;
+  // Legacy chat props kept for compatibility with callers (no-op in desktop header)
   chatAction?: MobileActionBarProps["chatAction"];
-  chatAttentionQueue?: EventChatAttentionPayload[] | null;
+  chatAttentionQueue?: unknown;
   chatAttentionSnoozedUntil?: string | null;
   chatAttentionPreferredSnoozeMinutes?: number | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
@@ -40,18 +37,9 @@ export type DesktopHeaderProps = {
   onClearDraft?: (conversationId: string) => void;
 };
 
-type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
-
-const CHAT_BADGE_TONE_CLASS: Record<NonNullable<DesktopChatAction["badgeTone"]>, string> = {
-  highlight: "bg-primary/15 text-primary",
-  success: "bg-emerald-400/15 text-emerald-100",
-  muted: "bg-white/10 text-white/70",
-};
-
 export function DesktopHeader({
   title,
   subtitle,
-  unreadCount = 0,
   onNavigateProfile,
   onNavigateMessages,
   viewMode,
@@ -59,16 +47,6 @@ export function DesktopHeader({
   userDisplayName,
   userEmail,
   userPhotoUrl,
-  chatAction,
-  chatAttentionQueue,
-  chatAttentionSnoozedUntil,
-  chatAttentionPreferredSnoozeMinutes,
-  onChatAttentionEntryHandled,
-  onChatAttentionClearAll,
-  onChatAttentionSnooze,
-  onChatAttentionResume,
-  canJumpToWaitingGuests,
-  onJumpToWaitingGuests,
   draftsWaitingCount,
   onJumpToDrafts,
   draftQuickPickEntries,
@@ -76,46 +54,7 @@ export function DesktopHeader({
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
-  const hasChatAction = Boolean(chatAction?.href && chatAction?.label);
-  const chatBadgeClassName = chatAction?.badgeTone ? CHAT_BADGE_TONE_CLASS[chatAction.badgeTone] : CHAT_BADGE_TONE_CLASS.muted;
-  const chatAttentionLabel = chatAction?.attentionLabel ?? "New chat ping";
-  const [attentionPickerOpen, setAttentionPickerOpen] = useState(false);
-  const [jumpPickerOpen, setJumpPickerOpen] = useState(false);
-  const chatAttentionEntries = useMemo(
-    () => (chatAttentionQueue ?? []).filter((entry): entry is EventChatAttentionPayload => Boolean(entry && entry.id)),
-    [chatAttentionQueue]
-  );
-  const chatAttentionLabels = useMemo(() => buildChatAttentionLabels(chatAttentionEntries), [chatAttentionEntries]);
-  const chatAttentionLeadEntry = chatAttentionLabels.leadEntry;
-  const chatAttentionLeadLabel = chatAttentionLabels.leadLabel ?? chatAction?.attentionSourceLabel;
-  const chatAttentionLeadHref = chatAttentionLeadEntry?.href ?? chatAction?.href;
-  const chatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(chatAttentionLeadEntry);
-  const chatAttentionWaitingLabel = chatAttentionLabels.waitingLabel ?? chatAction?.attentionQueueLabel;
-  const chatAttentionPickerEntries = useMemo(
-    () =>
-      chatAttentionEntries.filter(
-        (entry): entry is EventChatAttentionPayload & { href: string } => typeof entry?.href === "string" && entry.href.trim().length > 0
-      ),
-    [chatAttentionEntries]
-  );
-  const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
-  const chatAttentionHasEntries = chatAttentionEntries.length > 0;
-  const { isActive: chatAttentionIsSnoozed, label: chatAttentionSnoozeCountdownLabel } = useSnoozeCountdown(chatAttentionSnoozedUntil);
-  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed && chatAttentionSnoozeCountdownLabel
-    ? `Snoozed · ${chatAttentionSnoozeCountdownLabel}`
-    : chatAttentionIsSnoozed
-      ? "Snoozed"
-      : null;
-  const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
-  const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
-  const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
-  const showJumpAction = Boolean(canJumpToWaitingGuests && onJumpToWaitingGuests);
-  const showQuickJumpPicker = showJumpAction && chatAttentionPickerEntries.length > 0;
-  const jumpQuickPickerEntries = chatAttentionPickerEntries.slice(0, 3);
-  const jumpPickerRemainderCount = Math.max(chatAttentionPickerEntries.length - jumpQuickPickerEntries.length, 0);
-  const hasAdditionalJumpEntries = jumpPickerRemainderCount > 0;
-  const queuedGuestCount = chatAttentionEntries.length;
-  const queuedGuestCountLabel = queuedGuestCount > 0 ? `${queuedGuestCount} queued` : null;
+
   const showDraftsShortcut =
     typeof draftsWaitingCount === "number" && draftsWaitingCount > 0 && typeof onJumpToDrafts === "function";
   const draftsWaitingBadgeLabel = draftsWaitingCount && draftsWaitingCount > 99 ? "99+" : String(draftsWaitingCount ?? "");
@@ -130,57 +69,14 @@ export function DesktopHeader({
   );
   const hasDraftQuickPicker = showDraftsShortcut && draftQuickPickEntriesSafe.length > 0;
   const draftQuickPickerTopEntries = draftQuickPickEntriesSafe.slice(0, 3);
-  const draftQuickPickerRemainderCount = Math.max(
-    draftQuickPickEntriesSafe.length - draftQuickPickerTopEntries.length,
-    0
-  );
+  const draftQuickPickerRemainderCount = Math.max(draftQuickPickEntriesSafe.length - draftQuickPickerTopEntries.length, 0);
   const [draftPickerOpen, setDraftPickerOpen] = useState(false);
-
-
-  useEffect(() => {
-    if (!chatAttentionPickerAvailable && attentionPickerOpen) {
-      setAttentionPickerOpen(false);
-    }
-  }, [chatAttentionPickerAvailable, attentionPickerOpen]);
-
-  useEffect(() => {
-    if ((!hasAdditionalJumpEntries || !showJumpAction) && jumpPickerOpen) {
-      setJumpPickerOpen(false);
-    }
-  }, [hasAdditionalJumpEntries, jumpPickerOpen, showJumpAction]);
 
   useEffect(() => {
     if ((!hasDraftQuickPicker || draftQuickPickerRemainderCount === 0) && draftPickerOpen) {
       setDraftPickerOpen(false);
     }
   }, [draftPickerOpen, hasDraftQuickPicker, draftQuickPickerRemainderCount]);
-
-  const handleMarkAllHandled = () => {
-    if (!chatAttentionHasEntries) {
-      return;
-    }
-    setAttentionPickerOpen(false);
-    setJumpPickerOpen(false);
-    onChatAttentionClearAll?.();
-  };
-
-  const handleChatAttentionNavigate = () => {
-    chatAction?.onInteract?.();
-    setAttentionPickerOpen(false);
-    setJumpPickerOpen(false);
-  };
-
-  const handleMarkHandled = (entryId?: string | null) => {
-    if (!entryId) {
-      return;
-    }
-    onChatAttentionEntryHandled?.(entryId);
-  };
-
-  const handleJumpAction = () => {
-    onJumpToWaitingGuests?.();
-    setJumpPickerOpen(false);
-  };
 
   const renderDraftsShortcutButton = (options?: { fullWidth?: boolean }) => {
     if (!showDraftsShortcut || !onJumpToDrafts) {
@@ -343,371 +239,7 @@ export function DesktopHeader({
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-4">
-        {hasChatAction ? (
-          <div className="flex w-full max-w-xs flex-col items-end gap-1 text-right">
-            <Link
-              href={chatAction!.href}
-              prefetch={false}
-              onClick={chatAction?.onInteract}
-              className={classNames(
-                "inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                chatAction?.attentionActive ? "shadow-[0_0_35px_rgba(236,72,153,0.45)] animate-[pulse_2s_ease-in-out_infinite]" : undefined
-              )}
-              aria-label={`Open chat (${chatAction!.label})`}
-            >
-              <span>{chatAction!.label}</span>
-              {chatAction?.badgeLabel ? (
-                <span
-                  className={classNames(
-                    "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
-                    chatBadgeClassName
-                  )}
-                >
-                  {chatAction.badgeLabel}
-                </span>
-              ) : null}
-            </Link>
-            {chatAction?.attentionActive ? (
-              <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
-                <span>{chatAttentionLabel}</span>
-                {chatAttentionHasEntries && onChatAttentionClearAll ? (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllHandled}
-                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                    aria-label="Mark all chat attention entries as handled"
-                  >
-                    Mark all handled
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            {chatAttentionLeadLabel || chatAttentionWaitingLabel ? (
-              <div className="flex flex-wrap justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                {chatAttentionLeadLabel ? (
-                  chatAttentionLeadHref ? (
-                    <Link
-                      href={chatAttentionLeadHref}
-                      prefetch={false}
-                      onClick={handleChatAttentionNavigate}
-                      aria-label={chatAttentionLeadAriaLabel}
-                      className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-primary/90 transition hover:bg-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                    >
-                      {chatAttentionLeadLabel}
-                      <span aria-hidden className="text-[10px]">↗</span>
-                    </Link>
-                  ) : (
-                    <span className="rounded-full bg-primary/15 px-3 py-1 text-primary/90">{chatAttentionLeadLabel}</span>
-                  )
-                ) : null}
-                {chatAttentionLeadEntry?.id && onChatAttentionEntryHandled ? (
-                  <button
-                    type="button"
-                    onClick={() => handleMarkHandled(chatAttentionLeadEntry.id)}
-                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                    aria-label={`Mark handled${chatAttentionLeadEntry.authorName ? ` for ${chatAttentionLeadEntry.authorName}` : ''}`}
-                  >
-                    Mark handled
-                  </button>
-                ) : null}
-                {chatAttentionWaitingLabel ? (
-                  chatAttentionPickerAvailable ? (
-                    <button
-                      type="button"
-                      onClick={() => setAttentionPickerOpen((prev) => !prev)}
-                      aria-expanded={attentionPickerOpen}
-                      aria-controls="desktop-chat-attention-picker"
-                      aria-label={`View queued guests (${chatAttentionWaitingLabel})`}
-                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-primary/80 transition hover:border-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                    >
-                      {chatAttentionWaitingLabel}
-                      <ChevronDown
-                        className={classNames("h-3 w-3 transition-transform", attentionPickerOpen ? "rotate-180" : undefined)}
-                        aria-hidden
-                      />
-                    </button>
-                  ) : (
-                    <span className="rounded-full border border-primary/30 px-3 py-1 text-primary/70">{chatAttentionWaitingLabel}</span>
-                  )
-                ) : null}
-              </div>
-            ) : null}
-            {chatAttentionHasEntries && onChatAttentionSnooze ? (
-              chatAttentionIsSnoozed ? (
-                <div className="mt-1 inline-flex flex-wrap items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {chatAttentionSnoozeLabel ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1 text-white/80">
-                      <span className="h-1 w-1 rounded-full bg-white/70" aria-hidden />
-                      {chatAttentionSnoozeLabel}
-                    </span>
-                  ) : null}
-                  {onChatAttentionResume ? (
-                    <button
-                      type="button"
-                      onClick={onChatAttentionResume}
-                      className="text-primary/70 underline-offset-2 hover:text-primary"
-                      aria-label="Resume chat attention alerts"
-                    >
-                      Resume alerts
-                    </button>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="mt-1 flex flex-wrap items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <button
-                    type="button"
-                    onClick={() => onChatAttentionSnooze(quickSnoozeMinutes)}
-                    className="rounded-full border border-white/25 bg-white/5 px-3 py-1 text-white transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                    aria-label={quickSnoozeAriaLabel}
-                  >
-                    {quickSnoozeButtonLabel}
-                  </button>
-                  <span className="text-muted-foreground/70">Snooze:</span>
-                  {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
-                    const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
-                    return (
-                      <button
-                        key={minutes}
-                        type="button"
-                        onClick={() => onChatAttentionSnooze(minutes)}
-                        className={classNames(
-                          "rounded-full border px-3 py-1 text-muted-foreground transition hover:border-white/40 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
-                          isPreferred
-                            ? "border-white/60 bg-white/10 text-white"
-                            : "border-white/15"
-                        )}
-                        aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                        aria-pressed={isPreferred}
-                      >
-                        {minutes} min
-                      </button>
-                    );
-                  })}
-                </div>
-              )
-            ) : null}
-            {chatAttentionPickerAvailable && attentionPickerOpen ? (
-              <div
-                id="desktop-chat-attention-picker"
-                className="mt-2 w-full rounded-2xl border border-primary/30 bg-primary/5 p-3 text-left"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Queued guests</p>
-                  <button
-                    type="button"
-                    onClick={() => setAttentionPickerOpen(false)}
-                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
-                  >
-                    Hide list
-                  </button>
-                </div>
-                <ul className="space-y-2">
-                  {chatAttentionPickerEntries.map((entry) => {
-                    const href = entry.href.trim();
-                    const label = buildChatAttentionLinkLabel(entry);
-                    const relativeTime = formatRelativeTime(entry.timestampISO);
-                    return (
-                      <li key={entry.id}>
-                        <Link
-                          href={href}
-                          prefetch={false}
-                          onClick={handleChatAttentionNavigate}
-                          aria-label={label}
-                          className="block rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-white/80 transition hover:border-primary/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-white">{entry.authorName ?? "Guest thread"}</span>
-                            {relativeTime ? (
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/60">{relativeTime}</span>
-                            ) : null}
-                          </div>
-                          {entry.snippet ? <p className="mt-1 text-sm text-white/70 line-clamp-2">{entry.snippet}</p> : null}
-                          {entry.helperText ? (
-                            <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
-                          ) : null}
-                        </Link>
-                        {onChatAttentionEntryHandled ? (
-                          <div className="mt-1 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleMarkHandled(entry.id)}
-                              className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                              aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
-                            >
-                              Mark handled
-                            </button>
-                          </div>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {chatAttentionHasEntries && onChatAttentionClearAll ? (
-                  <div className="mt-2 text-right">
-                    <button
-                      type="button"
-                      onClick={handleMarkAllHandled}
-                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                      aria-label="Mark all chat attention entries as handled"
-                    >
-                      Mark all handled
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {showJumpAction ? (
-              <div className="mt-2 w-full rounded-2xl border border-primary/25 bg-primary/5 p-3 text-left text-primary">
-                <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide">
-                  <span className="inline-flex items-center gap-1 text-primary/80">
-                    <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Guests needing replies
-                  </span>
-                  {queuedGuestCountLabel ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary/90">{queuedGuestCountLabel}</span>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleJumpAction}
-                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                  aria-label="Jump to the guests waiting for a reply"
-                >
-                  <AlertTriangle className="h-4 w-4" aria-hidden />
-                  <span className="flex items-center gap-2">
-                    Jump to waiting guests
-                    {queuedGuestCountLabel ? (
-                      <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary/90">{queuedGuestCountLabel}</span>
-                    ) : null}
-                  </span>
-                </button>
-                {chatAttentionLeadLabel ? (
-                  <p className="mt-2 text-[11px] text-primary/80">
-                    {chatAttentionLeadLabel}
-                    {chatAttentionLeadEntry?.snippet ? ` · ${chatAttentionLeadEntry.snippet}` : null}
-                  </p>
-                ) : null}
-                {showQuickJumpPicker ? (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-primary/70">
-                      <span>Quick picker</span>
-                      {chatAttentionWaitingLabel ? <span>{chatAttentionWaitingLabel}</span> : null}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {jumpQuickPickerEntries.map((entry) => {
-                        const href = entry.href.trim();
-                        const label = buildChatAttentionLinkLabel(entry);
-                        const relativeTime = formatRelativeTime(entry.timestampISO);
-                        return (
-                          <span key={entry.id} className="inline-flex items-center gap-1">
-                            <Link
-                              href={href}
-                              prefetch={false}
-                              onClick={handleChatAttentionNavigate}
-                              aria-label={label}
-                              className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] text-primary/90 transition hover:border-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                            >
-                              <span>{entry.authorName ?? "Guest thread"}</span>
-                              {relativeTime ? <span className="text-[9px] text-primary/60">{relativeTime}</span> : null}
-                            </Link>
-                            {entry.id && onChatAttentionEntryHandled ? (
-                              <button
-                                type="button"
-                                onClick={() => handleMarkHandled(entry.id)}
-                                className="text-[9px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary"
-                                aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
-                              >
-                                Mark
-                              </button>
-                            ) : null}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    {hasAdditionalJumpEntries ? (
-                      <button
-                        type="button"
-                        onClick={() => setJumpPickerOpen((prev) => !prev)}
-                        aria-expanded={jumpPickerOpen}
-                        aria-controls="desktop-chat-attention-jump-picker"
-                        className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
-                      >
-                        {jumpPickerOpen ? "Hide remaining guests" : `View remaining guests (+${jumpPickerRemainderCount})`}
-                      </button>
-                    ) : null}
-                    {jumpPickerOpen ? (
-                      <div
-                        id="desktop-chat-attention-jump-picker"
-                        className="rounded-2xl border border-primary/30 bg-primary/10 p-3"
-                      >
-                        <ul className="space-y-2">
-                          {chatAttentionPickerEntries.map((entry) => {
-                            const href = entry.href.trim();
-                            const label = buildChatAttentionLinkLabel(entry);
-                            const relativeTime = formatRelativeTime(entry.timestampISO);
-                            return (
-                              <li key={`${entry.id}-jump`}>
-                                <Link
-                                  href={href}
-                                  prefetch={false}
-                                  onClick={handleChatAttentionNavigate}
-                                  aria-label={label}
-                                  className="block rounded-2xl border border-primary/20 bg-primary/5 px-3 py-2 text-primary/90 transition hover:border-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-semibold">{entry.authorName ?? "Guest thread"}</span>
-                                    {relativeTime ? (
-                                      <span className="text-[10px] font-semibold uppercase tracking-wide text-primary/60">{relativeTime}</span>
-                                    ) : null}
-                                  </div>
-                                  {entry.snippet ? <p className="mt-1 text-sm text-primary/80 line-clamp-2">{entry.snippet}</p> : null}
-                                </Link>
-                                {onChatAttentionEntryHandled ? (
-                                  <div className="mt-1 text-right">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMarkHandled(entry.id)}
-                                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary"
-                                      aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
-                                    >
-                                      Mark handled
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                        {chatAttentionHasEntries && onChatAttentionClearAll ? (
-                          <div className="mt-2 text-right">
-                            <button
-                              type="button"
-                              onClick={handleMarkAllHandled}
-                              className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary"
-                              aria-label="Mark all chat attention entries as handled"
-                            >
-                              Mark all handled
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {showDraftsShortcut ? (
-              <div className="mt-3 w-full space-y-3">
-                {renderDraftsShortcutButton({ fullWidth: true })}
-                {renderDraftQuickPicker({ fullWidth: true })}
-              </div>
-            ) : null}
-            {!chatAction?.attentionActive && chatAction?.helperText ? (
-              <p className="text-xs text-muted-foreground line-clamp-1">{chatAction.helperText}</p>
-            ) : null}
-          </div>
-        ) : null}
-        {!hasChatAction && showDraftsShortcut ? (
+        {showDraftsShortcut ? (
           <div className="flex w-full max-w-xs flex-col gap-3">
             {renderDraftsShortcutButton()}
             {renderDraftQuickPicker()}
@@ -727,11 +259,6 @@ export function DesktopHeader({
           disabled={messagesDisabled}
         >
           <MessageCircle className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-              {unreadCount}
-            </span>
-          )}
         </button>
         <button
           type="button"

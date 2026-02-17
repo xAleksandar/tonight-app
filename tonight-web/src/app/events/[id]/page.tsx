@@ -785,6 +785,12 @@ export default async function EventInsidePage({ params }: PageParams) {
       description: eventRecord.description,
       startDateISO: eventRecord.datetime.toISOString(),
       locationName: eventRecord.locationName,
+      location: eventRecord.latitude && eventRecord.longitude
+        ? {
+            latitude: typeof eventRecord.latitude === 'string' ? parseFloat(eventRecord.latitude) : eventRecord.latitude,
+            longitude: typeof eventRecord.longitude === 'string' ? parseFloat(eventRecord.longitude) : eventRecord.longitude,
+          }
+        : null,
       capacityLabel: `${eventRecord.maxParticipants} spots`,
     },
     host: {

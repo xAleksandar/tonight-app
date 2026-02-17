@@ -1141,7 +1141,7 @@ export default function ChatConversation({
     if (composerRef.current) {
       composerRef.current.focus();
     }
-    showSuccessToast('Draft cleared', 'Start fresh whenever you're ready.');
+    showSuccessToast('Draft cleared', "Start fresh whenever you're ready.");
   }, [hasSavedComposerDraft, joinRequestId, showSuccessToast]);
 
   return (
