@@ -423,3 +423,9 @@ Each run should:
 - Updated all surfaces to share the same aria copy/countdown wiring, tweaked the tests to cover the new control set, and kept the existing duration pills for people who want to switch windows manually.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx tests/app/events/EventInsidePageClient.test.tsx`
 - Next: bring the same quick-snooze/resume affordance into the standalone `/chat/[joinRequestId]` header so hosts can pause alerts without jumping back to the event page.
+
+## 2026-02-17 06:47 EET — Chat header inherits snooze/resume controls
+- Broke out the chat-attention storage keys into `lib/chatAttentionStorage` so both the event layout and standalone chat view can hydrate/update the same snooze + preference data without cross-importing page code.
+- Threaded the `/chat/[joinRequestId]` header with the same quick-snooze button, duration pills, countdown badge, and resume affordance the event page already exposes, including persistence to localStorage + the root data attribute and the wake timer so snoozes auto-expire.
+- Tests: `cd tonight-web && npx vitest run tests/app/events/EventInsidePageClient.test.tsx tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`
+- Next: surface the queued chat-attention entries inside the chat header (lead guest chip + waiting count + mark-handled controls) so hosts can jump between alerting threads without leaving the DM screen.

@@ -3,7 +3,8 @@ import { JSDOM } from 'jsdom';
 import { act, cleanup, render } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EventInsidePageClient, CHAT_ATTENTION_SNOOZE_STORAGE_KEY, CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY } from '@/app/events/[id]/EventInsidePageClient';
+import { EventInsidePageClient } from '@/app/events/[id]/EventInsidePageClient';
+import { CHAT_ATTENTION_SNOOZE_STORAGE_KEY, CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY } from '@/lib/chatAttentionStorage';
 import type { EventInsideExperienceProps } from '@/components/tonight/event-inside/EventInsideExperience';
 import { DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from '@/lib/chatAttentionSnoozeOptions';
 

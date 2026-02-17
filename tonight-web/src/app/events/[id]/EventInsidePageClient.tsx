@@ -12,10 +12,11 @@ import {
   DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES,
   type ChatAttentionSnoozeOptionMinutes,
 } from "@/lib/chatAttentionSnoozeOptions";
-
-export const CHAT_ATTENTION_SNOOZE_STORAGE_KEY = "tonight.chatAttentionSnoozedUntil";
-const CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE = "chatAttentionSnoozedUntil";
-export const CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY = "tonight.chatAttentionPreferredSnoozeMinutes";
+import {
+  CHAT_ATTENTION_SNOOZE_STORAGE_KEY,
+  CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
+  CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE,
+} from "@/lib/chatAttentionStorage";
 
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
