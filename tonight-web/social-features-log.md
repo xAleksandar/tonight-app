@@ -463,3 +463,10 @@ Each run should:
 - Passed the same queue/snooze handlers into the MobileActionBar so the bottom nav exposes the active timer + resume button, keeping mobile hosts in sync when they hide the Guests needing replies section.
 - Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/app/messages/messages-attention-summary.test.tsx`
 - Next: bubble the chat-attention queue count into the Messages filter chips so hosts can jump straight to whichever status still has guests waiting.
+
+## 2026-02-17 09:05 EET — Filter chips highlight queued chat attention
+- Exported a helper that maps the active chat-attention queue to the Messages filter set and surfaced the per-status counts directly inside each chip, including accessibility labels + alert badges so hosts can see where guests are waiting before switching filters.
+- Updated the Messages UI to show a warning pill with the number of queued guests per filter, ensuring the “All/Accepted/Pending” chips advertise live attention data while keeping the existing totals intact.
+- Added a focused Vitest suite for the new helper (`tests/app/messages/messages-filter-attention.test.ts`) and reran the Messages attention summary specs to keep the snooze rail coverage intact.
+- Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-filter-attention.test.ts tests/app/messages/messages-attention-summary.test.tsx`
+- Next: add a one-tap “Jump to waiting guests” action near the filter chips that auto-selects the chip with queued pings and scrolls the list to the first attention thread.

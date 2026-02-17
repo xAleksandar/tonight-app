@@ -50,7 +50,40 @@ export default function MessagesPage() {
   return <AuthenticatedMessagesPage currentUser={user ?? null} />;
 }
 
-type ConversationFilter = "all" | "accepted" | "pending";
+export type ConversationFilter = "all" | "accepted" | "pending";
+
+export const buildMessagesFilterAttentionCounts = (
+  conversations: Array<Pick<ConversationPreview, "id" | "status">>,
+  queue?: EventChatAttentionPayload[] | null
+): Record<ConversationFilter, number> => {
+  const counts: Record<ConversationFilter, number> = {
+    all: 0,
+    accepted: 0,
+    pending: 0,
+  };
+
+  if (!queue?.length) {
+    return counts;
+  }
+
+  const statusByConversationId = new Map<string, ConversationFilter>();
+  conversations.forEach((conversation) => {
+    statusByConversationId.set(conversation.id, conversation.status);
+  });
+
+  queue.forEach((entry) => {
+    if (!entry?.id) {
+      return;
+    }
+    counts.all += 1;
+    const status = statusByConversationId.get(entry.id);
+    if (status === "accepted" || status === "pending") {
+      counts[status] += 1;
+    }
+  });
+
+  return counts;
+};
 
 const chatAttentionQueuesMatch = (a: EventChatAttentionPayload[], b: EventChatAttentionPayload[]): boolean => {
   if (a.length !== b.length) {
@@ -250,6 +283,11 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
     } satisfies Record<ConversationFilter, number>;
   }, [conversations]);
 
+  const attentionCountsByFilter = useMemo(
+    () => buildMessagesFilterAttentionCounts(conversations, chatAttentionQueue),
+    [conversations, chatAttentionQueue]
+  );
+
   const filteredConversations = useMemo(() => {
     if (statusFilter === "all") {
       return conversations;
@@ -335,22 +373,26 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   const headline = hasOnlyPlaceholders ? "You're all caught up" : "Latest conversations";
 
   const filterOptions = useMemo(
-    () => [
-      { id: "all" as ConversationFilter, label: "All", description: "Every chat", count: filterCounts.all },
-      {
-        id: "accepted" as ConversationFilter,
-        label: "Accepted",
-        description: "Ready to chat",
-        count: filterCounts.accepted,
-      },
-      {
-        id: "pending" as ConversationFilter,
-        label: "Pending",
-        description: "Waiting on hosts",
-        count: filterCounts.pending,
-      },
-    ],
-    [filterCounts]
+    () =>
+      [
+        { id: "all" as ConversationFilter, label: "All", description: "Every chat", count: filterCounts.all },
+        {
+          id: "accepted" as ConversationFilter,
+          label: "Accepted",
+          description: "Ready to chat",
+          count: filterCounts.accepted,
+        },
+        {
+          id: "pending" as ConversationFilter,
+          label: "Pending",
+          description: "Waiting on hosts",
+          count: filterCounts.pending,
+        },
+      ].map((option) => ({
+        ...option,
+        attentionCount: attentionCountsByFilter[option.id] ?? 0,
+      })),
+    [filterCounts, attentionCountsByFilter]
   );
 
   const emptyStateByFilter = useMemo<Record<ConversationFilter, { title: string; description: string }>>(
@@ -519,25 +561,45 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {filterOptions.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => setStatusFilter(option.id)}
-                        className={classNames(
-                          "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition",
-                          statusFilter === option.id
-                            ? "border-primary/50 bg-primary/10 text-primary"
-                            : "border-border/60 text-muted-foreground hover:text-foreground"
-                        )}
-                        aria-pressed={statusFilter === option.id}
-                      >
-                        <span>{option.label}</span>
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-foreground/80">
-                          {option.count}
-                        </span>
-                      </button>
-                    ))}
+                    {filterOptions.map((option) => {
+                      const isActive = statusFilter === option.id;
+                      const attentionCount = option.attentionCount ?? 0;
+                      const showAttention = attentionCount > 0;
+                      const attentionLabel =
+                        attentionCount === 1 ? "1 guest needs a reply" : `${attentionCount} guests need replies`;
+
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setStatusFilter(option.id)}
+                          className={classNames(
+                            "inline-flex flex-col items-start gap-1 rounded-2xl border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition",
+                            isActive
+                              ? "border-primary/50 bg-primary/10 text-primary"
+                              : "border-border/60 text-muted-foreground hover:text-foreground"
+                          )}
+                          aria-pressed={isActive}
+                          aria-label={
+                            showAttention
+                              ? `${option.label} conversations, ${attentionLabel}`
+                              : `${option.label} conversations`
+                          }
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <span>{option.label}</span>
+                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-foreground/80">
+                              {option.count}
+                            </span>
+                          </span>
+                          {showAttention ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary">
+                              <AlertTriangle className="h-3 w-3" /> {attentionLabel}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {chatAttentionQueue.length ? (
