@@ -392,3 +392,9 @@ Each run should:
 - Extended the component test suites covering the new controls plus reran `npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx` to lock behavior.
 - Next: persist the snooze window across reloads (localStorage + data attribute) so hosts don’t immediately get re-pinged if they refresh or navigate while snoozed.
 
+## 2026-02-17 05:06 EET — Snooze state survives reloads
+- Hydrated the chat-attention snooze window from `localStorage`, gated persistence behind a hydration flag so we never clobber stored timestamps on first paint, and mirrored the active window into a `data-chat-attention-snoozed-until` attribute for layout consumers.
+- Synced the persisted ISO back into the shared EventLayout + hero/header/mobile chips so snoozed hosts stay quiet across refreshes, plus added a focused DOM test suite (`tests/app/events/EventInsidePageClient.test.tsx`) to cover storage + attribute behavior.
+- Tests: `cd tonight-web && npx vitest run tests/app/events/EventInsidePageClient.test.tsx`.
+- Next: surface a visible snooze countdown badge (hero/header/mobile/toast) so hosts know exactly when alerts will resume and can unsnooze early from any surface.
+
