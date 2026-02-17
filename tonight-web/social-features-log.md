@@ -547,3 +547,9 @@ Each run should:
 - Threaded the handler through `DesktopHeader` + `MessagesAttentionSummary`, giving every quick-picker chip/list entry a nearby “Clear draft” control (matching hover/focus states) so hosts can drop stale replies right from the header or Guests needing replies rail.
 - Updated the Vitest suites covering both components to assert the new buttons + callbacks (`cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/app/messages/messages-attention-summary.test.tsx`).
 - Next: mirror the inline clear-draft controls inside the Mobile Action Bar quick picker so mobile hosts get the same management affordance.
+
+## 2026-02-17 14:08 EET — Mobile drafts quick picker can clear in place
+- Added optional `onClearDraft` plumbing to the Mobile Action Bar so the drafts quick picker now mirrors desktop behavior: each chip carries a lightweight “Clear” control and the expanded list includes full “Clear draft” buttons with proper aria labels.
+- Threaded the handler through Messages mobile, updated the drawer UI, and extended the Vitest coverage to ensure both the chip-level control and the expanded list invoke the callback (`npx vitest run tests/components/MobileActionBar.test.tsx`).
+- Next: surface the same draft-clear affordance inside the floating chat attention toast so mobile hosts can drop stale replies without leaving the realtime alerts.
+

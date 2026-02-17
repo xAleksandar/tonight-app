@@ -59,6 +59,7 @@ export type MobileActionBarProps = {
   draftsWaitingCount?: number | null;
   onJumpToDrafts?: () => void;
   draftQuickPickEntries?: DraftQuickPickEntry[] | null;
+  onClearDraft?: (conversationId: string) => void;
 };
 
 type NavItem = {
@@ -96,6 +97,7 @@ export function MobileActionBar({
   draftsWaitingCount,
   onJumpToDrafts,
   draftQuickPickEntries,
+  onClearDraft,
 }: MobileActionBarProps) {
   const navItems: NavItem[] = [
     { id: "discover" as const, label: "Discover", icon: Compass, onPress: onNavigateDiscover },
@@ -594,17 +596,29 @@ export function MobileActionBar({
               <div className="flex flex-wrap gap-2">
                 {draftQuickPickerTopEntries.map((entry) => {
                   const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                  const clearLabel = entry.participantName ? `Clear draft for ${entry.participantName}` : "Clear draft";
                   return (
-                    <Link
-                      key={entry.conversationId}
-                      href={entry.href}
-                      prefetch={false}
-                      aria-label={`Open drafted chat with ${entry.participantName}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/85 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
-                    >
-                      <span>{entry.participantName}</span>
-                      {relativeTime ? <span className="text-[9px] text-white/60">{relativeTime}</span> : null}
-                    </Link>
+                    <span key={`${entry.conversationId}-chip`} className="inline-flex items-center gap-1">
+                      <Link
+                        href={entry.href}
+                        prefetch={false}
+                        aria-label={`Open drafted chat with ${entry.participantName}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/85 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                      >
+                        <span>{entry.participantName}</span>
+                        {relativeTime ? <span className="text-[9px] text-white/60">{relativeTime}</span> : null}
+                      </Link>
+                      {onClearDraft ? (
+                        <button
+                          type="button"
+                          onClick={() => onClearDraft(entry.conversationId)}
+                          className="text-[9px] font-semibold uppercase tracking-wide text-sky-100/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                          aria-label={clearLabel}
+                        >
+                          Clear
+                        </button>
+                      ) : null}
+                    </span>
                   );
                 })}
               </div>
@@ -626,8 +640,9 @@ export function MobileActionBar({
                   <ul className="space-y-2">
                     {draftQuickPickerEntriesSafe.map((entry) => {
                       const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                      const clearLabel = entry.participantName ? `Clear draft for ${entry.participantName}` : "Clear draft";
                       return (
-                        <li key={`${entry.conversationId}-draft`}>
+                        <li key={`${entry.conversationId}-draft`} className="space-y-1">
                           <Link
                             href={entry.href}
                             prefetch={false}
@@ -644,7 +659,20 @@ export function MobileActionBar({
                               <p className="mt-1 text-sm text-white/75 line-clamp-2">{entry.snippet}</p>
                             ) : null}
                           </Link>
+                          {onClearDraft ? (
+                            <div className="text-right">
+                              <button
+                                type="button"
+                                onClick={() => onClearDraft(entry.conversationId)}
+                                className="text-[10px] font-semibold uppercase tracking-wide text-sky-100/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                                aria-label={clearLabel}
+                              >
+                                Clear draft
+                              </button>
+                            </div>
+                          ) : null}
                         </li>
+
                       );
                     })}
                   </ul>

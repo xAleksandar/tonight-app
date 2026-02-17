@@ -868,6 +868,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         draftsWaitingCount={draftsWaitingCount}
         onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
         draftQuickPickEntries={draftQuickPickEntries}
+        onClearDraft={handleClearDraft}
       />
     </div>
   );

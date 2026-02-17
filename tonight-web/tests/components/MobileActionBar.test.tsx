@@ -299,6 +299,7 @@ describe('MobileActionBar', () => {
   });
 
   it('shows draft quick picker chips with links to each chat', () => {
+    const onClearDraft = vi.fn();
     render(
       <MobileActionBar
         active="messages"
@@ -325,12 +326,72 @@ describe('MobileActionBar', () => {
             snippet: 'Need to confirm timing.',
           },
         ]}
+        onClearDraft={onClearDraft}
       />
     );
 
     expect(screen.getByText(/draft quick picker/i)).toBeInTheDocument();
     const ninaLink = screen.getByRole('link', { name: /open drafted chat with nina/i });
     expect(ninaLink).toHaveAttribute('href', '/chat/jr_1');
+
+    const clearButton = screen.getByRole('button', { name: /clear draft for nina/i });
+    fireEvent.click(clearButton);
+    expect(onClearDraft).toHaveBeenCalledWith('jr_1');
+  });
+
+  it('lets hosts clear drafts from the expanded quick picker list', () => {
+    const onClearDraft = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        draftsWaitingCount={5}
+        onJumpToDrafts={noop}
+        draftQuickPickEntries={[
+          {
+            conversationId: 'jr_1',
+            participantName: 'Nina',
+            href: '/chat/jr_1',
+            updatedAtISO: new Date().toISOString(),
+            snippet: 'Working on a reply right now.',
+          },
+          {
+            conversationId: 'jr_2',
+            participantName: 'Carlos',
+            href: '/chat/jr_2',
+            updatedAtISO: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+            snippet: 'Need to confirm timing.',
+          },
+          {
+            conversationId: 'jr_3',
+            participantName: 'Leo',
+            href: '/chat/jr_3',
+            updatedAtISO: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+            snippet: 'Lining up rides.',
+          },
+          {
+            conversationId: 'jr_4',
+            participantName: 'Priya',
+            href: '/chat/jr_4',
+            updatedAtISO: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+            snippet: 'Saving a spot in line.',
+          },
+        ]}
+        onClearDraft={onClearDraft}
+      />
+    );
+
+    const viewMore = screen.getByRole('button', { name: /view remaining drafts \(\+1\)/i });
+    fireEvent.click(viewMore);
+
+    const clearExpanded = screen.getByRole('button', { name: /clear draft for priya/i });
+    fireEvent.click(clearExpanded);
+    expect(onClearDraft).toHaveBeenCalledWith('jr_4');
   });
 
   it('lets people snooze and resume chat attention alerts on mobile', () => {
