@@ -168,7 +168,25 @@ describe('MobileActionBar', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
-  it('renders chat attention chips when metadata is provided', () => {
+  it('makes chat attention chips clickable and exposes the queued guest list', () => {
+    const onInteract = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mia',
+        snippet: 'Can I bring a friend?',
+        href: '/chat/mia',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
     render(
       <MobileActionBar
         active="discover"
@@ -180,15 +198,23 @@ describe('MobileActionBar', () => {
         chatAction={{
           href: '/chat/abc',
           label: 'Open chat',
-          badgeLabel: 'You\'re caught up',
+          badgeLabel: "You're caught up",
           badgeTone: 'success',
-          attentionSourceLabel: 'Jess pinged',
-          attentionQueueLabel: '2 more waiting',
+          onInteract,
         }}
+        chatAttentionQueue={queue}
       />
     );
 
-    expect(screen.getByText('Jess pinged')).toBeInTheDocument();
-    expect(screen.getByText('2 more waiting')).toBeInTheDocument();
+    const leadChip = screen.getByRole('link', { name: /open chat with jess/i });
+    fireEvent.click(leadChip);
+    expect(onInteract).toHaveBeenCalledTimes(1);
+
+    const toggle = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggle);
+    const miaLink = screen.getByRole('link', { name: /open chat with mia/i });
+    expect(miaLink).toBeInTheDocument();
+    fireEvent.click(miaLink);
+    expect(onInteract).toHaveBeenCalledTimes(2);
   });
 });

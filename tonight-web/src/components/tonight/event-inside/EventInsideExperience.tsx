@@ -8,6 +8,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { useSocket } from "@/hooks/useSocket";
 import { classNames } from "@/lib/classNames";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
+import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 

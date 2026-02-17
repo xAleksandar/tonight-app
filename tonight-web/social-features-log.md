@@ -353,3 +353,10 @@ Each run should:
 - Added a compact “Queued guests” picker that expands inline, lists every live attention payload with timestamps/snippets, and lets hosts jump directly into any `/chat/[joinRequestId]` without waiting for the toast carousel.
 - Updated the EventInsideExperience test suite to cover the new link + picker behavior (`npx vitest run tests/components/EventInsideExperience.test.tsx`).
 - Next: Port the clickable attention chips + picker affordance into the desktop header/mobile action bar so every surface shares the same quick-jump controls.
+
+## 2026-02-17 02:26 EET — Desktop + mobile chat CTAs inherit the queue picker
+- Ported the new chat-attention chip/link treatment into the sticky desktop header and bottom mobile action bar so hosts see the exact guest who pinged (and how many are waiting) even after the hero scrolls away.
+- Added shared relative-time + label helpers, wired the lead chip to deep-link directly into the queued thread, and brought over the toggleable picker so both surfaces can cycle through queued guests without reopening the hero rail.
+- Bolstered the DesktopHeader/MobileActionBar specs to cover the new chips + drawer while keeping the targeted Vitest suites green.
+- Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`.
+- Next: let the floating chat attention toast expose the same quick-jump picker (chip actions + queue list) so users can jump threads even if the header/action bar is off-screen.

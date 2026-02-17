@@ -57,6 +57,7 @@ export function EventLayout({
             userEmail={userEmail}
             userPhotoUrl={userPhotoUrl}
             chatAction={chatAction}
+            chatAttentionQueue={chatAttentionQueue}
           />
 
           <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -87,6 +88,7 @@ export function EventLayout({
         onCreate={() => router.push('/events/create')}
         onOpenProfile={() => router.push('/profile')}
         chatAction={chatAction}
+        chatAttentionQueue={chatAttentionQueue}
       />
     </div>
   );

@@ -112,7 +112,25 @@ describe('DesktopHeader', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
-  it('renders inline attention chips in the desktop header when provided', () => {
+  it('makes chat attention chips actionable and exposes the queued guest list', () => {
+    const onInteract = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Alex',
+        snippet: 'Any dress code?',
+        href: '/chat/alex',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
     render(
       <DesktopHeader
         title="Tonight event"
@@ -121,15 +139,23 @@ describe('DesktopHeader', () => {
         chatAction={{
           href: '/chat/demo',
           label: 'Open chat',
-          badgeLabel: 'You\'re caught up',
+          badgeLabel: "You're caught up",
           badgeTone: 'success',
-          attentionSourceLabel: 'Jess pinged',
-          attentionQueueLabel: '1 more waiting',
+          onInteract,
         }}
+        chatAttentionQueue={queue}
       />
     );
 
-    expect(screen.getByText('Jess pinged')).toBeInTheDocument();
-    expect(screen.getByText('1 more waiting')).toBeInTheDocument();
+    const leadChip = screen.getByRole('link', { name: /open chat with jess/i });
+    fireEvent.click(leadChip);
+    expect(onInteract).toHaveBeenCalledTimes(1);
+
+    const toggle = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggle);
+    const alexLink = screen.getByRole('link', { name: /open chat with alex/i });
+    expect(alexLink).toBeInTheDocument();
+    fireEvent.click(alexLink);
+    expect(onInteract).toHaveBeenCalledTimes(2);
   });
 });
