@@ -126,6 +126,12 @@ export function MobileActionBar({
   const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
   const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
   const showMessagesJumpAction = Boolean(canJumpToWaitingGuests && onJumpToWaitingGuests);
+  const showQuickJumpPicker = showMessagesJumpAction && chatAttentionPickerEntries.length > 0;
+  const jumpQuickPickerEntries = chatAttentionPickerEntries.slice(0, 3);
+  const jumpPickerRemainderCount = Math.max(chatAttentionPickerEntries.length - jumpQuickPickerEntries.length, 0);
+  const hasAdditionalJumpEntries = jumpPickerRemainderCount > 0;
+  const queuedGuestCount = chatAttentionEntries.length;
+  const queuedGuestCountLabel = queuedGuestCount > 0 ? `${queuedGuestCount} queued` : null;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -133,17 +139,27 @@ export function MobileActionBar({
     }
   }, [chatAttentionPickerAvailable, attentionPickerOpen]);
 
+  const [jumpPickerOpen, setJumpPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if ((!hasAdditionalJumpEntries || !showMessagesJumpAction) && jumpPickerOpen) {
+      setJumpPickerOpen(false);
+    }
+  }, [hasAdditionalJumpEntries, jumpPickerOpen, showMessagesJumpAction]);
+
   const handleMarkAllHandled = () => {
     if (!chatAttentionHasEntries) {
       return;
     }
     setAttentionPickerOpen(false);
+    setJumpPickerOpen(false);
     onChatAttentionClearAll?.();
   };
 
   const handleChatAttentionNavigate = () => {
     chatAction?.onInteract?.();
     setAttentionPickerOpen(false);
+    setJumpPickerOpen(false);
   };
 
   const handleMarkHandled = (entryId?: string | null) => {
@@ -381,15 +397,139 @@ export function MobileActionBar({
       ) : null}
       {showMessagesJumpAction ? (
         <div className={classNames("border-b border-white/10 px-4 pb-3 text-white", hasChatAction ? "pt-3" : "pt-4")}>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/60">Guests needing replies</p>
+          <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-white/60">
+            <span>Guests needing replies</span>
+            {queuedGuestCountLabel ? (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-primary">{queuedGuestCountLabel}</span>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onJumpToWaitingGuests}
             className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
             aria-label="Jump to the guests waiting for a reply"
           >
-            <AlertTriangle className="h-4 w-4" aria-hidden /> Jump to waiting guests
+            <AlertTriangle className="h-4 w-4" aria-hidden />
+            <span className="flex items-center gap-2">
+              Jump to waiting guests
+              {queuedGuestCountLabel ? (
+                <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary/90">
+                  {queuedGuestCountLabel}
+                </span>
+              ) : null}
+            </span>
           </button>
+          {chatAttentionLeadLabel ? (
+            <p className="mt-2 text-[11px] text-white/80">
+              {chatAttentionLeadLabel}
+              {chatAttentionLeadEntry?.snippet ? ` · ${chatAttentionLeadEntry.snippet}` : null}
+            </p>
+          ) : null}
+          {showQuickJumpPicker ? (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-white/60">
+                <span>Quick picker</span>
+                {chatAttentionWaitingLabel ? <span className="text-primary/80">{chatAttentionWaitingLabel}</span> : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {jumpQuickPickerEntries.map((entry) => {
+                  const href = entry.href.trim();
+                  const label = buildChatAttentionLinkLabel(entry);
+                  const relativeTime = formatRelativeTime(entry.timestampISO);
+                  return (
+                    <span key={entry.id} className="inline-flex items-center gap-1">
+                      <Link
+                        href={href}
+                        prefetch={false}
+                        onClick={handleChatAttentionNavigate}
+                        aria-label={label}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/80 transition hover:border-primary/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      >
+                        <span>{entry.authorName ?? "Guest thread"}</span>
+                        {relativeTime ? <span className="text-[9px] text-white/60">{relativeTime}</span> : null}
+                      </Link>
+                      {entry.id && onChatAttentionEntryHandled ? (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkHandled(entry.id)}
+                          className="text-[9px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
+                        >
+                          Mark
+                        </button>
+                      ) : null}
+                    </span>
+                  );
+                })}
+              </div>
+              {hasAdditionalJumpEntries ? (
+                <button
+                  type="button"
+                  onClick={() => setJumpPickerOpen((prev) => !prev)}
+                  aria-expanded={jumpPickerOpen}
+                  aria-controls="mobile-chat-attention-picker-jump"
+                  className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
+                >
+                  View remaining guests (+{jumpPickerRemainderCount})
+                </button>
+              ) : null}
+              {jumpPickerOpen ? (
+                <div id="mobile-chat-attention-picker-jump" className="rounded-2xl border border-primary/30 bg-primary/5 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Queued guests</p>
+                    <button
+                      type="button"
+                      onClick={() => setJumpPickerOpen(false)}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
+                    >
+                      Hide list
+                    </button>
+                  </div>
+                  <ul className="mt-2 space-y-2">
+                    {chatAttentionPickerEntries.map((entry) => {
+                      const href = entry.href.trim();
+                      const label = buildChatAttentionLinkLabel(entry);
+                      const relativeTime = formatRelativeTime(entry.timestampISO);
+                      return (
+                        <li key={entry.id}>
+                          <Link
+                            href={href}
+                            prefetch={false}
+                            onClick={handleChatAttentionNavigate}
+                            aria-label={label}
+                            className="block rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white/80 transition hover:border-primary/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-white">{entry.authorName ?? "Guest thread"}</span>
+                              {relativeTime ? (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-white/60">{relativeTime}</span>
+                              ) : null}
+                            </div>
+                            {entry.snippet ? <p className="mt-1 text-sm text-white/70 line-clamp-2">{entry.snippet}</p> : null}
+                            {entry.helperText ? (
+                              <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
+                            ) : null}
+                          </Link>
+                          {onChatAttentionEntryHandled ? (
+                            <div className="mt-1 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleMarkHandled(entry.id)}
+                                className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                                aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
+                              >
+                                Mark handled
+                              </button>
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <p className="mt-2 text-[11px] text-white/70">Opens the first conversation with queued attention so you can reply faster.</p>
         </div>
       ) : null}

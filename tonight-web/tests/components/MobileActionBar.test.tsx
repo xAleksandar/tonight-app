@@ -185,6 +185,20 @@ describe('MobileActionBar', () => {
         href: '/chat/mia',
         timestampISO: new Date().toISOString(),
       },
+      {
+        id: 'entry-3',
+        authorName: 'Liam',
+        snippet: 'Is there parking?',
+        href: '/chat/liam',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-4',
+        authorName: 'Ava',
+        snippet: 'Running 5 min late',
+        href: '/chat/ava',
+        timestampISO: new Date().toISOString(),
+      },
     ];
 
     render(
@@ -363,6 +377,68 @@ describe('MobileActionBar', () => {
     const jumpButton = screen.getByRole('button', { name: /jump to the guests waiting for a reply/i });
     fireEvent.click(jumpButton);
     expect(onJump).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a quick picker and queue details under the jump action', () => {
+    const onHandle = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mia',
+        snippet: 'Can I bring a friend?',
+        href: '/chat/mia',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-3',
+        authorName: 'Liam',
+        snippet: 'Is there parking?',
+        href: '/chat/liam',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-4',
+        authorName: 'Ava',
+        snippet: 'Running 5 min late',
+        href: '/chat/ava',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        canJumpToWaitingGuests
+        onJumpToWaitingGuests={noop}
+        chatAttentionQueue={queue}
+        onChatAttentionEntryHandled={onHandle}
+      />
+    );
+
+    expect(screen.getAllByText(/4 queued/i)).toHaveLength(2);
+    expect(screen.getByText(/quick picker/i)).toBeInTheDocument();
+    const leadLink = screen.getByRole('link', { name: /open chat with jess/i });
+    expect(leadLink).toHaveAttribute('href', '/chat/jess');
+
+    const markButton = screen.getByRole('button', { name: /mark handled for jess/i });
+    fireEvent.click(markButton);
+    expect(onHandle).toHaveBeenCalledWith('entry-1');
+
+    const viewRemaining = screen.getByRole('button', { name: /view remaining guests \(\+1\)/i });
+    fireEvent.click(viewRemaining);
+    expect(screen.getByRole('link', { name: /open chat with ava/i })).toBeInTheDocument();
   });
 
 });

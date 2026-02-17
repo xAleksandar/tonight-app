@@ -485,3 +485,9 @@ Each run should:
 - Expanded `tests/components/MobileActionBar.test.tsx` to cover the new control and re-ran the suite (`npx vitest run tests/components/MobileActionBar.test.tsx`).
 - Next: enrich the MobileActionBar jump CTA with the queued guest count + quick picker so hosts can open a specific waiting thread without scrolling first.
 
+## 2026-02-17 10:22 EET — Mobile jump CTA gains queue picker + counts
+- Upgraded the MobileActionBar Guests needing replies block with a live queued count badge, inline quick picker chips (up to three guests), and a drawer that lists every waiting thread with snippets, timestamps, and mark-handled buttons.
+- Synced the quick picker interactions with the existing chat attention queue so tapping a chip, marking handled, or clearing all entries closes both pickers and keeps the jump CTA + helper copy in sync.
+- Tests: `cd tonight-web && npx vitest run tests/components/MobileActionBar.test.tsx`.
+- Next: bring the same queue-count + quick picker treatment to the Messages desktop header CTA so desktop hosts can jump directly into any waiting guest without scrolling.
+
