@@ -442,3 +442,11 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
 - Next: bubble the chat-attention queue into the /messages inbox list (badges + mark-handled affordances) so hosts can triage waiting guests straight from the thread overview.
 
+
+
+## 2026-02-17 08:10 EET — Inbox highlights queued chat attention
+- Hydrated the chat-attention queue inside `/messages`, adding a dedicated “Guests needing replies” rail + badges so the host inbox instantly shows who’s waiting (with deep links + mark-handled controls).
+- Threaded the queue metadata into `ConversationList`, overlaying inline warnings + a clear badge/snippet on every conversation that still needs a reply, and backfilled a focused React Testing Library suite to cover the new behaviors.
+- Wired the inbox actions back to the shared storage helpers so clearing or acknowledging a guest from `/messages` keeps the event + chat views in sync.
+- Tests: `cd tonight-web && npx vitest run tests/components/ConversationList.test.tsx`
+- Next: expose the chat-attention snooze/resume controls inside `/messages` (mirror the event/chat headers) so hosts can pause or resume alerts without leaving the inbox.
