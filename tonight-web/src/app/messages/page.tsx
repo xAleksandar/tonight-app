@@ -400,6 +400,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               userDisplayName={currentUser?.displayName ?? null}
               userEmail={currentUser?.email ?? null}
               userPhotoUrl={currentUser?.photoUrl ?? null}
+              chatAttentionQueue={chatAttentionQueue}
+              chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+              chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+              onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
+              onChatAttentionClearAll={handleChatAttentionClearAll}
+              onChatAttentionSnooze={handleChatAttentionSnooze}
+              onChatAttentionResume={handleChatAttentionResume}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -436,6 +443,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               userDisplayName={currentUser?.displayName ?? null}
               userEmail={currentUser?.email ?? null}
               userPhotoUrl={currentUser?.photoUrl ?? null}
+              chatAttentionQueue={chatAttentionQueue}
+              chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+              chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+              onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
+              onChatAttentionClearAll={handleChatAttentionClearAll}
+              onChatAttentionSnooze={handleChatAttentionSnooze}
+              onChatAttentionResume={handleChatAttentionResume}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -476,6 +490,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
             userDisplayName={currentUser?.displayName ?? null}
             userEmail={currentUser?.email ?? null}
             userPhotoUrl={currentUser?.photoUrl ?? null}
+            chatAttentionQueue={chatAttentionQueue}
+            chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+            chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+            onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
+            onChatAttentionClearAll={handleChatAttentionClearAll}
+            onChatAttentionSnooze={handleChatAttentionSnooze}
+            onChatAttentionResume={handleChatAttentionResume}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -558,6 +579,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         onNavigateMessages={handleMessages}
         onCreate={handleCreate}
         onOpenProfile={handleProfile}
+        chatAttentionQueue={chatAttentionQueue}
+        chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+        chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+        onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
+        onChatAttentionClearAll={handleChatAttentionClearAll}
+        onChatAttentionSnooze={handleChatAttentionSnooze}
+        onChatAttentionResume={handleChatAttentionResume}
       />
     </div>
   );

@@ -457,3 +457,9 @@ Each run should:
 - Backed the new behavior with a focused Vitest suite that covers the snooze UI states for the summary card.
 - Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-attention-summary.test.tsx`
 - Next: surface the active snooze countdown + resume shortcut inside the Messages desktop header/mobile bar so hosts can manage alerts even when the attention card is off-screen.
+
+## 2026-02-17 08:55 EET — Messages header + mobile bar mirror snooze state
+- Threaded the inbox chat-attention queue and snooze metadata into the Messages desktop header so the sticky top bar now shows the live countdown badge, resume shortcut, quick-snooze options, and mark-handled controls even after you scroll past the attention card.
+- Passed the same queue/snooze handlers into the MobileActionBar so the bottom nav exposes the active timer + resume button, keeping mobile hosts in sync when they hide the Guests needing replies section.
+- Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/app/messages/messages-attention-summary.test.tsx`
+- Next: bubble the chat-attention queue count into the Messages filter chips so hosts can jump straight to whichever status still has guests waiting.
