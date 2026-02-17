@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { X, MessageCircle, ChevronDown } from "lucide-react";
 import { classNames } from "@/lib/classNames";
@@ -18,6 +18,7 @@ export type EventChatAttentionToastProps = {
   snippetTimestamp?: string | null;
   onInteract?: () => void;
   attentionQueue?: EventChatAttentionPayload[];
+  onMarkHandled?: (entryId: string) => void;
 };
 
 const TOAST_CONTAINER_CLASS =
@@ -34,6 +35,7 @@ export function EventChatAttentionToast({
   snippetTimestamp,
   onInteract,
   attentionQueue,
+  onMarkHandled,
 }: EventChatAttentionToastProps) {
   const attentionItems = useMemo(() => {
     if (!attentionQueue?.length) {
@@ -113,6 +115,16 @@ export function EventChatAttentionToast({
   const ctaHref = activeItem?.href ?? href;
   const queuePositionLabel = attentionItems.length > 1 ? `${Math.min(activeIndex + 1, attentionItems.length)} of ${attentionItems.length}` : null;
 
+  const handleMarkHandled = useCallback(
+    (entryId?: string | null) => {
+      if (!entryId) {
+        return;
+      }
+      onMarkHandled?.(entryId);
+    },
+    [onMarkHandled]
+  );
+
   const handleInteract = () => {
     onInteract?.();
   };
@@ -143,6 +155,18 @@ export function EventChatAttentionToast({
                   <p className="text-sm text-white line-clamp-2">{resolvedSnippet}</p>
                   {queuePositionLabel ? (
                     <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/40">{queuePositionLabel}</p>
+                  ) : null}
+                  {onMarkHandled && activeItem?.id ? (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleMarkHandled(activeItem.id)}
+                        className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                        aria-label={`Mark handled${resolvedSnippetSender ? ` for ${resolvedSnippetSender}` : ""}`}
+                      >
+                        Mark handled
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -224,6 +248,18 @@ export function EventChatAttentionToast({
                             <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
                           ) : null}
                         </Link>
+                        {onMarkHandled ? (
+                          <div className="mt-1 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleMarkHandled(entry.id)}
+                              className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                              aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ""}`}
+                            >
+                              Mark handled
+                            </button>
+                          </div>
+                        ) : null}
                       </li>
                     );
                   })}

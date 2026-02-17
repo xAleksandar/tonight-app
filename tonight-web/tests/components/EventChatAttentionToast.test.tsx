@@ -189,4 +189,44 @@ describe('EventChatAttentionToast', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
+  it('lets hosts mark queued guests as handled directly from the toast', () => {
+    const onMarkHandled = vi.fn();
+
+    render(
+      <EventChatAttentionToast
+        href="/chat/default"
+        label="Open chat"
+        onMarkHandled={onMarkHandled}
+        attentionQueue={[
+          {
+            id: 'mira',
+            snippet: 'Mira needs a quick reply',
+            authorName: 'Mira',
+            timestampISO: '2026-02-17T00:30:00Z',
+            href: '/chat/mira',
+            helperText: 'Mira sent a new ping',
+          },
+          {
+            id: 'dante',
+            snippet: 'Dante asked about the guest list',
+            authorName: 'Dante',
+            timestampISO: '2026-02-17T00:31:00Z',
+            href: '/chat/dante',
+            helperText: 'Dante needs a reply',
+          },
+        ]}
+      />
+    );
+
+    const activeMarkButton = screen.getByRole('button', { name: /mark handled for mira/i });
+    fireEvent.click(activeMarkButton);
+    expect(onMarkHandled).toHaveBeenCalledWith('mira');
+
+    const toggle = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggle);
+
+    const queuedMarkButton = screen.getByRole('button', { name: /mark handled for dante/i });
+    fireEvent.click(queuedMarkButton);
+    expect(onMarkHandled).toHaveBeenCalledWith('dante');
+  });
 });

@@ -366,3 +366,9 @@ Each run should:
 - Wired the picker interactions to the shared ack handler so clicking any chip/list entry both jumps into the right `/chat/[joinRequestId]` thread and clears the toast attention state, keeping the queue in sync with the hero/header/mobile CTAs.
 - Added a focused Vitest run covering the toast picker + chip behavior (`cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx`).
 - Next: let the toast queue include inline "Mark handled" affordances (per guest) so hosts can clear attention pings without navigating away when they've already answered elsewhere.
+
+## 2026-02-17 03:05 EET — Toast queue gains "Mark handled" controls
+- Added per-entry "Mark handled" buttons to the floating chat attention toast (active snippet + queue list) so hosts can clear individual pings without jumping into /chat.
+- Threaded a new handler through EventInsidePageClient → EventLayout → EventChatAttentionToast to drop handled payloads from the live queue and keep the attention timer + chips in sync.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx`.
+- Next: propagate the mark-handled affordance to the hero/desktop/mobile chat attention chips so hosts can triage queued guests no matter where they are on the event page.

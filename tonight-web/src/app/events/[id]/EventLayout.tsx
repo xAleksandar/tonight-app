@@ -18,6 +18,7 @@ type EventLayoutProps = {
   userPhotoUrl: string | null;
   chatAction?: MobileActionBarProps['chatAction'];
   chatAttentionQueue?: EventChatAttentionPayload[];
+  onChatAttentionEntryHandled?: (entryId: string) => void;
 };
 
 export function EventLayout({
@@ -29,6 +30,7 @@ export function EventLayout({
   userPhotoUrl,
   chatAction,
   chatAttentionQueue,
+  onChatAttentionEntryHandled,
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
@@ -77,6 +79,7 @@ export function EventLayout({
           snippetTimestamp={chatAction?.lastMessageAtISO}
           onInteract={chatAction?.onInteract}
           attentionQueue={chatAttentionQueue}
+          onMarkHandled={onChatAttentionEntryHandled}
         />
       ) : null}
 

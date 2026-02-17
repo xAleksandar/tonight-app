@@ -83,6 +83,35 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
     [chatAttentionQueue.length, clearChatAttention, startAttentionTimeout]
   );
 
+  const handleChatAttentionEntryHandled = useCallback(
+    (entryId: string) => {
+      if (!entryId) {
+        return;
+      }
+
+      setChatAttentionQueue((prev) => {
+        const next = prev.filter((entry) => entry.id !== entryId);
+        if (next.length === prev.length) {
+          return prev;
+        }
+
+        if (next.length === 0) {
+          setChatAttentionActive(false);
+          if (chatAttentionTimeoutRef.current) {
+            clearTimeout(chatAttentionTimeoutRef.current);
+            chatAttentionTimeoutRef.current = null;
+          }
+          return next;
+        }
+
+        setChatAttentionActive(true);
+        startAttentionTimeout(next.length);
+        return next;
+      });
+    },
+    [startAttentionTimeout]
+  );
+
   useEffect(() => {
     return () => {
       if (chatAttentionTimeoutRef.current) {
@@ -133,6 +162,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       userPhotoUrl={layoutProps.userPhotoUrl}
       chatAction={chatAction}
       chatAttentionQueue={chatAttentionQueue}
+      onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
     >
       <EventInsideExperience
         {...experience}
