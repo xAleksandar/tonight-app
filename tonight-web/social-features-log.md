@@ -372,3 +372,10 @@ Each run should:
 - Threaded a new handler through EventInsidePageClient → EventLayout → EventChatAttentionToast to drop handled payloads from the live queue and keep the attention timer + chips in sync.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx`.
 - Next: propagate the mark-handled affordance to the hero/desktop/mobile chat attention chips so hosts can triage queued guests no matter where they are on the event page.
+
+## 2026-02-17 03:34 EET — Attention chips can clear threads anywhere
+- Threaded the chat-attention handler through EventInsideExperience, DesktopHeader, and MobileActionBar so every surface now shares the same queue controls.
+- Added "Mark handled" buttons to the hero chips and quick picker plus mirrored the affordance in the desktop header + mobile action bar lists, ensuring hosts can clear queued guests without opening /chat.
+- Extended the EventLayout + page client plumbing and refreshed the EventInsideExperience/DesktopHeader/MobileActionBar test suites to cover the new controls.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`.
+- Next: add a bulk "Mark all handled" control that clears every queued chat attention entry at once (with confirm + toast) so hosts can dismiss stale pings quickly.
