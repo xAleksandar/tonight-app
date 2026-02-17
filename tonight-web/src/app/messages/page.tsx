@@ -738,6 +738,8 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         onNavigateMessages={handleMessages}
         onCreate={handleCreate}
         onOpenProfile={handleProfile}
+        canJumpToWaitingGuests={canJumpToWaitingGuests}
+        onJumpToWaitingGuests={handleJumpToWaitingGuests}
         chatAttentionQueue={chatAttentionQueue}
         chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
         chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}

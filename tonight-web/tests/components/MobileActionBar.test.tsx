@@ -344,4 +344,25 @@ describe('MobileActionBar', () => {
     expect(onSnooze).toHaveBeenCalledWith(20);
   });
 
+  it('surfaces the jump to waiting guests action when provided', () => {
+    const onJump = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        canJumpToWaitingGuests
+        onJumpToWaitingGuests={onJump}
+      />
+    );
+
+    const jumpButton = screen.getByRole('button', { name: /jump to the guests waiting for a reply/i });
+    fireEvent.click(jumpButton);
+    expect(onJump).toHaveBeenCalledTimes(1);
+  });
+
 });

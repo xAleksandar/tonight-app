@@ -478,3 +478,10 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-filter-attention.test.ts tests/components/ConversationList.test.tsx`
 - Next: mirror the “Jump to waiting guests” affordance inside the Messages mobile action bar so phone users can warp to the queued chat without scrolling.
 
+
+## 2026-02-17 09:44 EET — Messages mobile bar jump CTA
+- Added a `canJumpToWaitingGuests` pathway to the shared `MobileActionBar`, surfacing a dedicated Guests needing replies panel with a one-tap jump button when the inbox has queued attention.
+- Threaded the new props through `/messages/page.tsx` so the mobile action bar now launches the existing jump-to-waiting flow, ensuring mobile hosts can warp straight to the first guest needing a reply.
+- Expanded `tests/components/MobileActionBar.test.tsx` to cover the new control and re-ran the suite (`npx vitest run tests/components/MobileActionBar.test.tsx`).
+- Next: enrich the MobileActionBar jump CTA with the queued guest count + quick picker so hosts can open a specific waiting thread without scrolling first.
+

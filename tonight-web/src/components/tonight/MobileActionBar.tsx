@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Compass, MessageCircle, Plus, User, Users } from "lucide-react";
+import { AlertTriangle, ChevronDown, Compass, MessageCircle, Plus, User, Users } from "lucide-react";
 
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { classNames } from "@/lib/classNames";
@@ -38,6 +38,8 @@ export type MobileActionBarProps = {
   onCreate: () => void;
   onOpenProfile: () => void;
   messagesUnreadCount?: number;
+  canJumpToWaitingGuests?: boolean;
+  onJumpToWaitingGuests?: () => void;
   chatAction?: MobileChatAction | null;
   chatAttentionQueue?: EventChatAttentionPayload[] | null;
   chatAttentionSnoozedUntil?: string | null;
@@ -70,6 +72,8 @@ export function MobileActionBar({
   onCreate,
   onOpenProfile,
   messagesUnreadCount = 0,
+  canJumpToWaitingGuests,
+  onJumpToWaitingGuests,
   chatAction,
   chatAttentionQueue,
   chatAttentionSnoozedUntil,
@@ -121,6 +125,7 @@ export function MobileActionBar({
   const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
   const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
   const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
+  const showMessagesJumpAction = Boolean(canJumpToWaitingGuests && onJumpToWaitingGuests);
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -372,6 +377,20 @@ export function MobileActionBar({
           {chatAction?.helperText ? (
             <p className="mt-2 text-[11px] text-white/70 line-clamp-2">{chatAction.helperText}</p>
           ) : null}
+        </div>
+      ) : null}
+      {showMessagesJumpAction ? (
+        <div className={classNames("border-b border-white/10 px-4 pb-3 text-white", hasChatAction ? "pt-3" : "pt-4")}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-white/60">Guests needing replies</p>
+          <button
+            type="button"
+            onClick={onJumpToWaitingGuests}
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-primary transition hover:border-primary/60 hover:bg-primary/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+            aria-label="Jump to the guests waiting for a reply"
+          >
+            <AlertTriangle className="h-4 w-4" aria-hidden /> Jump to waiting guests
+          </button>
+          <p className="mt-2 text-[11px] text-white/70">Opens the first conversation with queued attention so you can reply faster.</p>
         </div>
       ) : null}
       <div className="flex items-center justify-around px-2 py-2 text-xs font-medium">
