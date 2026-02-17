@@ -29,6 +29,11 @@ import {
   subscribeToChatAttentionQueueStorage,
   writeChatAttentionQueueToStorage,
 } from '@/lib/chatAttentionQueueStorage';
+import {
+  clearChatDraftFromStorage,
+  readChatDraftFromStorage,
+  writeChatDraftToStorage,
+} from '@/lib/chatDraftStorage';
 import type { EventChatAttentionPayload } from '@/components/tonight/event-inside/EventInsideExperience';
 import type { SocketReadReceiptEventPayload } from '@/lib/socket-shared';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
@@ -151,6 +156,7 @@ export default function ChatConversation({
   const [messagesStatus, setMessagesStatus] = useState<MessagesStatus>('loading');
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState('');
+  const [hasHydratedComposerDraft, setHasHydratedComposerDraft] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending'>('idle');
   const [socketNotice, setSocketNotice] = useState<string | null>(null);
@@ -243,6 +249,24 @@ export default function ChatConversation({
   const counterpart = useMemo(() => {
     return isHostViewer ? context.participant : context.host;
   }, [context, isHostViewer]);
+
+  useEffect(() => {
+    setHasHydratedComposerDraft(false);
+    const storedDraft = readChatDraftFromStorage(joinRequestId);
+    setComposerValue(storedDraft);
+    setHasHydratedComposerDraft(true);
+  }, [joinRequestId]);
+
+  useEffect(() => {
+    if (!hasHydratedComposerDraft) {
+      return;
+    }
+    if (!composerValue.length) {
+      clearChatDraftFromStorage(joinRequestId);
+      return;
+    }
+    writeChatDraftToStorage(joinRequestId, composerValue);
+  }, [composerValue, hasHydratedComposerDraft, joinRequestId]);
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && chatAttentionPickerOpen) {

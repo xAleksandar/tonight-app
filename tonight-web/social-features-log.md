@@ -496,3 +496,9 @@ Each run should:
 - Updated `/messages/page.tsx` to pass the new jump props through every DesktopHeader instance so the CTA stays wired during loading/error states, and added Vitest coverage for the expanded UI (`npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`).
 - Next: persist per-thread draft replies on `/chat/[joinRequestId]` so bouncing between queued guests via the new pickers never drops an in-progress message.
 
+
+## 2026-02-17 11:12 EET — Chat drafts persist per thread
+- Added a `chatDraftStorage` helper that stores per-join-request composer text in localStorage with pruning so hopping between chats never drops in-progress replies.
+- Hydrated the `/chat/[joinRequestId]` composer from the new storage, auto-saved changes after hydration, and cleared entries once messages send or drafts empty out.
+- Covered the storage helper with a dedicated Vitest suite and reran the chat properties + socket suites to ensure regressions stay caught (`npx vitest run tests/lib/chatDraftStorage.test.ts tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`).
+- Next: surface the saved-draft indicator + manual clear affordance in the chat composer so hosts know when a message is staged before jumping threads.
