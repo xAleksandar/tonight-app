@@ -450,3 +450,10 @@ Each run should:
 - Wired the inbox actions back to the shared storage helpers so clearing or acknowledging a guest from `/messages` keeps the event + chat views in sync.
 - Tests: `cd tonight-web && npx vitest run tests/components/ConversationList.test.tsx`
 - Next: expose the chat-attention snooze/resume controls inside `/messages` (mirror the event/chat headers) so hosts can pause or resume alerts without leaving the inbox.
+
+## 2026-02-17 08:34 EET — Messages inbox picks up chat snooze controls
+- Hydrated the `/messages` client with the same chat-attention snooze state + preference plumbing as the event/chat surfaces (localStorage, `data-chat-attention-snoozed-until`, timers, and shared toast copy) so the inbox stays in sync when hosts pause alerts elsewhere.
+- Added quick snooze/resume controls to the `MessagesAttentionSummary` card, complete with countdown badges, duration pills, and storage-backed defaults, ensuring hosts can pause or resume chat pings without leaving the inbox.
+- Backed the new behavior with a focused Vitest suite that covers the snooze UI states for the summary card.
+- Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-attention-summary.test.tsx`
+- Next: surface the active snooze countdown + resume shortcut inside the Messages desktop header/mobile bar so hosts can manage alerts even when the attention card is off-screen.

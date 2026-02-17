@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, BadgeCheck, MapPin, MessageCircle, Send, ShieldCheck, Sparkles, Users } from "lucide-react";
 
@@ -14,10 +14,21 @@ import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useSocket } from "@/hooks/useSocket";
+import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 import type { CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
 import { formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import { readChatAttentionQueueFromStorage, subscribeToChatAttentionQueueStorage, writeChatAttentionQueueToStorage } from "@/lib/chatAttentionQueueStorage";
+import {
+  CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES,
+  DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES,
+  type ChatAttentionSnoozeOptionMinutes,
+} from "@/lib/chatAttentionSnoozeOptions";
+import {
+  CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE,
+  CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
+  CHAT_ATTENTION_SNOOZE_STORAGE_KEY,
+} from "@/lib/chatAttentionStorage";
 import { showSuccessToast } from "@/lib/toast";
 import type { SocketMessagePayload } from "@/lib/socket-shared";
 
@@ -57,6 +68,40 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   const [statusFilter, setStatusFilter] = useState<ConversationFilter>("all");
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
 
+  const [chatAttentionSnoozedUntil, setChatAttentionSnoozedUntil] = useState<string | null>(null);
+  const [chatAttentionPreferredSnoozeMinutes, setChatAttentionPreferredSnoozeMinutes] = useState<ChatAttentionSnoozeOptionMinutes>(
+    DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES
+  );
+  const [hasHydratedSnoozeState, setHasHydratedSnoozeState] = useState(false);
+  const chatAttentionSnoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearChatAttentionSnoozeTimeout = useCallback(() => {
+    if (chatAttentionSnoozeTimeoutRef.current) {
+      clearTimeout(chatAttentionSnoozeTimeoutRef.current);
+      chatAttentionSnoozeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleChatAttentionSnoozeWake = useCallback(
+    (targetISO: string | null) => {
+      clearChatAttentionSnoozeTimeout();
+      if (!targetISO) {
+        return;
+      }
+      const targetTimestamp = Date.parse(targetISO);
+      if (Number.isNaN(targetTimestamp)) {
+        return;
+      }
+      const delay = Math.max(targetTimestamp - Date.now(), 0);
+      chatAttentionSnoozeTimeoutRef.current = setTimeout(() => {
+        chatAttentionSnoozeTimeoutRef.current = null;
+        setChatAttentionSnoozedUntil(null);
+        showSuccessToast("Chat alerts back on", "We'll nudge you again when guests reach out.");
+      }, delay);
+    },
+    [clearChatAttentionSnoozeTimeout, showSuccessToast]
+  );
+
   const fetchConversations = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -90,6 +135,71 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
       setChatAttentionQueue((current) => (chatAttentionQueuesMatch(current, nextQueue) ? current : nextQueue));
     });
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      setHasHydratedSnoozeState(true);
+      return;
+    }
+
+    const storedSnoozeUntil = window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY);
+    if (storedSnoozeUntil) {
+      const timestamp = Date.parse(storedSnoozeUntil);
+      if (!Number.isNaN(timestamp) && timestamp > Date.now()) {
+        setChatAttentionSnoozedUntil(storedSnoozeUntil);
+        scheduleChatAttentionSnoozeWake(storedSnoozeUntil);
+      } else {
+        window.localStorage.removeItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY);
+      }
+    }
+
+    const storedPreferenceRaw = window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY);
+    if (storedPreferenceRaw) {
+      const parsed = Number(storedPreferenceRaw);
+      if (CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.includes(parsed as ChatAttentionSnoozeOptionMinutes)) {
+        setChatAttentionPreferredSnoozeMinutes(parsed as ChatAttentionSnoozeOptionMinutes);
+      }
+    }
+
+    setHasHydratedSnoozeState(true);
+
+    return () => {
+      clearChatAttentionSnoozeTimeout();
+    };
+  }, [scheduleChatAttentionSnoozeWake, clearChatAttentionSnoozeTimeout]);
+
+  useEffect(() => {
+    if (!hasHydratedSnoozeState) {
+      return;
+    }
+
+    if (typeof document !== "undefined") {
+      const root = document.documentElement;
+      if (chatAttentionSnoozedUntil) {
+        root.dataset[CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE] = chatAttentionSnoozedUntil;
+      } else {
+        delete root.dataset[CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE];
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      if (chatAttentionSnoozedUntil) {
+        window.localStorage.setItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY, chatAttentionSnoozedUntil);
+      } else {
+        window.localStorage.removeItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY);
+      }
+    }
+  }, [chatAttentionSnoozedUntil, hasHydratedSnoozeState]);
+
+  useEffect(() => {
+    if (!hasHydratedSnoozeState || typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(
+      CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
+      String(chatAttentionPreferredSnoozeMinutes)
+    );
+  }, [chatAttentionPreferredSnoozeMinutes, hasHydratedSnoozeState]);
 
   // Socket.IO connection for real-time updates
   const handleMessage = useCallback((payload: SocketMessagePayload) => {
@@ -190,6 +300,31 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
       return [];
     });
   }, []);
+
+  const handleChatAttentionSnooze = useCallback(
+    (durationMinutes?: number) => {
+      const fallbackMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+      const safeMinutes = typeof durationMinutes === "number" && durationMinutes > 0 ? durationMinutes : fallbackMinutes;
+      const snoozeUntil = new Date(Date.now() + safeMinutes * 60 * 1000).toISOString();
+      setChatAttentionSnoozedUntil(snoozeUntil);
+      const durationLabel = safeMinutes === 1 ? "minute" : "minutes";
+      showSuccessToast("Chat alerts snoozed", `We'll remind you again in about ${safeMinutes} ${durationLabel}.`);
+      scheduleChatAttentionSnoozeWake(snoozeUntil);
+      if (CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.includes(safeMinutes as ChatAttentionSnoozeOptionMinutes)) {
+        setChatAttentionPreferredSnoozeMinutes(safeMinutes as ChatAttentionSnoozeOptionMinutes);
+      }
+    },
+    [chatAttentionPreferredSnoozeMinutes, scheduleChatAttentionSnoozeWake, showSuccessToast]
+  );
+
+  const handleChatAttentionResume = useCallback(() => {
+    if (!chatAttentionSnoozedUntil) {
+      return;
+    }
+    clearChatAttentionSnoozeTimeout();
+    setChatAttentionSnoozedUntil(null);
+    showSuccessToast("Chat alerts back on", "We'll nudge you again when guests reach out.");
+  }, [chatAttentionSnoozedUntil, clearChatAttentionSnoozeTimeout, showSuccessToast]);
 
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const handleDiscover = useCallback(() => router.push("/"), [router]);
@@ -390,6 +525,10 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                       onSelectConversation={handleSelectConversation}
                       onEntryHandled={handleChatAttentionEntryHandled}
                       onClearAll={handleChatAttentionClearAll}
+                      chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+                      chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+                      onChatAttentionSnooze={handleChatAttentionSnooze}
+                      onChatAttentionResume={handleChatAttentionResume}
                     />
                   ) : null}
 
@@ -649,9 +788,22 @@ type MessagesAttentionSummaryProps = {
   onSelectConversation: (conversationId: string) => void;
   onEntryHandled?: (entryId: string) => void;
   onClearAll?: () => void;
+  chatAttentionSnoozedUntil?: string | null;
+  chatAttentionPreferredSnoozeMinutes?: number | null;
+  onChatAttentionSnooze?: (durationMinutes?: number) => void;
+  onChatAttentionResume?: () => void;
 };
 
-function MessagesAttentionSummary({ queue, onSelectConversation, onEntryHandled, onClearAll }: MessagesAttentionSummaryProps) {
+export function MessagesAttentionSummary({
+  queue,
+  onSelectConversation,
+  onEntryHandled,
+  onClearAll,
+  chatAttentionSnoozedUntil,
+  chatAttentionPreferredSnoozeMinutes,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
+}: MessagesAttentionSummaryProps) {
   if (!Array.isArray(queue) || queue.length === 0) {
     return null;
   }
@@ -686,6 +838,12 @@ function MessagesAttentionSummary({ queue, onSelectConversation, onEntryHandled,
           />
         ))}
       </ul>
+      <MessagesAttentionSnoozeControls
+        chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+        chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+        onChatAttentionSnooze={onChatAttentionSnooze}
+        onChatAttentionResume={onChatAttentionResume}
+      />
     </div>
   );
 }
@@ -741,5 +899,86 @@ function MessagesAttentionEntry({ entry, onSelectConversation, onEntryHandled }:
         ) : null}
       </div>
     </li>
+  );
+}
+
+type MessagesAttentionSnoozeControlsProps = {
+  chatAttentionSnoozedUntil?: string | null;
+  chatAttentionPreferredSnoozeMinutes?: number | null;
+  onChatAttentionSnooze?: (durationMinutes?: number) => void;
+  onChatAttentionResume?: () => void;
+};
+
+function MessagesAttentionSnoozeControls({
+  chatAttentionSnoozedUntil,
+  chatAttentionPreferredSnoozeMinutes,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
+}: MessagesAttentionSnoozeControlsProps) {
+  if (!onChatAttentionSnooze && !onChatAttentionResume) {
+    return null;
+  }
+
+  const { isActive: chatAttentionIsSnoozed, label: chatAttentionSnoozeCountdownLabel } = useSnoozeCountdown(
+    chatAttentionSnoozedUntil
+  );
+  const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+  const quickSnoozeLabel = `Snooze for ${quickSnoozeMinutes} min`;
+  const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
+
+  if (chatAttentionIsSnoozed) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wide text-primary">
+        <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-primary">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+          {chatAttentionSnoozeCountdownLabel ? `Snoozed · ${chatAttentionSnoozeCountdownLabel}` : "Snoozed"}
+        </span>
+        {onChatAttentionResume ? (
+          <button
+            type="button"
+            onClick={onChatAttentionResume}
+            className="text-primary/80 underline-offset-2 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+          >
+            Resume alerts
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (!onChatAttentionSnooze) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+      <button
+        type="button"
+        onClick={() => onChatAttentionSnooze(quickSnoozeMinutes)}
+        className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-primary transition hover:border-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+        aria-label={quickSnoozeAriaLabel}
+      >
+        {quickSnoozeLabel}
+      </button>
+      <span className="text-primary/70">Snooze:</span>
+      {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
+        const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
+        return (
+          <button
+            key={minutes}
+            type="button"
+            onClick={() => onChatAttentionSnooze(minutes)}
+            className={classNames(
+              "rounded-full border px-3 py-1 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
+              isPreferred ? "border-primary/60 bg-primary/15 text-primary" : "border-primary/25 text-primary/80 hover:border-primary/50"
+            )}
+            aria-pressed={isPreferred}
+            aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+          >
+            {minutes} min
+          </button>
+        );
+      })}
+    </div>
   );
 }
