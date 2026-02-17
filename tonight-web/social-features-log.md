@@ -410,3 +410,10 @@ Each run should:
 - Refreshed the component + client test suites (EventInsideExperience/DesktopHeader/MobileActionBar/EventChatAttentionToast + EventInsidePageClient) to cover the new handlers and ensure each surface passes the selected duration downstream.
 - Next: let hosts pick the snooze duration (e.g., 5/10/20 minutes) from any surface so they can pause alerts for longer focus blocks without hitting snooze repeatedly.
 
+
+## 2026-02-17 06:10 EET — Snooze preference remembered everywhere
+- Tracked each host's preferred chat snooze duration (localStorage + layout wiring) so the last-picked window now hydrates automatically after reloads and flows through `EventInsideExperience`, Desktop header, Mobile bar, and the floating toast.
+- Highlighted the preferred pill on every snooze surface (hero chips, desktop header, mobile bar, toast) with selection styling + `aria-pressed`, keeping accessibility intact while making the go-to option obvious at a glance.
+- Threaded the preference through `EventInsidePageClient` (new storage key, prop plumbing, tests) and refreshed the whole chat-attention test matrix to cover hydration + highlighting.
+- Tests: `cd tonight-web && npx vitest run tests/app/events/EventInsidePageClient.test.tsx tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx`
+- Next: add a one-tap "Snooze for X min" shortcut (using the saved preference) on each surface so hosts can pause alerts with a single press instead of reselecting a pill every time.

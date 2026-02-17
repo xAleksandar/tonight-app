@@ -137,6 +137,8 @@ export type EventInsideExperienceProps = {
   chatAttentionActive?: boolean;
   /** Active queue of attention payloads (used for chips + inline context) */
   chatAttentionQueue?: EventChatAttentionPayload[];
+  /** Preferred snooze window in minutes (to highlight default pills) */
+  chatAttentionPreferredSnoozeMinutes?: number | null;
   /** When set, attention pulses are snoozed until this ISO timestamp */
   chatAttentionSnoozedUntil?: string | null;
   /** Fired when realtime events request the attention indicator to toggle */
@@ -288,6 +290,7 @@ export function EventInsideExperience({
   onChatPreviewRefresh,
   chatAttentionActive = false,
   chatAttentionQueue = [],
+  chatAttentionPreferredSnoozeMinutes,
   chatAttentionSnoozedUntil,
   onChatAttentionChange,
   onChatAttentionEntryHandled,
@@ -2286,17 +2289,26 @@ export function EventInsideExperience({
                     ) : (
                       <div className="inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
                         <span className="text-white/50">Snooze:</span>
-                        {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => (
-                          <button
-                            key={minutes}
-                            type="button"
-                            onClick={() => onChatAttentionSnooze(minutes)}
-                            className="rounded-full border border-white/25 px-3 py-1 text-white/80 transition hover:border-white/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                            aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                          >
-                            {minutes} min
-                          </button>
-                        ))}
+                        {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
+                          const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
+                          return (
+                            <button
+                              key={minutes}
+                              type="button"
+                              onClick={() => onChatAttentionSnooze(minutes)}
+                              className={classNames(
+                                "rounded-full border px-3 py-1 text-white/80 transition hover:border-white/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
+                                isPreferred
+                                  ? "border-white/80 bg-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.25)]"
+                                  : "border-white/25"
+                              )}
+                              aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                              aria-pressed={isPreferred}
+                            >
+                              {minutes} min
+                            </button>
+                          );
+                        })}
                       </div>
                     )
                   ) : null}
@@ -2429,17 +2441,26 @@ export function EventInsideExperience({
                       ) : (
                         <div className="flex flex-wrap items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
                           <span className="text-white/50">Snooze:</span>
-                          {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => (
-                            <button
-                              key={minutes}
-                              type="button"
-                              onClick={() => onChatAttentionSnooze(minutes)}
-                              className="rounded-full border border-white/25 px-3 py-1 text-white/80 transition hover:border-white/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                              aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                            >
-                              {minutes} min
-                            </button>
-                          ))}
+                          {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
+                            const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
+                            return (
+                              <button
+                                key={minutes}
+                                type="button"
+                                onClick={() => onChatAttentionSnooze(minutes)}
+                                className={classNames(
+                                  "rounded-full border px-3 py-1 text-white/80 transition hover:border-white/50 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
+                                  isPreferred
+                                    ? "border-white/80 bg-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.25)]"
+                                    : "border-white/25"
+                                )}
+                                aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                                aria-pressed={isPreferred}
+                              >
+                                {minutes} min
+                              </button>
+                            );
+                          })}
                         </div>
                       )
                     ) : null}

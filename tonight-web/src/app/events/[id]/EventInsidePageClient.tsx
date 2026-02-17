@@ -7,10 +7,15 @@ import { EventInsideExperience } from "@/components/tonight/event-inside/EventIn
 import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { showSuccessToast } from "@/lib/toast";
-import { DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
+import {
+  CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES,
+  DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES,
+  type ChatAttentionSnoozeOptionMinutes,
+} from "@/lib/chatAttentionSnoozeOptions";
 
 export const CHAT_ATTENTION_SNOOZE_STORAGE_KEY = "tonight.chatAttentionSnoozedUntil";
 const CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE = "chatAttentionSnoozedUntil";
+export const CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY = "tonight.chatAttentionPreferredSnoozeMinutes";
 
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
@@ -32,6 +37,9 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   const [chatAttentionActive, setChatAttentionActive] = useState(false);
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
   const [chatAttentionSnoozedUntil, setChatAttentionSnoozedUntil] = useState<string | null>(null);
+  const [chatAttentionPreferredSnoozeMinutes, setChatAttentionPreferredSnoozeMinutes] = useState<ChatAttentionSnoozeOptionMinutes>(
+    DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES
+  );
   const [hasHydratedSnoozeState, setHasHydratedSnoozeState] = useState(false);
   const chatAttentionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatAttentionSnoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -154,6 +162,33 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
     scheduleSnoozeWake(storedSnoozeUntil);
   }, [scheduleSnoozeWake]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedPreferenceRaw = window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY);
+    if (!storedPreferenceRaw) {
+      return;
+    }
+
+    const parsed = Number(storedPreferenceRaw);
+    if (CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.includes(parsed as ChatAttentionSnoozeOptionMinutes)) {
+      setChatAttentionPreferredSnoozeMinutes(parsed as ChatAttentionSnoozeOptionMinutes);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
+      String(chatAttentionPreferredSnoozeMinutes)
+    );
+  }, [chatAttentionPreferredSnoozeMinutes]);
+
   const clearChatAttention = useCallback(() => {
     setChatAttentionActive(false);
     setChatAttentionQueue([]);
@@ -253,8 +288,8 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   );
 
   const handleChatAttentionSnooze = useCallback(
-    (durationMinutes: number = DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES) => {
-      const safeMinutes = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+    (durationMinutes: number = chatAttentionPreferredSnoozeMinutes) => {
+      const safeMinutes = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : chatAttentionPreferredSnoozeMinutes;
       const snoozeUntil = new Date(Date.now() + safeMinutes * 60 * 1000).toISOString();
       setChatAttentionSnoozedUntil(snoozeUntil);
       setChatAttentionActive(false);
@@ -265,8 +300,12 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       const durationLabel = safeMinutes === 1 ? "minute" : "minutes";
       showSuccessToast("Chat alerts snoozed", `We'll remind you again in about ${safeMinutes} ${durationLabel}.`);
       scheduleSnoozeWake(snoozeUntil);
+
+      if (CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.includes(safeMinutes as ChatAttentionSnoozeOptionMinutes)) {
+        setChatAttentionPreferredSnoozeMinutes(safeMinutes as ChatAttentionSnoozeOptionMinutes);
+      }
     },
-    [scheduleSnoozeWake, showSuccessToast]
+    [chatAttentionPreferredSnoozeMinutes, scheduleSnoozeWake, showSuccessToast]
   );
 
   const handleChatAttentionResume = useCallback(() => {
@@ -339,6 +378,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       chatAction={chatAction}
       chatAttentionQueue={chatAttentionQueue}
       chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+      chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
       onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
       onChatAttentionClearAll={handleChatAttentionClearAll}
       onChatAttentionSnooze={handleChatAttentionSnooze}
@@ -350,6 +390,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
         chatAttentionActive={chatAttentionActive}
         chatAttentionQueue={chatAttentionQueue}
         chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+        chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
         onChatAttentionChange={handleChatAttentionChange}
         onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
         onChatAttentionClearAll={handleChatAttentionClearAll}

@@ -3,8 +3,9 @@ import { JSDOM } from 'jsdom';
 import { act, cleanup, render } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EventInsidePageClient, CHAT_ATTENTION_SNOOZE_STORAGE_KEY } from '@/app/events/[id]/EventInsidePageClient';
+import { EventInsidePageClient, CHAT_ATTENTION_SNOOZE_STORAGE_KEY, CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY } from '@/app/events/[id]/EventInsidePageClient';
 import type { EventInsideExperienceProps } from '@/components/tonight/event-inside/EventInsideExperience';
+import { DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from '@/lib/chatAttentionSnoozeOptions';
 
 let latestLayoutProps: any = null;
 vi.mock('@/app/events/[id]/EventLayout', () => {
@@ -130,6 +131,11 @@ describe('EventInsidePageClient chat attention snooze persistence', () => {
   const renderClient = () =>
     render(<EventInsidePageClient experience={baseExperience} layoutProps={baseLayoutProps} />);
 
+  it('passes the default preferred snooze duration to the layout', () => {
+    renderClient();
+    expect(latestLayoutProps?.chatAttentionPreferredSnoozeMinutes).toBe(DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES);
+  });
+
   it('restores a stored snooze timestamp on mount', () => {
     const futureISO = new Date(Date.now() + 60_000).toISOString();
     window.localStorage.setItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY, futureISO);
@@ -170,5 +176,24 @@ describe('EventInsidePageClient chat attention snooze persistence', () => {
 
     expect(window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY)).toBeNull();
     expect(document.documentElement.dataset.chatAttentionSnoozedUntil).toBeUndefined();
+  });
+
+  it('hydrates the preferred snooze duration from storage', () => {
+    window.localStorage.setItem(CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY, '10');
+
+    renderClient();
+
+    expect(latestLayoutProps?.chatAttentionPreferredSnoozeMinutes).toBe(10);
+  });
+
+  it('persists the latest preferred snooze duration when snoozing', async () => {
+    renderClient();
+
+    await act(async () => {
+      latestLayoutProps.onChatAttentionSnooze?.(20);
+    });
+
+    expect(window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY)).toBe('20');
+    expect(latestLayoutProps?.chatAttentionPreferredSnoozeMinutes).toBe(20);
   });
 });

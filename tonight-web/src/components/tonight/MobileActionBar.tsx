@@ -41,6 +41,7 @@ export type MobileActionBarProps = {
   chatAction?: MobileChatAction | null;
   chatAttentionQueue?: EventChatAttentionPayload[] | null;
   chatAttentionSnoozedUntil?: string | null;
+  chatAttentionPreferredSnoozeMinutes?: number | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
   onChatAttentionClearAll?: () => void;
   onChatAttentionSnooze?: (durationMinutes?: number) => void;
@@ -72,6 +73,7 @@ export function MobileActionBar({
   chatAction,
   chatAttentionQueue,
   chatAttentionSnoozedUntil,
+  chatAttentionPreferredSnoozeMinutes,
   onChatAttentionEntryHandled,
   onChatAttentionClearAll,
   onChatAttentionSnooze,
@@ -263,17 +265,26 @@ export function MobileActionBar({
             ) : (
               <div className="mt-2 inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
                 <span className="text-white/50">Snooze:</span>
-                {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => (
-                  <button
-                    key={minutes}
-                    type="button"
-                    onClick={() => onChatAttentionSnooze(minutes)}
-                    className="rounded-full border border-white/20 px-3 py-1 text-white/80 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                    aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                  >
-                    {minutes} min
-                  </button>
-                ))}
+                {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
+                  const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
+                  return (
+                    <button
+                      key={minutes}
+                      type="button"
+                      onClick={() => onChatAttentionSnooze(minutes)}
+                      className={classNames(
+                        "rounded-full border px-3 py-1 text-white/80 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
+                        isPreferred
+                          ? "border-white/70 bg-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.25)]"
+                          : "border-white/20"
+                      )}
+                      aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                      aria-pressed={isPreferred}
+                    >
+                      {minutes} min
+                    </button>
+                  );
+                })}
               </div>
             )
           ) : null}

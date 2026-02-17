@@ -1412,4 +1412,28 @@ describe('EventInsideExperience', () => {
     expect(onResume).toHaveBeenCalledTimes(1);
   });
 
+  it('highlights the preferred snooze duration pill', () => {
+    const queue = [
+      {
+        id: 'msg-2',
+        snippet: 'Ping',
+        authorName: 'Riley',
+        timestampISO: new Date().toISOString(),
+        href: '/chat/jr-9',
+      },
+    ];
+
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={10}
+        onChatAttentionSnooze={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /snooze chat attention alerts for 10 minutes/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /snooze chat attention alerts for 5 minutes/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
 });

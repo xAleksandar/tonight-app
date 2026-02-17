@@ -19,6 +19,7 @@ type EventLayoutProps = {
   chatAction?: MobileActionBarProps['chatAction'];
   chatAttentionQueue?: EventChatAttentionPayload[];
   chatAttentionSnoozedUntil?: string | null;
+  chatAttentionPreferredSnoozeMinutes?: number | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
   onChatAttentionClearAll?: () => void;
   onChatAttentionSnooze?: (durationMinutes?: number) => void;
@@ -35,6 +36,7 @@ export function EventLayout({
   chatAction,
   chatAttentionQueue,
   chatAttentionSnoozedUntil,
+  chatAttentionPreferredSnoozeMinutes,
   onChatAttentionEntryHandled,
   onChatAttentionClearAll,
   onChatAttentionSnooze,
@@ -73,6 +75,7 @@ export function EventLayout({
             chatAction={chatAction}
             chatAttentionQueue={chatAttentionQueue}
             chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+            chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
             onChatAttentionEntryHandled={onChatAttentionEntryHandled}
             onChatAttentionClearAll={onChatAttentionClearAll}
             onChatAttentionSnooze={onChatAttentionSnooze}
@@ -97,6 +100,7 @@ export function EventLayout({
           onInteract={chatAction?.onInteract}
           attentionQueue={chatAttentionQueue}
           chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+          chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
           onMarkHandled={onChatAttentionEntryHandled}
           onMarkAllHandled={onChatAttentionClearAll}
           onSnooze={onChatAttentionSnooze}
@@ -114,6 +118,7 @@ export function EventLayout({
         chatAction={chatAction}
         chatAttentionQueue={chatAttentionQueue}
         chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+        chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
         onChatAttentionEntryHandled={onChatAttentionEntryHandled}
         onChatAttentionClearAll={onChatAttentionClearAll}
         onChatAttentionSnooze={onChatAttentionSnooze}

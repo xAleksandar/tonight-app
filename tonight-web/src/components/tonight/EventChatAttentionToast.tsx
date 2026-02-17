@@ -21,6 +21,7 @@ export type EventChatAttentionToastProps = {
   onInteract?: () => void;
   attentionQueue?: EventChatAttentionPayload[];
   chatAttentionSnoozedUntil?: string | null;
+  chatAttentionPreferredSnoozeMinutes?: number | null;
   onMarkHandled?: (entryId: string) => void;
   onMarkAllHandled?: () => void;
   onSnooze?: (durationMinutes?: number) => void;
@@ -42,6 +43,7 @@ export function EventChatAttentionToast({
   onInteract,
   attentionQueue,
   chatAttentionSnoozedUntil,
+  chatAttentionPreferredSnoozeMinutes,
   onMarkHandled,
   onMarkAllHandled,
   onSnooze,
@@ -203,17 +205,26 @@ export function EventChatAttentionToast({
                         ) : (
                           <div className="inline-flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70">
                             <span className="text-white/50">Snooze:</span>
-                            {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => (
-                              <button
-                                key={minutes}
-                                type="button"
-                                onClick={() => onSnooze(minutes)}
-                                className="rounded-full border border-white/20 px-3 py-1 text-white/85 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                                aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                              >
-                                {minutes} min
-                              </button>
-                            ))}
+                            {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
+                              const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
+                              return (
+                                <button
+                                  key={minutes}
+                                  type="button"
+                                  onClick={() => onSnooze(minutes)}
+                                  className={classNames(
+                                    "rounded-full border px-3 py-1 text-white/85 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40",
+                                    isPreferred
+                                      ? "border-white/70 bg-white/10 text-white"
+                                      : "border-white/20"
+                                  )}
+                                  aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                                  aria-pressed={isPreferred}
+                                >
+                                  {minutes} min
+                                </button>
+                              );
+                            })}
                           </div>
                         )
                       ) : null}
