@@ -12,6 +12,7 @@ import type { AuthUser } from "@/components/auth/AuthProvider";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import type { DraftQuickPickEntry } from "@/components/tonight/MobileActionBar";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useSocket } from "@/hooks/useSocket";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
@@ -93,6 +94,8 @@ export type MessagesAttentionJumpTarget = {
 
 type DraftConversationTarget = MessagesAttentionJumpTarget & {
   updatedAt: string;
+  participantName: string;
+  draftSnippet: string;
 };
 
 export const findMessagesAttentionJumpTarget = (
@@ -375,10 +378,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         if (!conversation) {
           return acc;
         }
+        const snippet = content.length > 140 ? `${content.slice(0, 140).trim()}…` : content;
         acc.push({
           conversationId,
           filter: conversation.status,
           updatedAt: payload?.updatedAt ?? new Date().toISOString(),
+          participantName: conversation.participantName,
+          draftSnippet: snippet,
         });
         return acc;
       }, [])
@@ -386,6 +392,13 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
   }, [conversations, chatDraftMap]);
   const draftsWaitingCount = draftJumpTargets.length;
   const draftJumpTarget = draftJumpTargets[0] ?? null;
+  const draftQuickPickEntries: DraftQuickPickEntry[] = draftJumpTargets.map((target) => ({
+    conversationId: target.conversationId,
+    participantName: target.participantName,
+    href: `/chat/${target.conversationId}`,
+    updatedAtISO: target.updatedAt,
+    snippet: target.draftSnippet,
+  }));
   const canJumpToDrafts = Boolean(draftJumpTarget);
 
   const filteredConversations = useMemo(() => {
@@ -602,6 +615,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               onJumpToWaitingGuests={handleJumpToWaitingGuests}
               draftsWaitingCount={draftsWaitingCount}
               onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
+              draftQuickPickEntries={draftQuickPickEntries}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -649,6 +663,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               onJumpToWaitingGuests={handleJumpToWaitingGuests}
               draftsWaitingCount={draftsWaitingCount}
               onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
+              draftQuickPickEntries={draftQuickPickEntries}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -698,6 +713,9 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
             onChatAttentionResume={handleChatAttentionResume}
             canJumpToWaitingGuests={canJumpToWaitingGuests}
             onJumpToWaitingGuests={handleJumpToWaitingGuests}
+            draftsWaitingCount={draftsWaitingCount}
+            onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
+            draftQuickPickEntries={draftQuickPickEntries}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -785,6 +803,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
                       onChatAttentionResume={handleChatAttentionResume}
                       draftsWaitingCount={draftsWaitingCount}
                       onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
+                      draftQuickPickEntries={draftQuickPickEntries}
                     />
                   ) : null}
 
@@ -826,6 +845,7 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         onChatAttentionResume={handleChatAttentionResume}
         draftsWaitingCount={draftsWaitingCount}
         onJumpToDrafts={canJumpToDrafts ? handleJumpToDrafts : undefined}
+        draftQuickPickEntries={draftQuickPickEntries}
       />
     </div>
   );
@@ -1062,6 +1082,7 @@ type MessagesAttentionSummaryProps = {
   onChatAttentionResume?: () => void;
   draftsWaitingCount?: number;
   onJumpToDrafts?: () => void;
+  draftQuickPickEntries?: DraftQuickPickEntry[] | null;
 };
 
 export function MessagesAttentionSummary({
@@ -1075,6 +1096,7 @@ export function MessagesAttentionSummary({
   onChatAttentionResume,
   draftsWaitingCount,
   onJumpToDrafts,
+  draftQuickPickEntries,
 }: MessagesAttentionSummaryProps) {
   if (!Array.isArray(queue) || queue.length === 0) {
     return null;
@@ -1083,6 +1105,35 @@ export function MessagesAttentionSummary({
   const queueCountLabel = queue.length === 1 ? "1 chat awaiting a reply" : `${queue.length} chats awaiting replies`;
   const showDraftsChip = typeof draftsWaitingCount === "number" && draftsWaitingCount > 0 && typeof onJumpToDrafts === "function";
   const draftChipLabel = draftsWaitingCount === 1 ? "1 draft waiting" : `${draftsWaitingCount ?? 0} drafts waiting`;
+
+  const draftQuickPickEntriesSafe = useMemo(
+    () =>
+      (draftQuickPickEntries ?? []).filter((entry): entry is DraftQuickPickEntry => {
+        return Boolean(entry?.conversationId && entry?.participantName);
+      }),
+    [draftQuickPickEntries]
+  );
+  const hasDraftQuickPicker = showDraftsChip && draftQuickPickEntriesSafe.length > 0;
+  const draftQuickPickerTopEntries = draftQuickPickEntriesSafe.slice(0, 3);
+  const draftQuickPickerRemainderCount = Math.max(
+    draftQuickPickEntriesSafe.length - draftQuickPickerTopEntries.length,
+    0
+  );
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if ((!hasDraftQuickPicker || draftQuickPickerRemainderCount === 0) && draftPickerOpen) {
+      setDraftPickerOpen(false);
+    }
+  }, [draftPickerOpen, hasDraftQuickPicker, draftQuickPickerRemainderCount]);
+
+  const handleSelectDraft = (conversationId: string) => {
+    if (!conversationId) {
+      return;
+    }
+    onSelectConversation(conversationId);
+    setDraftPickerOpen(false);
+  };
 
   return (
     <div className="mt-5 rounded-3xl border border-primary/30 bg-primary/5 p-4 text-primary shadow-inner shadow-black/5">
@@ -1115,6 +1166,70 @@ export function MessagesAttentionSummary({
           ) : null}
         </div>
       </div>
+      {hasDraftQuickPicker ? (
+        <div className="mt-4 rounded-2xl border border-sky-400/30 bg-sky-400/10 p-3 text-sky-50">
+          <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-sky-100/80">
+            <span>Draft quick picker</span>
+            <span>{draftChipLabel}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {draftQuickPickerTopEntries.map((entry) => {
+              const relativeTime = formatRelativeTime(entry.updatedAtISO);
+              return (
+                <button
+                  type="button"
+                  key={entry.conversationId}
+                  onClick={() => handleSelectDraft(entry.conversationId)}
+                  className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/15 px-3 py-1 text-[11px] font-semibold text-sky-50 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                  aria-label={`Open drafted chat with ${entry.participantName}`}
+                >
+                  <span>{entry.participantName}</span>
+                  {relativeTime ? <span className="text-[9px] text-sky-100/70">{relativeTime}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          {draftQuickPickerRemainderCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setDraftPickerOpen((prev) => !prev)}
+              aria-expanded={draftPickerOpen}
+              aria-controls="messages-draft-quick-picker"
+              className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-sky-50 transition hover:text-white"
+            >
+              {draftPickerOpen ? "Hide remaining drafts" : `View remaining drafts (+${draftQuickPickerRemainderCount})`}
+            </button>
+          ) : null}
+          {draftPickerOpen ? (
+            <div id="messages-draft-quick-picker" className="mt-2 rounded-2xl border border-sky-300/30 bg-sky-400/5 p-3">
+              <ul className="space-y-2">
+                {draftQuickPickEntriesSafe.map((entry) => {
+                  const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                  return (
+                    <li key={`${entry.conversationId}-summary`}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDraft(entry.conversationId)}
+                        className="w-full rounded-2xl border border-sky-300/25 bg-sky-400/15 px-3 py-2 text-left text-sky-50 transition hover:border-sky-200/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                        aria-label={`Open drafted chat with ${entry.participantName}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">{entry.participantName}</span>
+                          {relativeTime ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-100/70">{relativeTime}</span>
+                          ) : null}
+                        </div>
+                        {entry.snippet ? <p className="mt-1 text-sm text-sky-50/80 line-clamp-2">{entry.snippet}</p> : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <ul className="mt-4 space-y-3">
         {queue.map((entry) => (
           <MessagesAttentionEntry

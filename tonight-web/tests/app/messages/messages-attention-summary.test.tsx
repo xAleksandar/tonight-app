@@ -129,5 +129,33 @@ describe('MessagesAttentionSummary', () => {
     expect(chip).toBeInTheDocument();
     fireEvent.click(chip);
     expect(onJumpToDrafts).toHaveBeenCalledTimes(1);
+  });  it('lets hosts jump directly into drafted chats via the quick picker', () => {
+    const onSelect = vi.fn();
+    const now = new Date().toISOString();
+
+    render(
+      <MessagesAttentionSummary
+        queue={stubQueue()}
+        onSelectConversation={onSelect}
+        draftsWaitingCount={2}
+        onJumpToDrafts={vi.fn()}
+        draftQuickPickEntries={[
+          { conversationId: 'jr_123', participantName: 'Jess', href: '/chat/jr_123', updatedAtISO: now },
+          { conversationId: 'jr_456', participantName: 'Mira', href: '/chat/jr_456', updatedAtISO: now },
+          { conversationId: 'jr_789', participantName: 'Noah', href: '/chat/jr_789', updatedAtISO: now },
+          { conversationId: 'jr_101', participantName: 'Rina', href: '/chat/jr_101', updatedAtISO: now, snippet: 'Saved reply' },
+        ]}
+      />
+    );
+
+    const quickButton = screen.getByRole('button', { name: /open drafted chat with jess/i });
+    fireEvent.click(quickButton);
+    expect(onSelect).toHaveBeenCalledWith('jr_123');
+
+    const toggle = screen.getByRole('button', { name: /view remaining drafts/i });
+    fireEvent.click(toggle);
+    expect(screen.getByText('Saved reply')).toBeInTheDocument();
   });
+
+
 });

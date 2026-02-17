@@ -327,5 +327,30 @@ describe('DesktopHeader', () => {
     const toggle = screen.getByRole('button', { name: /view remaining guests/i });
     fireEvent.click(toggle);
     expect(screen.getByRole('link', { name: /open chat with noah/i })).toBeInTheDocument();
+  });  it('surfaces draft quick picker entries inside the header', () => {
+    const now = new Date().toISOString();
+
+    render(
+      <DesktopHeader
+        title="Messages"
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        draftsWaitingCount={3}
+        onJumpToDrafts={noop}
+        draftQuickPickEntries={[
+          { conversationId: 'jr_1', participantName: 'Jess', href: '/chat/jr_1', updatedAtISO: now },
+          { conversationId: 'jr_2', participantName: 'Mira', href: '/chat/jr_2', updatedAtISO: now, snippet: 'Need your ETA' },
+          { conversationId: 'jr_3', participantName: 'Noah', href: '/chat/jr_3', updatedAtISO: now },
+          { conversationId: 'jr_4', participantName: 'Rina', href: '/chat/jr_4', updatedAtISO: now },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: /open drafted chat with jess/i })).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /view remaining drafts/i });
+    fireEvent.click(toggle);
+    expect(screen.getByRole('link', { name: /open drafted chat with rina/i })).toBeInTheDocument();
   });
+
+
 });

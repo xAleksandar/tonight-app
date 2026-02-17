@@ -11,7 +11,7 @@ import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES, DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
-import type { MobileActionBarProps } from "./MobileActionBar";
+import type { DraftQuickPickEntry, MobileActionBarProps } from "./MobileActionBar";
 
 export type DesktopHeaderProps = {
   title: string;
@@ -36,6 +36,7 @@ export type DesktopHeaderProps = {
   onJumpToWaitingGuests?: () => void;
   draftsWaitingCount?: number | null;
   onJumpToDrafts?: () => void;
+  draftQuickPickEntries?: DraftQuickPickEntry[] | null;
 };
 
 type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
@@ -69,6 +70,7 @@ export function DesktopHeader({
   onJumpToWaitingGuests,
   draftsWaitingCount,
   onJumpToDrafts,
+  draftQuickPickEntries,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -117,6 +119,21 @@ export function DesktopHeader({
   const draftsWaitingBadgeLabel = draftsWaitingCount && draftsWaitingCount > 99 ? "99+" : String(draftsWaitingCount ?? "");
   const draftsWaitingChipLabel = draftsWaitingCount === 1 ? "1 draft waiting" : `${draftsWaitingCount ?? 0} drafts waiting`;
 
+  const draftQuickPickEntriesSafe = useMemo(
+    () =>
+      (draftQuickPickEntries ?? []).filter((entry): entry is DraftQuickPickEntry => {
+        return Boolean(entry?.href && entry?.participantName);
+      }),
+    [draftQuickPickEntries]
+  );
+  const hasDraftQuickPicker = showDraftsShortcut && draftQuickPickEntriesSafe.length > 0;
+  const draftQuickPickerTopEntries = draftQuickPickEntriesSafe.slice(0, 3);
+  const draftQuickPickerRemainderCount = Math.max(
+    draftQuickPickEntriesSafe.length - draftQuickPickerTopEntries.length,
+    0
+  );
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false);
+
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -129,6 +146,12 @@ export function DesktopHeader({
       setJumpPickerOpen(false);
     }
   }, [hasAdditionalJumpEntries, jumpPickerOpen, showJumpAction]);
+
+  useEffect(() => {
+    if ((!hasDraftQuickPicker || draftQuickPickerRemainderCount === 0) && draftPickerOpen) {
+      setDraftPickerOpen(false);
+    }
+  }, [draftPickerOpen, hasDraftQuickPicker, draftQuickPickerRemainderCount]);
 
   const handleMarkAllHandled = () => {
     if (!chatAttentionHasEntries) {
@@ -177,6 +200,80 @@ export function DesktopHeader({
         </span>
         <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white/90">{draftsWaitingBadgeLabel}</span>
       </button>
+    );
+  };
+
+  const renderDraftQuickPicker = (options?: { fullWidth?: boolean }) => {
+    if (!hasDraftQuickPicker) {
+      return null;
+    }
+    return (
+      <div
+        className={classNames(
+          "rounded-2xl border border-sky-400/25 bg-sky-400/10 p-3 text-left text-sky-100",
+          options?.fullWidth ? "w-full" : "max-w-xs"
+        )}
+      >
+        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-sky-100/80">
+          <span>Draft quick picker</span>
+          <span>{draftsWaitingChipLabel}</span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {draftQuickPickerTopEntries.map((entry) => {
+            const relativeTime = formatRelativeTime(entry.updatedAtISO);
+            return (
+              <Link
+                key={entry.conversationId}
+                href={entry.href}
+                prefetch={false}
+                aria-label={`Open drafted chat with ${entry.participantName}`}
+                className="inline-flex items-center gap-1 rounded-full border border-sky-300/30 bg-sky-400/15 px-3 py-1 text-[11px] text-sky-50/90 transition hover:border-sky-200/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+              >
+                <span>{entry.participantName}</span>
+                {relativeTime ? <span className="text-[9px] text-sky-100/70">{relativeTime}</span> : null}
+              </Link>
+            );
+          })}
+        </div>
+        {draftQuickPickerRemainderCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => setDraftPickerOpen((prev) => !prev)}
+            aria-expanded={draftPickerOpen}
+            aria-controls="desktop-draft-quick-picker"
+            className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-sky-100/80 transition hover:text-white"
+          >
+            {draftPickerOpen ? "Hide remaining drafts" : `View remaining drafts (+${draftQuickPickerRemainderCount})`}
+          </button>
+        ) : null}
+        {draftPickerOpen ? (
+          <div id="desktop-draft-quick-picker" className="mt-2 rounded-2xl border border-sky-300/30 bg-sky-400/5 p-3">
+            <ul className="space-y-2">
+              {draftQuickPickEntriesSafe.map((entry) => {
+                const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                return (
+                  <li key={`${entry.conversationId}-draft`}>
+                    <Link
+                      href={entry.href}
+                      prefetch={false}
+                      aria-label={`Open drafted chat with ${entry.participantName}`}
+                      className="block rounded-2xl border border-sky-300/25 bg-sky-400/10 px-3 py-2 text-sky-50/90 transition hover:border-sky-200/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-white">{entry.participantName}</span>
+                        {relativeTime ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-100/70">{relativeTime}</span>
+                        ) : null}
+                      </div>
+                      {entry.snippet ? <p className="mt-1 text-sm text-sky-50/80 line-clamp-2">{entry.snippet}</p> : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+      </div>
     );
   };
 
@@ -572,13 +669,23 @@ export function DesktopHeader({
                 ) : null}
               </div>
             ) : null}
-            {showDraftsShortcut ? <div className="mt-3 w-full">{renderDraftsShortcutButton({ fullWidth: true })}</div> : null}
+            {showDraftsShortcut ? (
+              <div className="mt-3 w-full space-y-3">
+                {renderDraftsShortcutButton({ fullWidth: true })}
+                {renderDraftQuickPicker({ fullWidth: true })}
+              </div>
+            ) : null}
             {!chatAction?.attentionActive && chatAction?.helperText ? (
               <p className="text-xs text-muted-foreground line-clamp-1">{chatAction.helperText}</p>
             ) : null}
           </div>
         ) : null}
-        {!hasChatAction && showDraftsShortcut ? renderDraftsShortcutButton() : null}
+        {!hasChatAction && showDraftsShortcut ? (
+          <div className="flex w-full max-w-xs flex-col gap-3">
+            {renderDraftsShortcutButton()}
+            {renderDraftQuickPicker()}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={messagesDisabled ? undefined : onNavigateMessages}

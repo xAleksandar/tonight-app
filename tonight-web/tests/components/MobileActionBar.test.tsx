@@ -297,6 +297,42 @@ describe('MobileActionBar', () => {
     fireEvent.click(miaLink);
     expect(onInteract).toHaveBeenCalledTimes(2);
   });
+
+  it('shows draft quick picker chips with links to each chat', () => {
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        draftsWaitingCount={4}
+        onJumpToDrafts={noop}
+        draftQuickPickEntries={[
+          {
+            conversationId: 'jr_1',
+            participantName: 'Nina',
+            href: '/chat/jr_1',
+            updatedAtISO: new Date().toISOString(),
+            snippet: 'Working on a reply right now.',
+          },
+          {
+            conversationId: 'jr_2',
+            participantName: 'Carlos',
+            href: '/chat/jr_2',
+            updatedAtISO: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+            snippet: 'Need to confirm timing.',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText(/draft quick picker/i)).toBeInTheDocument();
+    const ninaLink = screen.getByRole('link', { name: /open drafted chat with nina/i });
+    expect(ninaLink).toHaveAttribute('href', '/chat/jr_1');
+  });
+
   it('lets people snooze and resume chat attention alerts on mobile', () => {
     const onSnooze = vi.fn();
     const onResume = vi.fn();

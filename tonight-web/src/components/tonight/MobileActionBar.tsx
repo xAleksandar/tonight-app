@@ -30,6 +30,14 @@ type MobileChatAction = {
   onInteract?: () => void;
 };
 
+export type DraftQuickPickEntry = {
+  conversationId: string;
+  participantName: string;
+  href: string;
+  updatedAtISO?: string | null;
+  snippet?: string | null;
+};
+
 export type MobileActionBarProps = {
   active?: MobileNavTarget | null;
   onNavigateDiscover?: () => void;
@@ -50,6 +58,7 @@ export type MobileActionBarProps = {
   onChatAttentionResume?: () => void;
   draftsWaitingCount?: number | null;
   onJumpToDrafts?: () => void;
+  draftQuickPickEntries?: DraftQuickPickEntry[] | null;
 };
 
 type NavItem = {
@@ -86,6 +95,7 @@ export function MobileActionBar({
   onChatAttentionResume,
   draftsWaitingCount,
   onJumpToDrafts,
+  draftQuickPickEntries,
 }: MobileActionBarProps) {
   const navItems: NavItem[] = [
     { id: "discover" as const, label: "Discover", icon: Compass, onPress: onNavigateDiscover },
@@ -140,6 +150,16 @@ export function MobileActionBar({
     typeof draftsWaitingCount === "number" && draftsWaitingCount > 0 && typeof onJumpToDrafts === "function";
   const draftsWaitingBadgeLabel = draftsWaitingCount && draftsWaitingCount > 99 ? "99+" : String(draftsWaitingCount ?? "");
   const draftsWaitingChipLabel = draftsWaitingCount === 1 ? "1 draft waiting" : `${draftsWaitingCount ?? 0} drafts waiting`;
+  const draftQuickPickerEntriesSafe = useMemo(
+    () =>
+      (draftQuickPickEntries ?? []).filter((entry): entry is DraftQuickPickEntry => {
+        return Boolean(entry?.href && entry?.participantName);
+      }),
+    [draftQuickPickEntries]
+  );
+  const hasDraftQuickPicker = showDraftsShortcut && draftQuickPickerEntriesSafe.length > 0;
+  const draftQuickPickerTopEntries = draftQuickPickerEntriesSafe.slice(0, 3);
+  const draftQuickPickerRemainderCount = Math.max(draftQuickPickerEntriesSafe.length - draftQuickPickerTopEntries.length, 0);
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -148,12 +168,19 @@ export function MobileActionBar({
   }, [chatAttentionPickerAvailable, attentionPickerOpen]);
 
   const [jumpPickerOpen, setJumpPickerOpen] = useState(false);
+  const [draftPickerOpen, setDraftPickerOpen] = useState(false);
 
   useEffect(() => {
     if ((!hasAdditionalJumpEntries || !showMessagesJumpAction) && jumpPickerOpen) {
       setJumpPickerOpen(false);
     }
   }, [hasAdditionalJumpEntries, jumpPickerOpen, showMessagesJumpAction]);
+
+  useEffect(() => {
+    if ((!hasDraftQuickPicker || draftQuickPickerRemainderCount === 0) && draftPickerOpen) {
+      setDraftPickerOpen(false);
+    }
+  }, [draftPickerOpen, hasDraftQuickPicker, draftQuickPickerRemainderCount]);
 
   const handleMarkAllHandled = () => {
     if (!chatAttentionHasEntries) {
@@ -558,6 +585,73 @@ export function MobileActionBar({
             Jump to drafts
           </button>
           <p className="mt-2 text-[11px] text-white/70">{draftsWaitingChipLabel}</p>
+          {hasDraftQuickPicker ? (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-white/60">
+                <span>Draft quick picker</span>
+                <span className="text-white/45">{draftsWaitingChipLabel}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {draftQuickPickerTopEntries.map((entry) => {
+                  const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                  return (
+                    <Link
+                      key={entry.conversationId}
+                      href={entry.href}
+                      prefetch={false}
+                      aria-label={`Open drafted chat with ${entry.participantName}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-white/85 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                    >
+                      <span>{entry.participantName}</span>
+                      {relativeTime ? <span className="text-[9px] text-white/60">{relativeTime}</span> : null}
+                    </Link>
+                  );
+                })}
+              </div>
+              {draftQuickPickerRemainderCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setDraftPickerOpen((prev) => !prev)}
+                  aria-expanded={draftPickerOpen}
+                  aria-controls="mobile-draft-quick-picker"
+                  className="text-[10px] font-semibold uppercase tracking-wide text-sky-100 transition hover:text-white"
+                >
+                  {draftPickerOpen
+                    ? "Hide remaining drafts"
+                    : `View remaining drafts (+${draftQuickPickerRemainderCount})`}
+                </button>
+              ) : null}
+              {draftPickerOpen ? (
+                <div id="mobile-draft-quick-picker" className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <ul className="space-y-2">
+                    {draftQuickPickerEntriesSafe.map((entry) => {
+                      const relativeTime = formatRelativeTime(entry.updatedAtISO);
+                      return (
+                        <li key={`${entry.conversationId}-draft`}>
+                          <Link
+                            href={entry.href}
+                            prefetch={false}
+                            aria-label={`Open drafted chat with ${entry.participantName}`}
+                            className="block rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white/85 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-white">{entry.participantName}</span>
+                              {relativeTime ? (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-white/60">{relativeTime}</span>
+                              ) : null}
+                            </div>
+                            {entry.snippet ? (
+                              <p className="mt-1 text-sm text-white/75 line-clamp-2">{entry.snippet}</p>
+                            ) : null}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div className="flex items-center justify-around px-2 py-2 text-xs font-medium">

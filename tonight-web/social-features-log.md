@@ -529,3 +529,15 @@ Each run should:
 - Threaded the new props through `messages/page.tsx` and covered them with focused unit tests so both surfaces stay exercised.
 - Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`.
 - Next: extend the Mobile Action Bar drafts block with a tiny quick picker (names + timestamps) so hosts can jump directly into a specific drafted thread without opening the inbox.
+
+## 2026-02-17 12:54 EET — Mobile drafts quick picker lands in action bar
+- Extended the Messages draft-tracking helpers so each stored draft now carries the participant name plus a sanitized snippet, and threaded those details into a new `draftQuickPickEntries` payload for the Mobile Action Bar.
+- Refined the Mobile Action Bar to accept the new entries, rendering quick-picker chips + an expandable list that deep-link straight into `/chat/[joinRequestId]`, complete with relative timestamps and snippets so hosts can jump to any draft without opening the inbox.
+- Added unit coverage for the new quick picker and kept the component suite green (`cd tonight-web && npx vitest run tests/components/MobileActionBar.test.tsx`).
+- Next: bring the same drafts quick picker affordance to the Desktop header + inbox attention summary so the parity holds across surfaces.
+
+## 2026-02-17 13:22 EET — Desktop + inbox drafts quick picker parity
+- Mirrored the Mobile Action Bar's draft quick picker in `DesktopHeader`, including inline chips, an expandable list with snippets/timestamps, and the same badge counters so desktop hosts can hop straight into any drafted chat without scrolling the inbox.
+- Upgraded `MessagesAttentionSummary` with the identical quick picker treatment, wiring the selector to the existing jump handler so the Guests needing replies rail now doubles as a draft hub; refreshed the `/messages` page wiring plus Desktop/Mobile specs to cover the new props.
+- Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/app/messages/messages-attention-summary.test.tsx`.
+- Next: add inline “Clear draft” controls to each quick-picker entry so hosts can drop stale drafts directly from the header/attention summary without opening the conversation.
