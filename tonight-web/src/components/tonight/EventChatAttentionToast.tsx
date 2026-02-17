@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { X, MessageCircle } from "lucide-react";
+import { X, MessageCircle, ChevronDown } from "lucide-react";
+import { classNames } from "@/lib/classNames";
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
+import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
+import { buildChatAttentionLinkLabel, formatRelativeTime as formatQueueRelativeTime } from "@/lib/chatAttentionHelpers";
 
 export type EventChatAttentionToastProps = {
   href: string;
@@ -50,6 +53,7 @@ export function EventChatAttentionToast({
 
   const queueSignature = useMemo(() => attentionItems.map((item) => item.id).join("|"), [attentionItems]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [attentionPickerOpen, setAttentionPickerOpen] = useState(false);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -76,6 +80,28 @@ export function EventChatAttentionToast({
     ? attentionItems[Math.min(activeIndex, attentionItems.length - 1)]
     : null;
 
+  const chatAttentionLabels = useMemo(() => buildChatAttentionLabels(attentionItems), [attentionItems]);
+  const attentionLeadEntry = chatAttentionLabels.leadEntry;
+  const attentionLeadLabel = chatAttentionLabels.leadLabel;
+  const attentionWaitingLabel = chatAttentionLabels.waitingLabel;
+
+  const attentionLeadHref = attentionLeadEntry?.href?.trim() ?? "";
+  const attentionLeadAriaLabel = buildChatAttentionLinkLabel(attentionLeadEntry ?? activeItem ?? null);
+  const attentionPickerEntries = useMemo(
+    () =>
+      attentionItems.filter(
+        (entry): entry is EventChatAttentionPayload & { href: string } => typeof entry?.href === "string" && entry.href.trim().length > 0
+      ),
+    [attentionItems]
+  );
+  const attentionPickerAvailable = attentionPickerEntries.length > 1;
+
+  useEffect(() => {
+    if (!attentionPickerAvailable && attentionPickerOpen) {
+      setAttentionPickerOpen(false);
+    }
+  }, [attentionPickerAvailable, attentionPickerOpen]);
+
   const resolvedAttentionLabel = attentionLabel && attentionLabel.trim().length > 0 ? attentionLabel : "New chat ping";
   const resolvedHelperText = activeItem?.helperText ?? helperText;
   const snippetSource = activeItem?.snippet ?? snippet;
@@ -83,12 +109,17 @@ export function EventChatAttentionToast({
   const snippetSenderSource = activeItem?.authorName ?? snippetSender;
   const resolvedSnippetSender =
     typeof snippetSenderSource === "string" && snippetSenderSource.trim().length > 0 ? snippetSenderSource.trim() : null;
-  const resolvedSnippetTimestamp = formatRelativeTime(activeItem?.timestampISO ?? snippetTimestamp);
+  const resolvedSnippetTimestamp = formatRelativeTimeOrNull(activeItem?.timestampISO ?? snippetTimestamp);
   const ctaHref = activeItem?.href ?? href;
   const queuePositionLabel = attentionItems.length > 1 ? `${Math.min(activeIndex + 1, attentionItems.length)} of ${attentionItems.length}` : null;
 
   const handleInteract = () => {
     onInteract?.();
+  };
+
+  const handleQueueNavigate = () => {
+    onInteract?.();
+    setAttentionPickerOpen(false);
   };
 
   return (
@@ -116,6 +147,89 @@ export function EventChatAttentionToast({
                 </div>
               ) : null}
             </div>
+            {attentionLeadLabel || attentionWaitingLabel ? (
+              <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                {attentionLeadLabel ? (
+                  attentionLeadHref ? (
+                    <Link
+                      href={attentionLeadHref}
+                      prefetch={false}
+                      onClick={handleQueueNavigate}
+                      aria-label={attentionLeadAriaLabel}
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-primary transition hover:bg-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                    >
+                      {attentionLeadLabel}
+                      <span aria-hidden className="text-[10px]">↗</span>
+                    </Link>
+                  ) : (
+                    <span className="rounded-full bg-primary/15 px-3 py-1 text-primary">{attentionLeadLabel}</span>
+                  )
+                ) : null}
+                {attentionWaitingLabel ? (
+                  attentionPickerAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => setAttentionPickerOpen((prev) => !prev)}
+                      aria-expanded={attentionPickerOpen}
+                      aria-controls="toast-chat-attention-picker"
+                      aria-label={`View queued guests (${attentionWaitingLabel})`}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-primary/80 transition hover:border-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                    >
+                      {attentionWaitingLabel}
+                      <ChevronDown
+                        className={classNames("h-3 w-3 transition-transform", attentionPickerOpen ? "rotate-180" : undefined)}
+                        aria-hidden
+                      />
+                    </button>
+                  ) : (
+                    <span className="rounded-full border border-primary/30 px-3 py-1 text-primary/70">{attentionWaitingLabel}</span>
+                  )
+                ) : null}
+              </div>
+            ) : null}
+            {attentionPickerAvailable && attentionPickerOpen ? (
+              <div id="toast-chat-attention-picker" className="rounded-2xl border border-primary/30 bg-primary/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">Queued guests</p>
+                  <button
+                    type="button"
+                    onClick={() => setAttentionPickerOpen(false)}
+                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
+                  >
+                    Hide list
+                  </button>
+                </div>
+                <ul className="mt-2 space-y-2">
+                  {attentionPickerEntries.map((entry) => {
+                    const linkHref = entry.href.trim();
+                    const linkLabel = buildChatAttentionLinkLabel(entry);
+                    const relativeTime = formatQueueRelativeTime(entry.timestampISO);
+                    return (
+                      <li key={entry.id}>
+                        <Link
+                          href={linkHref}
+                          prefetch={false}
+                          onClick={handleQueueNavigate}
+                          aria-label={linkLabel}
+                          className="block rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white/85 transition hover:border-primary/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-white">{entry.authorName ?? "Guest thread"}</span>
+                            {relativeTime ? (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/60">{relativeTime}</span>
+                            ) : null}
+                          </div>
+                          {entry.snippet ? <p className="mt-1 text-sm text-white/75 line-clamp-2">{entry.snippet}</p> : null}
+                          {entry.helperText ? (
+                            <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
+                          ) : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={ctaHref}
@@ -142,7 +256,7 @@ export function EventChatAttentionToast({
   );
 }
 
-function formatRelativeTime(value?: string | null) {
+function formatRelativeTimeOrNull(value?: string | null) {
   if (!value) {
     return null;
   }

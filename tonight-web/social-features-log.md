@@ -360,3 +360,9 @@ Each run should:
 - Bolstered the DesktopHeader/MobileActionBar specs to cover the new chips + drawer while keeping the targeted Vitest suites green.
 - Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`.
 - Next: let the floating chat attention toast expose the same quick-jump picker (chip actions + queue list) so users can jump threads even if the header/action bar is off-screen.
+
+## 2026-02-17 02:45 EET — Floating toast inherits quick-jump picker
+- Ported the chat-attention chips into `EventChatAttentionToast`, so the floating banner now shows the lead guest chip, waiting-count toggle, and a full queued-guest picker with snippets + timestamps.
+- Wired the picker interactions to the shared ack handler so clicking any chip/list entry both jumps into the right `/chat/[joinRequestId]` thread and clears the toast attention state, keeping the queue in sync with the hero/header/mobile CTAs.
+- Added a focused Vitest run covering the toast picker + chip behavior (`cd tonight-web && npx vitest run tests/components/EventChatAttentionToast.test.tsx`).
+- Next: let the toast queue include inline "Mark handled" affordances (per guest) so hosts can clear attention pings without navigating away when they've already answered elsewhere.

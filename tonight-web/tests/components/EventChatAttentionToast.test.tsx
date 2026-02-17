@@ -82,7 +82,7 @@ describe('EventChatAttentionToast', () => {
 
     expect(screen.getByText('New ping')).toBeInTheDocument();
     expect(screen.getByText('Latest note from the host')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/abc');
+    expect(screen.getByRole('link', { name: /^open chat$/i })).toHaveAttribute('href', '/chat/abc');
     expect(screen.getByText('Aleks')).toBeInTheDocument();
     expect(screen.getByText('2 minutes ago')).toBeInTheDocument();
     expect(screen.getByText("Don't forget the speaker setup.")).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('EventChatAttentionToast', () => {
 
     expect(screen.getByText('First guest ping')).toBeInTheDocument();
     expect(screen.getByText('1 of 2')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/first');
+    expect(screen.getByRole('link', { name: /^open chat$/i })).toHaveAttribute('href', '/chat/first');
 
     act(() => {
       vi.advanceTimersByTime(4000);
@@ -144,6 +144,49 @@ describe('EventChatAttentionToast', () => {
 
     expect(screen.getByText('Second guest ping')).toBeInTheDocument();
     expect(screen.getByText('2 of 2')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/second');
+    expect(screen.getByRole('link', { name: /^open chat$/i })).toHaveAttribute('href', '/chat/second');
   });
+  it('renders quick-jump chips and picker so queued threads are actionable', () => {
+    vi.useFakeTimers();
+    const onInteract = vi.fn();
+
+    render(
+      <EventChatAttentionToast
+        href="/chat/default"
+        label="Open chat"
+        onInteract={onInteract}
+        attentionQueue={[
+          {
+            id: 'mira',
+            snippet: 'Mira needs a quick reply',
+            authorName: 'Mira',
+            timestampISO: '2026-02-17T00:30:00Z',
+            href: '/chat/mira',
+            helperText: 'Mira sent a new ping',
+          },
+          {
+            id: 'dante',
+            snippet: 'Dante asked about the guest list',
+            authorName: 'Dante',
+            timestampISO: '2026-02-17T00:31:00Z',
+            href: '/chat/dante',
+            helperText: 'Dante needs a reply',
+          },
+        ]}
+      />
+    );
+
+    const leadChip = screen.getByRole('link', { name: /open chat with mira/i });
+    expect(leadChip).toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggle);
+
+    const queuedLink = screen.getByRole('link', { name: /open chat with dante/i });
+    expect(queuedLink).toBeInTheDocument();
+
+    fireEvent.click(queuedLink);
+    expect(onInteract).toHaveBeenCalledTimes(1);
+  });
+
 });
