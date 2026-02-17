@@ -18,8 +18,11 @@ type EventLayoutProps = {
   userPhotoUrl: string | null;
   chatAction?: MobileActionBarProps['chatAction'];
   chatAttentionQueue?: EventChatAttentionPayload[];
+  chatAttentionSnoozedUntil?: string | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
   onChatAttentionClearAll?: () => void;
+  onChatAttentionSnooze?: () => void;
+  onChatAttentionResume?: () => void;
 };
 
 export function EventLayout({
@@ -31,8 +34,11 @@ export function EventLayout({
   userPhotoUrl,
   chatAction,
   chatAttentionQueue,
+  chatAttentionSnoozedUntil,
   onChatAttentionEntryHandled,
   onChatAttentionClearAll,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
@@ -62,8 +68,11 @@ export function EventLayout({
             userPhotoUrl={userPhotoUrl}
             chatAction={chatAction}
             chatAttentionQueue={chatAttentionQueue}
+            chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
             onChatAttentionEntryHandled={onChatAttentionEntryHandled}
             onChatAttentionClearAll={onChatAttentionClearAll}
+            onChatAttentionSnooze={onChatAttentionSnooze}
+            onChatAttentionResume={onChatAttentionResume}
           />
 
           <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -85,6 +94,7 @@ export function EventLayout({
           attentionQueue={chatAttentionQueue}
           onMarkHandled={onChatAttentionEntryHandled}
           onMarkAllHandled={onChatAttentionClearAll}
+          onSnooze={onChatAttentionSnooze}
         />
       ) : null}
 
@@ -97,8 +107,11 @@ export function EventLayout({
         onOpenProfile={() => router.push('/profile')}
         chatAction={chatAction}
         chatAttentionQueue={chatAttentionQueue}
+        chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
         onChatAttentionEntryHandled={onChatAttentionEntryHandled}
         onChatAttentionClearAll={onChatAttentionClearAll}
+        onChatAttentionSnooze={onChatAttentionSnooze}
+        onChatAttentionResume={onChatAttentionResume}
       />
     </div>
   );

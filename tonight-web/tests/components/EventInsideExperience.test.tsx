@@ -1377,4 +1377,38 @@ describe('EventInsideExperience', () => {
     });
   });
 
+  it('exposes snooze and resume controls for chat attention alerts', () => {
+    const onSnooze = vi.fn();
+    const onResume = vi.fn();
+    const queue = [
+      {
+        id: 'msg-1',
+        snippet: 'Need a quick reply',
+        authorName: 'Jess',
+        timestampISO: new Date().toISOString(),
+        href: '/chat/jr-2',
+      },
+    ];
+    const futureISO = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { rerender } = render(
+      <EventInsideExperience {...baseProps} chatAttentionQueue={queue} onChatAttentionSnooze={onSnooze} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for five minutes/i }));
+    expect(onSnooze).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionQueue={queue}
+        chatAttentionSnoozedUntil={futureISO}
+        onChatAttentionSnooze={onSnooze}
+        onChatAttentionResume={onResume}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /resume chat attention alerts/i }));
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
 });

@@ -386,3 +386,9 @@ Each run should:
 - Updated the chat attention picker + chip UIs to close automatically when the bulk action fires and refreshed the component test suites to assert the new buttons + callbacks, along with the top-level layout/client plumbing.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx`.
 - Next: add a "Snooze chat pings" affordance that mutes the attention pulse for ~5 minutes (with reminder copy + toast) so hosts can pause alerts without clearing the queue when they're mid-conversation elsewhere.
+## 2026-02-17 04:42 EET — Chat attention snooze controls
+- Added a five-minute snooze pathway for chat attention alerts that pauses the hero/desktop/mobile/float toast pulses, resumes automatically when the timer elapses, and lets people unsnooze early with contextual copy.
+- Surfaced Snooze/Resume affordances across EventInsideExperience, DesktopHeader, MobileActionBar, and the floating toast so every surface can pause pings without clearing the queue; updated EventInsidePageClient to manage the timer + resume toast + queue sync.
+- Extended the component test suites covering the new controls plus reran `npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx` to lock behavior.
+- Next: persist the snooze window across reloads (localStorage + data attribute) so hosts don’t immediately get re-pinged if they refresh or navigate while snoozed.
+

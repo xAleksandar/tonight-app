@@ -8,6 +8,8 @@ import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { showSuccessToast } from "@/lib/toast";
 
+const CHAT_ATTENTION_SNOOZE_DURATION_MS = 5 * 60 * 1000;
+
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
 type EventInsidePageClientProps = {
@@ -27,35 +29,91 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   );
   const [chatAttentionActive, setChatAttentionActive] = useState(false);
   const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
+  const [chatAttentionSnoozedUntil, setChatAttentionSnoozedUntil] = useState<string | null>(null);
   const chatAttentionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatAttentionSnoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatAttentionQueueRef = useRef<EventChatAttentionPayload[]>([]);
+  const isChatAttentionSnoozed = useMemo(() => {
+    if (!chatAttentionSnoozedUntil) {
+      return false;
+    }
+    const timestamp = Date.parse(chatAttentionSnoozedUntil);
+    return Number.isNaN(timestamp) ? false : timestamp > Date.now();
+  }, [chatAttentionSnoozedUntil]);
   const chatAttentionLabels = useMemo(() => buildChatAttentionLabels(chatAttentionQueue), [chatAttentionQueue]);
   const chatAttentionTotalCount = chatAttentionLabels.leadEntry ? chatAttentionLabels.waitingCount + 1 : chatAttentionLabels.waitingCount;
 
-  const startAttentionTimeout = useCallback((queueLength = 1) => {
-    const baseDuration = 10_000;
-    const extraPerItem = 3_500;
-    const extraItems = Math.max(Math.min(queueLength - 1, 4), 0);
-    const duration = baseDuration + extraItems * extraPerItem;
+  useEffect(() => {
+    chatAttentionQueueRef.current = chatAttentionQueue;
+  }, [chatAttentionQueue]);
 
-    if (chatAttentionTimeoutRef.current) {
-      clearTimeout(chatAttentionTimeoutRef.current);
+  const startAttentionTimeout = useCallback(
+    (queueLength = 1) => {
+      if (queueLength <= 0 || isChatAttentionSnoozed) {
+        return;
+      }
+
+      const baseDuration = 10_000;
+      const extraPerItem = 3_500;
+      const extraItems = Math.max(Math.min(queueLength - 1, 4), 0);
+      const duration = baseDuration + extraItems * extraPerItem;
+
+      if (chatAttentionTimeoutRef.current) {
+        clearTimeout(chatAttentionTimeoutRef.current);
+      }
+
+      chatAttentionTimeoutRef.current = setTimeout(() => {
+        setChatAttentionActive(false);
+        setChatAttentionQueue([]);
+        chatAttentionTimeoutRef.current = null;
+      }, duration);
+    },
+    [isChatAttentionSnoozed]
+  );
+
+  const clearSnoozeTimeout = useCallback(() => {
+    if (chatAttentionSnoozeTimeoutRef.current) {
+      clearTimeout(chatAttentionSnoozeTimeoutRef.current);
+      chatAttentionSnoozeTimeoutRef.current = null;
     }
-
-    chatAttentionTimeoutRef.current = setTimeout(() => {
-      setChatAttentionActive(false);
-      setChatAttentionQueue([]);
-      chatAttentionTimeoutRef.current = null;
-    }, duration);
   }, []);
+
+  const scheduleSnoozeWake = useCallback(
+    (targetISO: string | null) => {
+      clearSnoozeTimeout();
+      if (!targetISO) {
+        return;
+      }
+
+      const targetTimestamp = Date.parse(targetISO);
+      if (Number.isNaN(targetTimestamp)) {
+        return;
+      }
+
+      const delay = Math.max(targetTimestamp - Date.now(), 0);
+      chatAttentionSnoozeTimeoutRef.current = setTimeout(() => {
+        chatAttentionSnoozeTimeoutRef.current = null;
+        setChatAttentionSnoozedUntil(null);
+        if (chatAttentionQueueRef.current.length > 0) {
+          setChatAttentionActive(true);
+          startAttentionTimeout(chatAttentionQueueRef.current.length);
+          showSuccessToast("Chat alerts resumed", "We'll keep nudging you while guests wait.");
+        }
+      }, delay);
+    },
+    [clearSnoozeTimeout, startAttentionTimeout, showSuccessToast]
+  );
 
   const clearChatAttention = useCallback(() => {
     setChatAttentionActive(false);
     setChatAttentionQueue([]);
+    setChatAttentionSnoozedUntil(null);
+    clearSnoozeTimeout();
     if (chatAttentionTimeoutRef.current) {
       clearTimeout(chatAttentionTimeoutRef.current);
       chatAttentionTimeoutRef.current = null;
     }
-  }, []);
+  }, [clearSnoozeTimeout]);
 
   const handleChatAttentionClearAll = useCallback(() => {
     const queueLength = chatAttentionQueue.length;
@@ -83,7 +141,9 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
   const handleChatAttentionChange = useCallback(
     (active: boolean, payload?: EventChatAttentionPayload) => {
       if (active) {
-        setChatAttentionActive(true);
+        if (!isChatAttentionSnoozed) {
+          setChatAttentionActive(true);
+        }
         if (payload) {
           setChatAttentionQueue((prev) => {
             const existingIndex = prev.findIndex((entry) => entry.id === payload.id);
@@ -94,17 +154,19 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
             } else {
               next = [...prev, payload];
             }
-            startAttentionTimeout(next.length);
+            if (!isChatAttentionSnoozed) {
+              startAttentionTimeout(next.length);
+            }
             return next;
           });
-        } else {
+        } else if (!isChatAttentionSnoozed) {
           startAttentionTimeout(Math.max(chatAttentionQueue.length, 1));
         }
         return;
       }
       clearChatAttention();
     },
-    [chatAttentionQueue.length, clearChatAttention, startAttentionTimeout]
+    [chatAttentionQueue.length, clearChatAttention, isChatAttentionSnoozed, startAttentionTimeout]
   );
 
   const handleChatAttentionEntryHandled = useCallback(
@@ -121,6 +183,8 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
 
         if (next.length === 0) {
           setChatAttentionActive(false);
+          setChatAttentionSnoozedUntil(null);
+          clearSnoozeTimeout();
           if (chatAttentionTimeoutRef.current) {
             clearTimeout(chatAttentionTimeoutRef.current);
             chatAttentionTimeoutRef.current = null;
@@ -128,18 +192,51 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
           return next;
         }
 
-        setChatAttentionActive(true);
-        startAttentionTimeout(next.length);
+        if (!isChatAttentionSnoozed) {
+          setChatAttentionActive(true);
+          startAttentionTimeout(next.length);
+        }
         return next;
       });
     },
-    [startAttentionTimeout]
+    [clearSnoozeTimeout, isChatAttentionSnoozed, startAttentionTimeout]
   );
+
+  const handleChatAttentionSnooze = useCallback(() => {
+    const snoozeUntil = new Date(Date.now() + CHAT_ATTENTION_SNOOZE_DURATION_MS).toISOString();
+    setChatAttentionSnoozedUntil(snoozeUntil);
+    setChatAttentionActive(false);
+    if (chatAttentionTimeoutRef.current) {
+      clearTimeout(chatAttentionTimeoutRef.current);
+      chatAttentionTimeoutRef.current = null;
+    }
+    showSuccessToast("Chat alerts snoozed", "We'll remind you again in about 5 minutes.");
+    scheduleSnoozeWake(snoozeUntil);
+  }, [scheduleSnoozeWake, showSuccessToast]);
+
+  const handleChatAttentionResume = useCallback(() => {
+    if (!chatAttentionSnoozedUntil) {
+      return;
+    }
+
+    clearSnoozeTimeout();
+    setChatAttentionSnoozedUntil(null);
+    if (chatAttentionQueueRef.current.length > 0) {
+      setChatAttentionActive(true);
+      startAttentionTimeout(chatAttentionQueueRef.current.length);
+      showSuccessToast("Chat alerts back on", "We'll resume nudges for the guests who pinged.");
+    } else {
+      showSuccessToast("Chat alerts back on", "We'll ping you again when someone reaches out.");
+    }
+  }, [chatAttentionSnoozedUntil, clearSnoozeTimeout, showSuccessToast, startAttentionTimeout]);
 
   useEffect(() => {
     return () => {
       if (chatAttentionTimeoutRef.current) {
         clearTimeout(chatAttentionTimeoutRef.current);
+      }
+      if (chatAttentionSnoozeTimeoutRef.current) {
+        clearTimeout(chatAttentionSnoozeTimeoutRef.current);
       }
     };
   }, []);
@@ -186,17 +283,23 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       userPhotoUrl={layoutProps.userPhotoUrl}
       chatAction={chatAction}
       chatAttentionQueue={chatAttentionQueue}
+      chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
       onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
       onChatAttentionClearAll={handleChatAttentionClearAll}
+      onChatAttentionSnooze={handleChatAttentionSnooze}
+      onChatAttentionResume={handleChatAttentionResume}
     >
       <EventInsideExperience
         {...experience}
         onChatPreviewRefresh={handleChatPreviewRefresh}
         chatAttentionActive={chatAttentionActive}
         chatAttentionQueue={chatAttentionQueue}
+        chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
         onChatAttentionChange={handleChatAttentionChange}
         onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
         onChatAttentionClearAll={handleChatAttentionClearAll}
+        onChatAttentionSnooze={handleChatAttentionSnooze}
+        onChatAttentionResume={handleChatAttentionResume}
       />
     </EventLayout>
   );

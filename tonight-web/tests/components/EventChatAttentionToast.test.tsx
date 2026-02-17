@@ -255,4 +255,28 @@ describe('EventChatAttentionToast', () => {
     fireEvent.click(queuedMarkButton);
     expect(onMarkHandled).toHaveBeenCalledWith('dante');
   });
+  it('offers a snooze control inside the toast', () => {
+    const onSnooze = vi.fn();
+
+    render(
+      <EventChatAttentionToast
+        href="/chat/abc"
+        label="Open chat"
+        attentionQueue={[
+          {
+            id: 'entry-1',
+            snippet: 'Need a quick update',
+            authorName: 'Jess',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jess',
+          },
+        ]}
+        onSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts/i }));
+    expect(onSnooze).toHaveBeenCalledTimes(1);
+  });
+
 });

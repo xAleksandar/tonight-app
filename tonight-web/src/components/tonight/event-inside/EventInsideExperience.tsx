@@ -135,12 +135,18 @@ export type EventInsideExperienceProps = {
   chatAttentionActive?: boolean;
   /** Active queue of attention payloads (used for chips + inline context) */
   chatAttentionQueue?: EventChatAttentionPayload[];
+  /** When set, attention pulses are snoozed until this ISO timestamp */
+  chatAttentionSnoozedUntil?: string | null;
   /** Fired when realtime events request the attention indicator to toggle */
   onChatAttentionChange?: (active: boolean, payload?: EventChatAttentionPayload) => void;
   /** Fired when the host manually marks a queued chat attention entry as handled */
   onChatAttentionEntryHandled?: (entryId: string) => void;
   /** Clears the entire chat attention queue in one action */
   onChatAttentionClearAll?: () => void;
+  /** Snoozes chat attention pulses for ~5 minutes */
+  onChatAttentionSnooze?: () => void;
+  /** Resumes chat attention pulses immediately */
+  onChatAttentionResume?: () => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -280,9 +286,12 @@ export function EventInsideExperience({
   onChatPreviewRefresh,
   chatAttentionActive = false,
   chatAttentionQueue = [],
+  chatAttentionSnoozedUntil,
   onChatAttentionChange,
   onChatAttentionEntryHandled,
   onChatAttentionClearAll,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
 }: EventInsideExperienceProps) {
   const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
   const chatPreview = chatPreviewState ?? initialChatPreview;
@@ -995,6 +1004,11 @@ export function EventInsideExperience({
   const heroChatAttentionWaitingChip = chatAttentionLabels.waitingLabel;
   const heroChatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? "New chat ping";
   const heroChatAttentionHasQueue = (chatAttentionQueue?.length ?? 0) > 0;
+  const chatAttentionSnoozedUntilTimestamp = useMemo(() => parseIsoTimestamp(chatAttentionSnoozedUntil), [chatAttentionSnoozedUntil]);
+  const chatAttentionIsSnoozed = Boolean(chatAttentionSnoozedUntilTimestamp && chatAttentionSnoozedUntilTimestamp > Date.now());
+  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed && chatAttentionSnoozedUntil
+    ? `Resumes ${formatRelativeTime(chatAttentionSnoozedUntil)}`
+    : null;
   const heroChatAttentionLeadEntry = chatAttentionLabels.leadEntry;
   const heroChatAttentionLeadHref = heroChatAttentionLeadEntry?.href ?? chatCtaHref;
   const heroChatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(heroChatAttentionLeadEntry);
@@ -2245,6 +2259,32 @@ export function EventInsideExperience({
                       Mark all handled
                     </button>
                   ) : null}
+                  {heroChatAttentionHasQueue && onChatAttentionSnooze ? (
+                    chatAttentionIsSnoozed ? (
+                      <div className="inline-flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                        <span>{chatAttentionSnoozeLabel ?? "Snoozed"}</span>
+                        {onChatAttentionResume ? (
+                          <button
+                            type="button"
+                            onClick={onChatAttentionResume}
+                            className="text-primary/70 underline-offset-2 hover:text-primary"
+                            aria-label="Resume chat attention alerts"
+                          >
+                            Resume alerts
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onChatAttentionSnooze}
+                        className="text-[10px] font-semibold uppercase tracking-wide text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                        aria-label="Snooze chat attention alerts for five minutes"
+                      >
+                        Snooze 5 min
+                      </button>
+                    )
+                  ) : null}
                 </div>
               </div>
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -2349,16 +2389,44 @@ export function EventInsideExperience({
                     );
                   })}
                 </ul>
-                {heroChatAttentionHasQueue && onChatAttentionClearAll ? (
-                  <div className="mt-3 text-right">
-                    <button
-                      type="button"
-                      onClick={handleChatAttentionClearAll}
-                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                      aria-label="Mark all chat attention entries as handled"
-                    >
-                      Mark all handled
-                    </button>
+                {(heroChatAttentionHasQueue && onChatAttentionClearAll) || (heroChatAttentionHasQueue && onChatAttentionSnooze) ? (
+                  <div className="mt-3 flex flex-wrap items-center justify-end gap-3 text-right">
+                    {heroChatAttentionHasQueue && onChatAttentionSnooze ? (
+                      chatAttentionIsSnoozed ? (
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                          <span>{chatAttentionSnoozeLabel ?? "Snoozed"}</span>
+                          {onChatAttentionResume ? (
+                            <button
+                              type="button"
+                              onClick={onChatAttentionResume}
+                              className="ml-2 text-primary/70 underline-offset-2 hover:text-primary"
+                              aria-label="Resume chat attention alerts"
+                            >
+                              Resume alerts
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={onChatAttentionSnooze}
+                          className="text-[10px] font-semibold uppercase tracking-wide text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          aria-label="Snooze chat attention alerts for five minutes"
+                        >
+                          Snooze 5 min
+                        </button>
+                      )
+                    ) : null}
+                    {heroChatAttentionHasQueue && onChatAttentionClearAll ? (
+                      <button
+                        type="button"
+                        onClick={handleChatAttentionClearAll}
+                        className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                        aria-label="Mark all chat attention entries as handled"
+                      >
+                        Mark all handled
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

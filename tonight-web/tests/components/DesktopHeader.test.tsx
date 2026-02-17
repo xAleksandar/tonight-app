@@ -200,4 +200,48 @@ describe('DesktopHeader', () => {
     fireEvent.click(alexLink);
     expect(onInteract).toHaveBeenCalledTimes(2);
   });
+  it('snoozes and resumes chat attention alerts from the header controls', () => {
+    const onSnooze = vi.fn();
+    const onResume = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+    const futureISO = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { rerender } = render(
+      <DesktopHeader
+        title='Tonight event'
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        chatAction={{ href: '/chat/demo', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts/i }));
+    expect(onSnooze).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <DesktopHeader
+        title='Tonight event'
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        chatAction={{ href: '/chat/demo', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        chatAttentionSnoozedUntil={futureISO}
+        onChatAttentionSnooze={onSnooze}
+        onChatAttentionResume={onResume}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /resume chat attention alerts/i }));
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
 });

@@ -20,6 +20,7 @@ export type EventChatAttentionToastProps = {
   attentionQueue?: EventChatAttentionPayload[];
   onMarkHandled?: (entryId: string) => void;
   onMarkAllHandled?: () => void;
+  onSnooze?: () => void;
 };
 
 const TOAST_CONTAINER_CLASS =
@@ -38,6 +39,7 @@ export function EventChatAttentionToast({
   attentionQueue,
   onMarkHandled,
   onMarkAllHandled,
+  onSnooze,
 }: EventChatAttentionToastProps) {
   const attentionItems = useMemo(() => {
     if (!attentionQueue?.length) {
@@ -166,8 +168,18 @@ export function EventChatAttentionToast({
                   {queuePositionLabel ? (
                     <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/40">{queuePositionLabel}</p>
                   ) : null}
-                  {onMarkAllHandled || (onMarkHandled && activeItem?.id) ? (
+                  {onMarkAllHandled || (onMarkHandled && activeItem?.id) || onSnooze ? (
                     <div className="mt-3 flex flex-wrap justify-end gap-3">
+                      {onSnooze ? (
+                        <button
+                          type="button"
+                          onClick={onSnooze}
+                          className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          aria-label="Snooze chat attention alerts for five minutes"
+                        >
+                          Snooze 5 min
+                        </button>
+                      ) : null}
                       {onMarkAllHandled ? (
                         <button
                           type="button"

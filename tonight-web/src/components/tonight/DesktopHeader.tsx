@@ -24,8 +24,11 @@ export type DesktopHeaderProps = {
   userPhotoUrl?: string | null;
   chatAction?: MobileActionBarProps["chatAction"];
   chatAttentionQueue?: EventChatAttentionPayload[] | null;
+  chatAttentionSnoozedUntil?: string | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
   onChatAttentionClearAll?: () => void;
+  onChatAttentionSnooze?: () => void;
+  onChatAttentionResume?: () => void;
 };
 
 type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
@@ -49,8 +52,11 @@ export function DesktopHeader({
   userPhotoUrl,
   chatAction,
   chatAttentionQueue,
+  chatAttentionSnoozedUntil,
   onChatAttentionEntryHandled,
   onChatAttentionClearAll,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -77,6 +83,11 @@ export function DesktopHeader({
   );
   const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
   const chatAttentionHasEntries = chatAttentionEntries.length > 0;
+  const chatAttentionSnoozedTimestamp = chatAttentionSnoozedUntil ? Date.parse(chatAttentionSnoozedUntil) : NaN;
+  const chatAttentionIsSnoozed = Number.isFinite(chatAttentionSnoozedTimestamp) && chatAttentionSnoozedTimestamp > Date.now();
+  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed && chatAttentionSnoozedUntil
+    ? `Resumes ${formatRelativeTime(chatAttentionSnoozedUntil)}`
+    : null;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -232,6 +243,32 @@ export function DesktopHeader({
                   )
                 ) : null}
               </div>
+            ) : null}
+            {chatAttentionHasEntries && onChatAttentionSnooze ? (
+              chatAttentionIsSnoozed ? (
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {chatAttentionSnoozeLabel ?? "Snoozed"}
+                  {onChatAttentionResume ? (
+                    <button
+                      type="button"
+                      onClick={onChatAttentionResume}
+                      className="ml-2 text-primary/70 underline-offset-2 hover:text-primary"
+                      aria-label="Resume chat attention alerts"
+                    >
+                      Resume alerts
+                    </button>
+                  ) : null}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onChatAttentionSnooze}
+                  className="mt-1 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition hover:text-foreground"
+                  aria-label="Snooze chat attention alerts for five minutes"
+                >
+                  Snooze chat pings for 5 min
+                </button>
+              )
             ) : null}
             {chatAttentionPickerAvailable && attentionPickerOpen ? (
               <div
