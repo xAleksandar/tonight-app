@@ -491,3 +491,8 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/components/MobileActionBar.test.tsx`.
 - Next: bring the same queue-count + quick picker treatment to the Messages desktop header CTA so desktop hosts can jump directly into any waiting guest without scrolling.
 
+## 2026-02-17 10:40 EET — Desktop header jump CTA matches mobile quick picker
+- Extended `DesktopHeader` with the same Guests needing replies CTA from mobile: desktop hosts now see the queued count, a jump button, inline quick picker chips, and a drawer listing every waiting guest (with mark-handled + bulk clear actions).
+- Updated `/messages/page.tsx` to pass the new jump props through every DesktopHeader instance so the CTA stays wired during loading/error states, and added Vitest coverage for the expanded UI (`npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`).
+- Next: persist per-thread draft replies on `/chat/[joinRequestId]` so bouncing between queued guests via the new pickers never drops an in-progress message.
+

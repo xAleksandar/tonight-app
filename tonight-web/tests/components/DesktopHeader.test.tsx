@@ -273,4 +273,42 @@ describe('DesktopHeader', () => {
     expect(onSnooze).toHaveBeenCalledWith(10);
   });
 
+  it('shows the desktop jump CTA with queue counts and quick picker entries', () => {
+    const onJump = vi.fn();
+    const onHandle = vi.fn();
+    const onInteract = vi.fn();
+    const queue = [
+      { id: 'entry-1', authorName: 'Jess', snippet: 'Need a quick update', href: '/chat/jess', timestampISO: new Date().toISOString() },
+      { id: 'entry-2', authorName: 'Alex', snippet: 'Any dress code?', href: '/chat/alex', timestampISO: new Date().toISOString() },
+      { id: 'entry-3', authorName: 'Mira', snippet: 'Heading over soon', href: '/chat/mira', timestampISO: new Date().toISOString() },
+      { id: 'entry-4', authorName: 'Noah', snippet: 'Lost near the venue', href: '/chat/noah', timestampISO: new Date().toISOString() },
+    ];
+
+    render(
+      <DesktopHeader
+        title='Tonight event'
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        chatAction={{ href: '/chat/demo', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread', onInteract }}
+        chatAttentionQueue={queue}
+        onChatAttentionEntryHandled={onHandle}
+        canJumpToWaitingGuests
+        onJumpToWaitingGuests={onJump}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /jump to the guests waiting for a reply/i }));
+    expect(onJump).toHaveBeenCalledTimes(1);
+
+    const quickLink = screen.getAllByRole('link', { name: /open chat with jess/i })[0];
+    fireEvent.click(quickLink);
+    expect(onInteract).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /mark handled for alex/i }));
+    expect(onHandle).toHaveBeenCalledWith('entry-2');
+
+    const toggle = screen.getByRole('button', { name: /view remaining guests/i });
+    fireEvent.click(toggle);
+    expect(screen.getByRole('link', { name: /open chat with noah/i })).toBeInTheDocument();
+  });
 });

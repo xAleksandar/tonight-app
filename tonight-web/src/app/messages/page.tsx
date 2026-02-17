@@ -534,6 +534,8 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               onChatAttentionClearAll={handleChatAttentionClearAll}
               onChatAttentionSnooze={handleChatAttentionSnooze}
               onChatAttentionResume={handleChatAttentionResume}
+              canJumpToWaitingGuests={canJumpToWaitingGuests}
+              onJumpToWaitingGuests={handleJumpToWaitingGuests}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -577,6 +579,8 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
               onChatAttentionClearAll={handleChatAttentionClearAll}
               onChatAttentionSnooze={handleChatAttentionSnooze}
               onChatAttentionResume={handleChatAttentionResume}
+              canJumpToWaitingGuests={canJumpToWaitingGuests}
+              onJumpToWaitingGuests={handleJumpToWaitingGuests}
             />
             <main className="flex-1 flex items-center justify-center">
               <div className="text-center">
@@ -624,6 +628,8 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
             onChatAttentionClearAll={handleChatAttentionClearAll}
             onChatAttentionSnooze={handleChatAttentionSnooze}
             onChatAttentionResume={handleChatAttentionResume}
+            canJumpToWaitingGuests={canJumpToWaitingGuests}
+            onJumpToWaitingGuests={handleJumpToWaitingGuests}
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
