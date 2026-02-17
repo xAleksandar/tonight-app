@@ -20,7 +20,7 @@ export type DesktopHeaderProps = {
   userDisplayName?: string | null;
   userEmail?: string | null;
   userPhotoUrl?: string | null;
-  // Legacy chat props kept for compatibility with callers (no-op in desktop header)
+  // Legacy chat props retained for compatibility (unused in desktop header)
   chatAction?: MobileActionBarProps["chatAction"];
   chatAttentionQueue?: unknown;
   chatAttentionSnoozedUntil?: string | null;
@@ -51,6 +51,10 @@ export function DesktopHeader({
   onJumpToDrafts,
   draftQuickPickEntries,
   onClearDraft,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  chatAction: _chatAction,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  chatAttentionQueue: _chatAttentionQueue,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -201,80 +205,82 @@ export function DesktopHeader({
   };
 
   return (
-    <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-background/85 px-10 py-3 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:grid md:grid-cols-3 md:items-center">
-      <div>
-        <h1 className="font-serif text-3xl font-semibold leading-tight">{title}</h1>
-        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-      </div>
+    <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-background/85 px-10 py-3 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:block">
+      <div className="mx-auto grid w-full max-w-[1344px] grid-cols-3 items-center">
+        <div>
+          <h1 className="font-serif text-3xl font-semibold leading-tight">{title}</h1>
+          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
 
-      <div className="flex justify-center">
-        {canToggleView && (
-          <div className="flex items-center rounded-full border border-border/70 bg-card/60 p-1 text-sm font-semibold">
-            <button
-              type="button"
-              onClick={() => onViewModeChange?.("list")}
-              className={classNames(
-                "flex items-center gap-1.5 rounded-full px-4 py-1.5 transition-colors",
-                viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-              aria-pressed={viewMode === "list"}
-            >
-              <ListIcon className="h-4 w-4" />
-              List
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange?.("map")}
-              className={classNames(
-                "flex items-center gap-1.5 rounded-full px-4 py-1.5 transition-colors",
-                viewMode === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-              aria-pressed={viewMode === "map"}
-            >
-              <MapIcon className="h-4 w-4" />
-              Map
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-4">
-        {showDraftsShortcut ? (
-          <div className="flex w-full max-w-xs flex-col gap-3">
-            {renderDraftsShortcutButton()}
-            {renderDraftQuickPicker()}
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={messagesDisabled ? undefined : onNavigateMessages}
-          className={classNames(
-            "relative flex h-11 w-11 items-center justify-center rounded-full border",
-            messagesDisabled
-              ? "border-border/70 text-muted-foreground"
-              : "border-border/80 bg-card/60 text-muted-foreground hover:text-primary"
+        <div className="flex justify-center">
+          {canToggleView && (
+            <div className="flex items-center rounded-full border border-border/70 bg-card/60 p-1 text-sm font-semibold">
+              <button
+                type="button"
+                onClick={() => onViewModeChange?.("list")}
+                className={classNames(
+                  "flex items-center gap-1.5 rounded-full px-4 py-1.5 transition-colors",
+                  viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+                aria-pressed={viewMode === "list"}
+              >
+                <ListIcon className="h-4 w-4" />
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange?.("map")}
+                className={classNames(
+                  "flex items-center gap-1.5 rounded-full px-4 py-1.5 transition-colors",
+                  viewMode === "map" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+                aria-pressed={viewMode === "map"}
+              >
+                <MapIcon className="h-4 w-4" />
+                Map
+              </button>
+            </div>
           )}
-          aria-label="Messages"
-          aria-disabled={messagesDisabled}
-          disabled={messagesDisabled}
-        >
-          <MessageCircle className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={onNavigateProfile}
-          className="relative flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          aria-label="Profile"
-        >
-          <UserAvatar
-            displayName={userDisplayName ?? undefined}
-            email={userEmail ?? undefined}
-            photoUrl={userPhotoUrl ?? undefined}
-            size="sm"
-            className="h-11 w-11 border border-border/70 bg-card/70 text-foreground"
-            initialsClassName="text-[13px]"
-          />
-        </button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          {showDraftsShortcut ? (
+            <div className="flex w-full max-w-xs flex-col gap-3">
+              {renderDraftsShortcutButton()}
+              {renderDraftQuickPicker()}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={messagesDisabled ? undefined : onNavigateMessages}
+            className={classNames(
+              "relative flex h-11 w-11 items-center justify-center rounded-full border",
+              messagesDisabled
+                ? "border-border/70 text-muted-foreground"
+                : "border-border/80 bg-card/60 text-muted-foreground hover:text-primary"
+            )}
+            aria-label="Messages"
+            aria-disabled={messagesDisabled}
+            disabled={messagesDisabled}
+          >
+            <MessageCircle className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={onNavigateProfile}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold text-foreground transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-label="Profile"
+          >
+            <UserAvatar
+              displayName={userDisplayName ?? undefined}
+              email={userEmail ?? undefined}
+              photoUrl={userPhotoUrl ?? undefined}
+              size="sm"
+              className="h-11 w-11 border border-border/70 bg-card/70 text-foreground"
+              initialsClassName="text-[13px]"
+            />
+          </button>
+        </div>
       </div>
     </header>
   );

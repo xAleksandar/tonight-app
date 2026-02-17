@@ -83,7 +83,9 @@ export function EventLayout({
           />
 
           <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
-            {children}
+            <div className="mx-auto w-full max-w-[1344px]">
+              {children}
+            </div>
           </main>
         </div>
       </div>
