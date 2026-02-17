@@ -289,7 +289,8 @@ describe('MobileActionBar', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for 5 minutes/i }));
+    expect(onSnooze).toHaveBeenCalledWith(5);
     expect(onSnooze).toHaveBeenCalledTimes(1);
 
     rerender(

@@ -403,4 +403,10 @@ Each run should:
 - Added a reusable `useSnoozeCountdown` hook and threaded it through EventInsideExperience, the desktop header, mobile action bar, and the floating toast so every surface now shows a live “Snoozed · mm:ss left” badge with a resume control.
 - Kept the chat toast visible while snoozed, propagated the countdown into Desktop/Mobile/Toast UIs, and updated the Event layout plumbing so snoozed queues can still surface mark-all/mark-handled actions.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx tests/app/events/EventInsidePageClient.test.tsx`.
+- Next: remember the last snooze duration per host (and surface that selection in the pills) so repeat snoozes default to their preferred window without extra taps.
+## 2026-02-17 05:45 EET — Snooze duration picker everywhere
+- Added shared chat snooze duration options (5/10/20 min) so the hero chips, desktop header, mobile action bar, and floating toast all show the same quick-select pills, keeping the UX consistent across surfaces.
+- Updated the EventInsidePageClient to accept variable snooze durations, persist the right timestamps, and emit duration-specific toast copy so hosts know exactly when alerts will resume.
+- Refreshed the component + client test suites (EventInsideExperience/DesktopHeader/MobileActionBar/EventChatAttentionToast + EventInsidePageClient) to cover the new handlers and ensure each surface passes the selected duration downstream.
 - Next: let hosts pick the snooze duration (e.g., 5/10/20 minutes) from any surface so they can pause alerts for longer focus blocks without hitting snooze repeatedly.
+

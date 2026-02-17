@@ -10,6 +10,7 @@ import { classNames } from "@/lib/classNames";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
+import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
 import type { MobileActionBarProps } from "./MobileActionBar";
 
 export type DesktopHeaderProps = {
@@ -28,7 +29,7 @@ export type DesktopHeaderProps = {
   chatAttentionSnoozedUntil?: string | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
   onChatAttentionClearAll?: () => void;
-  onChatAttentionSnooze?: () => void;
+  onChatAttentionSnooze?: (durationMinutes?: number) => void;
   onChatAttentionResume?: () => void;
 };
 
@@ -267,14 +268,20 @@ export function DesktopHeader({
                   ) : null}
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={onChatAttentionSnooze}
-                  className="mt-1 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition hover:text-foreground"
-                  aria-label="Snooze chat attention alerts for five minutes"
-                >
-                  Snooze chat pings for 5 min
-                </button>
+                <div className="mt-1 flex flex-wrap items-center justify-end gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="text-muted-foreground/70">Snooze:</span>
+                  {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => (
+                    <button
+                      key={minutes}
+                      type="button"
+                      onClick={() => onChatAttentionSnooze(minutes)}
+                      className="rounded-full border border-white/15 px-3 py-1 text-muted-foreground transition hover:border-white/40 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                    >
+                      {minutes} min
+                    </button>
+                  ))}
+                </div>
               )
             ) : null}
             {chatAttentionPickerAvailable && attentionPickerOpen ? (

@@ -7,8 +7,8 @@ import { EventInsideExperience } from "@/components/tonight/event-inside/EventIn
 import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { showSuccessToast } from "@/lib/toast";
+import { DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
 
-const CHAT_ATTENTION_SNOOZE_DURATION_MS = 5 * 60 * 1000;
 export const CHAT_ATTENTION_SNOOZE_STORAGE_KEY = "tonight.chatAttentionSnoozedUntil";
 const CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE = "chatAttentionSnoozedUntil";
 
@@ -252,17 +252,22 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
     [clearSnoozeTimeout, isChatAttentionSnoozed, startAttentionTimeout]
   );
 
-  const handleChatAttentionSnooze = useCallback(() => {
-    const snoozeUntil = new Date(Date.now() + CHAT_ATTENTION_SNOOZE_DURATION_MS).toISOString();
-    setChatAttentionSnoozedUntil(snoozeUntil);
-    setChatAttentionActive(false);
-    if (chatAttentionTimeoutRef.current) {
-      clearTimeout(chatAttentionTimeoutRef.current);
-      chatAttentionTimeoutRef.current = null;
-    }
-    showSuccessToast("Chat alerts snoozed", "We'll remind you again in about 5 minutes.");
-    scheduleSnoozeWake(snoozeUntil);
-  }, [scheduleSnoozeWake, showSuccessToast]);
+  const handleChatAttentionSnooze = useCallback(
+    (durationMinutes: number = DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES) => {
+      const safeMinutes = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+      const snoozeUntil = new Date(Date.now() + safeMinutes * 60 * 1000).toISOString();
+      setChatAttentionSnoozedUntil(snoozeUntil);
+      setChatAttentionActive(false);
+      if (chatAttentionTimeoutRef.current) {
+        clearTimeout(chatAttentionTimeoutRef.current);
+        chatAttentionTimeoutRef.current = null;
+      }
+      const durationLabel = safeMinutes === 1 ? "minute" : "minutes";
+      showSuccessToast("Chat alerts snoozed", `We'll remind you again in about ${safeMinutes} ${durationLabel}.`);
+      scheduleSnoozeWake(snoozeUntil);
+    },
+    [scheduleSnoozeWake, showSuccessToast]
+  );
 
   const handleChatAttentionResume = useCallback(() => {
     if (!chatAttentionSnoozedUntil) {

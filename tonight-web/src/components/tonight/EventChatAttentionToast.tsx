@@ -8,6 +8,7 @@ import type { EventChatAttentionPayload } from "@/components/tonight/event-insid
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime as formatQueueRelativeTime } from "@/lib/chatAttentionHelpers";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
+import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
 
 export type EventChatAttentionToastProps = {
   href: string;
@@ -22,7 +23,7 @@ export type EventChatAttentionToastProps = {
   chatAttentionSnoozedUntil?: string | null;
   onMarkHandled?: (entryId: string) => void;
   onMarkAllHandled?: () => void;
-  onSnooze?: () => void;
+  onSnooze?: (durationMinutes?: number) => void;
   onResume?: () => void;
 };
 
@@ -200,14 +201,20 @@ export function EventChatAttentionToast({
                             ) : null}
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={onSnooze}
-                            className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                            aria-label="Snooze chat attention alerts for five minutes"
-                          >
-                            Snooze 5 min
-                          </button>
+                          <div className="inline-flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/70">
+                            <span className="text-white/50">Snooze:</span>
+                            {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => (
+                              <button
+                                key={minutes}
+                                type="button"
+                                onClick={() => onSnooze(minutes)}
+                                className="rounded-full border border-white/20 px-3 py-1 text-white/85 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                                aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                              >
+                                {minutes} min
+                              </button>
+                            ))}
+                          </div>
                         )
                       ) : null}
                       {onMarkAllHandled ? (

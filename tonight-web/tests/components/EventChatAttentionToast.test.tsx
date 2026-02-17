@@ -275,7 +275,8 @@ describe('EventChatAttentionToast', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for 20 minutes/i }));
+    expect(onSnooze).toHaveBeenCalledWith(20);
     expect(onSnooze).toHaveBeenCalledTimes(1);
   });
 

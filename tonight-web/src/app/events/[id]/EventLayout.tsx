@@ -21,7 +21,7 @@ type EventLayoutProps = {
   chatAttentionSnoozedUntil?: string | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
   onChatAttentionClearAll?: () => void;
-  onChatAttentionSnooze?: () => void;
+  onChatAttentionSnooze?: (durationMinutes?: number) => void;
   onChatAttentionResume?: () => void;
 };
 

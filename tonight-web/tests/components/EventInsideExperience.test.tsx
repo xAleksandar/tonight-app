@@ -1394,7 +1394,8 @@ describe('EventInsideExperience', () => {
       <EventInsideExperience {...baseProps} chatAttentionQueue={queue} onChatAttentionSnooze={onSnooze} />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for five minutes/i }));
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for 10 minutes/i }));
+    expect(onSnooze).toHaveBeenCalledWith(10);
     expect(onSnooze).toHaveBeenCalledTimes(1);
 
     rerender(
