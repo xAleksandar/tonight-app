@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, List as ListIcon, Map as MapIcon, MessageCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, Edit3, List as ListIcon, Map as MapIcon, MessageCircle } from "lucide-react";
 
 import UserAvatar from "@/components/UserAvatar";
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
@@ -34,6 +34,8 @@ export type DesktopHeaderProps = {
   onChatAttentionResume?: () => void;
   canJumpToWaitingGuests?: boolean;
   onJumpToWaitingGuests?: () => void;
+  draftsWaitingCount?: number | null;
+  onJumpToDrafts?: () => void;
 };
 
 type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
@@ -65,6 +67,8 @@ export function DesktopHeader({
   onChatAttentionResume,
   canJumpToWaitingGuests,
   onJumpToWaitingGuests,
+  draftsWaitingCount,
+  onJumpToDrafts,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -108,6 +112,11 @@ export function DesktopHeader({
   const hasAdditionalJumpEntries = jumpPickerRemainderCount > 0;
   const queuedGuestCount = chatAttentionEntries.length;
   const queuedGuestCountLabel = queuedGuestCount > 0 ? `${queuedGuestCount} queued` : null;
+  const showDraftsShortcut =
+    typeof draftsWaitingCount === "number" && draftsWaitingCount > 0 && typeof onJumpToDrafts === "function";
+  const draftsWaitingBadgeLabel = draftsWaitingCount && draftsWaitingCount > 99 ? "99+" : String(draftsWaitingCount ?? "");
+  const draftsWaitingChipLabel = draftsWaitingCount === 1 ? "1 draft waiting" : `${draftsWaitingCount ?? 0} drafts waiting`;
+
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -148,6 +157,29 @@ export function DesktopHeader({
     setJumpPickerOpen(false);
   };
 
+  const renderDraftsShortcutButton = (options?: { fullWidth?: boolean }) => {
+    if (!showDraftsShortcut || !onJumpToDrafts) {
+      return null;
+    }
+    return (
+      <button
+        type="button"
+        onClick={onJumpToDrafts}
+        className={classNames(
+          "inline-flex items-center justify-between gap-2 rounded-2xl border border-sky-400/40 bg-sky-400/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-sky-100 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40",
+          options?.fullWidth ? "w-full" : "max-w-xs"
+        )}
+        aria-label={draftsWaitingChipLabel}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Edit3 className="h-3.5 w-3.5" aria-hidden />
+          Drafts waiting
+        </span>
+        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white/90">{draftsWaitingBadgeLabel}</span>
+      </button>
+    );
+  };
+
   return (
     <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-background/85 px-10 py-3 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl md:grid md:grid-cols-3 md:items-center">
       <div>
@@ -186,7 +218,7 @@ export function DesktopHeader({
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-4">
         {hasChatAction ? (
           <div className="flex w-full max-w-xs flex-col items-end gap-1 text-right">
             <Link
@@ -540,11 +572,13 @@ export function DesktopHeader({
                 ) : null}
               </div>
             ) : null}
+            {showDraftsShortcut ? <div className="mt-3 w-full">{renderDraftsShortcutButton({ fullWidth: true })}</div> : null}
             {!chatAction?.attentionActive && chatAction?.helperText ? (
               <p className="text-xs text-muted-foreground line-clamp-1">{chatAction.helperText}</p>
             ) : null}
           </div>
         ) : null}
+        {!hasChatAction && showDraftsShortcut ? renderDraftsShortcutButton() : null}
         <button
           type="button"
           onClick={messagesDisabled ? undefined : onNavigateMessages}

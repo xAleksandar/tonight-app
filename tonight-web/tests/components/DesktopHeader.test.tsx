@@ -38,6 +38,23 @@ beforeAll(async () => {
   screen = testingLibrary.screen;
   fireEvent = testingLibrary.fireEvent;
   cleanup = testingLibrary.cleanup;
+  it('surfaces drafts waiting shortcut without chat action', () => {
+    const onJumpDrafts = vi.fn();
+
+    render(
+      <DesktopHeader
+        title="Messages"
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        draftsWaitingCount={2}
+        onJumpToDrafts={onJumpDrafts}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /drafts waiting/i });
+    fireEvent.click(button);
+    expect(onJumpDrafts).toHaveBeenCalledTimes(1);
+  });
 });
 
 afterAll(() => {

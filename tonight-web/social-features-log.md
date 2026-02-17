@@ -522,3 +522,10 @@ Each run should:
 - Tests: `cd tonight-web && npx vitest run tests/app/messages/messages-attention-summary.test.tsx`
 - Next: mirror the Drafts waiting shortcut in the Messages desktop header + mobile action bar so the quick picker stays accessible even after you scroll past the rail.
 
+
+## 2026-02-17 12:32 EET — Drafts shortcut stays visible
+- Mirrored the Messages rail's “Drafts waiting” CTA inside `DesktopHeader`, including a shared button that works even when no chat CTA is present so hosts can always jump back to unsent replies.
+- Added the same drafts shortcut block to `MobileActionBar`, styled for the bottom nav, so mobile hosts get the badge + context without scrolling back to the rail.
+- Threaded the new props through `messages/page.tsx` and covered them with focused unit tests so both surfaces stay exercised.
+- Tests: `cd tonight-web && npx vitest run tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`.
+- Next: extend the Mobile Action Bar drafts block with a tiny quick picker (names + timestamps) so hosts can jump directly into a specific drafted thread without opening the inbox.

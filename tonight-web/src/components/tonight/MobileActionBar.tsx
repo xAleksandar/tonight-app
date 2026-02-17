@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, Compass, MessageCircle, Plus, User, Users } from "lucide-react";
+import { AlertTriangle, ChevronDown, Compass, Edit3, MessageCircle, Plus, User, Users } from "lucide-react";
 
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { classNames } from "@/lib/classNames";
@@ -48,6 +48,8 @@ export type MobileActionBarProps = {
   onChatAttentionClearAll?: () => void;
   onChatAttentionSnooze?: (durationMinutes?: number) => void;
   onChatAttentionResume?: () => void;
+  draftsWaitingCount?: number | null;
+  onJumpToDrafts?: () => void;
 };
 
 type NavItem = {
@@ -82,6 +84,8 @@ export function MobileActionBar({
   onChatAttentionClearAll,
   onChatAttentionSnooze,
   onChatAttentionResume,
+  draftsWaitingCount,
+  onJumpToDrafts,
 }: MobileActionBarProps) {
   const navItems: NavItem[] = [
     { id: "discover" as const, label: "Discover", icon: Compass, onPress: onNavigateDiscover },
@@ -132,6 +136,10 @@ export function MobileActionBar({
   const hasAdditionalJumpEntries = jumpPickerRemainderCount > 0;
   const queuedGuestCount = chatAttentionEntries.length;
   const queuedGuestCountLabel = queuedGuestCount > 0 ? `${queuedGuestCount} queued` : null;
+  const showDraftsShortcut =
+    typeof draftsWaitingCount === "number" && draftsWaitingCount > 0 && typeof onJumpToDrafts === "function";
+  const draftsWaitingBadgeLabel = draftsWaitingCount && draftsWaitingCount > 99 ? "99+" : String(draftsWaitingCount ?? "");
+  const draftsWaitingChipLabel = draftsWaitingCount === 1 ? "1 draft waiting" : `${draftsWaitingCount ?? 0} drafts waiting`;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
@@ -531,6 +539,25 @@ export function MobileActionBar({
             </div>
           ) : null}
           <p className="mt-2 text-[11px] text-white/70">Opens the first conversation with queued attention so you can reply faster.</p>
+        </div>
+      ) : null}
+      {showDraftsShortcut ? (
+        <div className={classNames("border-b border-white/10 px-4 pb-3 text-white", showMessagesJumpAction || hasChatAction ? "pt-3" : "pt-4")}>
+          <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-white/65">
+            <span className="inline-flex items-center gap-2 text-white/80">
+              <Edit3 className="h-3.5 w-3.5" aria-hidden /> Drafts waiting
+            </span>
+            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white">{draftsWaitingBadgeLabel}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onJumpToDrafts}
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-sky-400/40 bg-sky-400/15 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-sky-50 transition hover:border-sky-300/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300/40"
+            aria-label={draftsWaitingChipLabel}
+          >
+            Jump to drafts
+          </button>
+          <p className="mt-2 text-[11px] text-white/70">{draftsWaitingChipLabel}</p>
         </div>
       ) : null}
       <div className="flex items-center justify-around px-2 py-2 text-xs font-medium">

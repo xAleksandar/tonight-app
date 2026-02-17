@@ -38,6 +38,27 @@ beforeAll(async () => {
   screen = testingLibrary.screen;
   fireEvent = testingLibrary.fireEvent;
   cleanup = testingLibrary.cleanup;
+  it('mirrors the drafts waiting shortcut on mobile', () => {
+    const onJumpDrafts = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        draftsWaitingCount={3}
+        onJumpToDrafts={onJumpDrafts}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /drafts waiting/i });
+    fireEvent.click(button);
+    expect(onJumpDrafts).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/3 drafts waiting/i)).toBeInTheDocument();
+  });
 });
 
 afterAll(() => {
