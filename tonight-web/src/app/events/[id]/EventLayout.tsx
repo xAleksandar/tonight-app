@@ -60,6 +60,7 @@ export function EventLayout({
             userPhotoUrl={userPhotoUrl}
             chatAction={chatAction}
             chatAttentionQueue={chatAttentionQueue}
+            onChatAttentionEntryHandled={onChatAttentionEntryHandled}
           />
 
           <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
@@ -92,6 +93,7 @@ export function EventLayout({
         onOpenProfile={() => router.push('/profile')}
         chatAction={chatAction}
         chatAttentionQueue={chatAttentionQueue}
+        onChatAttentionEntryHandled={onChatAttentionEntryHandled}
       />
     </div>
   );

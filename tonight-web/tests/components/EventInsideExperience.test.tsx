@@ -239,6 +239,31 @@ describe('EventInsideExperience', () => {
     expect(leadLink).toHaveAttribute('href', '/chat/jr-2');
   });
 
+  it('lets hosts mark chat attention entries as handled directly from the hero chips', () => {
+    const onHandled = vi.fn();
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+        ]}
+        onChatAttentionEntryHandled={onHandled}
+      />
+    );
+
+    const markButton = screen.getByRole('button', { name: /mark handled for jess/i });
+    fireEvent.click(markButton);
+    expect(onHandled).toHaveBeenCalledWith('msg-1');
+  });
+
   it('exposes a quick picker for queued chat attention entries', () => {
     render(
       <EventInsideExperience

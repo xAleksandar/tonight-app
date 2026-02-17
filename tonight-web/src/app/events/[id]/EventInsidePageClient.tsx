@@ -170,6 +170,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
         chatAttentionActive={chatAttentionActive}
         chatAttentionQueue={chatAttentionQueue}
         onChatAttentionChange={handleChatAttentionChange}
+        onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
       />
     </EventLayout>
   );

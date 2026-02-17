@@ -112,6 +112,39 @@ describe('DesktopHeader', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
+  it('lets hosts mark chat attention entries as handled from the desktop chips', () => {
+    const onHandled = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <DesktopHeader
+        title="Tonight event"
+        onNavigateProfile={noop}
+        onNavigateMessages={noop}
+        chatAction={{
+          href: '/chat/demo',
+          label: 'Open chat',
+          badgeLabel: '1 ping',
+          badgeTone: 'highlight',
+        }}
+        chatAttentionQueue={queue}
+        onChatAttentionEntryHandled={onHandled}
+      />
+    );
+
+    const heroButton = screen.getByRole('button', { name: /mark handled for jess/i });
+    fireEvent.click(heroButton);
+    expect(onHandled).toHaveBeenCalledWith('entry-1');
+  });
+
   it('makes chat attention chips actionable and exposes the queued guest list', () => {
     const onInteract = vi.fn();
     const queue = [

@@ -24,6 +24,7 @@ export type DesktopHeaderProps = {
   userPhotoUrl?: string | null;
   chatAction?: MobileActionBarProps["chatAction"];
   chatAttentionQueue?: EventChatAttentionPayload[] | null;
+  onChatAttentionEntryHandled?: (entryId: string) => void;
 };
 
 type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
@@ -47,6 +48,7 @@ export function DesktopHeader({
   userPhotoUrl,
   chatAction,
   chatAttentionQueue,
+  onChatAttentionEntryHandled,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -82,6 +84,13 @@ export function DesktopHeader({
   const handleChatAttentionNavigate = () => {
     chatAction?.onInteract?.();
     setAttentionPickerOpen(false);
+  };
+
+  const handleMarkHandled = (entryId?: string | null) => {
+    if (!entryId) {
+      return;
+    }
+    onChatAttentionEntryHandled?.(entryId);
   };
 
   return (
@@ -171,6 +180,16 @@ export function DesktopHeader({
                     <span className="rounded-full bg-primary/15 px-3 py-1 text-primary/90">{chatAttentionLeadLabel}</span>
                   )
                 ) : null}
+                {chatAttentionLeadEntry?.id && onChatAttentionEntryHandled ? (
+                  <button
+                    type="button"
+                    onClick={() => handleMarkHandled(chatAttentionLeadEntry.id)}
+                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                    aria-label={`Mark handled${chatAttentionLeadEntry.authorName ? ` for ${chatAttentionLeadEntry.authorName}` : ''}`}
+                  >
+                    Mark handled
+                  </button>
+                ) : null}
                 {chatAttentionWaitingLabel ? (
                   chatAttentionPickerAvailable ? (
                     <button
@@ -233,6 +252,18 @@ export function DesktopHeader({
                             <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
                           ) : null}
                         </Link>
+                        {onChatAttentionEntryHandled ? (
+                          <div className="mt-1 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleMarkHandled(entry.id)}
+                              className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                              aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
+                            >
+                              Mark handled
+                            </button>
+                          </div>
+                        ) : null}
                       </li>
                     );
                   })}

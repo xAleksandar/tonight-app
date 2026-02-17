@@ -137,6 +137,8 @@ export type EventInsideExperienceProps = {
   chatAttentionQueue?: EventChatAttentionPayload[];
   /** Fired when realtime events request the attention indicator to toggle */
   onChatAttentionChange?: (active: boolean, payload?: EventChatAttentionPayload) => void;
+  /** Fired when the host manually marks a queued chat attention entry as handled */
+  onChatAttentionEntryHandled?: (entryId: string) => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -277,6 +279,7 @@ export function EventInsideExperience({
   chatAttentionActive = false,
   chatAttentionQueue = [],
   onChatAttentionChange,
+  onChatAttentionEntryHandled,
 }: EventInsideExperienceProps) {
   const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
   const chatPreview = chatPreviewState ?? initialChatPreview;
@@ -406,6 +409,15 @@ export function EventInsideExperience({
     [onChatAttentionChange]
   );
   const acknowledgeChatAttention = useCallback(() => onChatAttentionChange?.(false), [onChatAttentionChange]);
+  const handleChatAttentionEntryHandled = useCallback(
+    (entryId?: string | null) => {
+      if (!entryId) {
+        return;
+      }
+      onChatAttentionEntryHandled?.(entryId);
+    },
+    [onChatAttentionEntryHandled]
+  );
 
   useEffect(() => {
     setChatPreviewState(initialChatPreview);
@@ -2177,6 +2189,16 @@ export function EventInsideExperience({
                       </span>
                     )
                   ) : null}
+                  {heroChatAttentionLeadEntry?.id && onChatAttentionEntryHandled ? (
+                    <button
+                      type="button"
+                      onClick={() => handleChatAttentionEntryHandled(heroChatAttentionLeadEntry.id)}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      aria-label={`Mark handled${heroChatAttentionLeadEntry.authorName ? ` for ${heroChatAttentionLeadEntry.authorName}` : ''}`}
+                    >
+                      Mark handled
+                    </button>
+                  ) : null}
                   {heroChatAttentionWaitingChip ? (
                     chatAttentionPickerAvailable ? (
                       <button
@@ -2290,6 +2312,18 @@ export function EventInsideExperience({
                             <p className="mt-1 text-[11px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
                           ) : null}
                         </Link>
+                        {onChatAttentionEntryHandled ? (
+                          <div className="mt-1 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleChatAttentionEntryHandled(entry.id)}
+                              className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                              aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
+                            >
+                              Mark handled
+                            </button>
+                          </div>
+                        ) : null}
                       </li>
                     );
                   })}

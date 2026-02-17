@@ -168,6 +168,42 @@ describe('MobileActionBar', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
+  it('lets hosts mark chat attention entries as handled from the mobile chips', () => {
+    const onHandled = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          badgeLabel: 'Ping',
+          badgeTone: 'highlight',
+        }}
+        chatAttentionQueue={queue}
+        onChatAttentionEntryHandled={onHandled}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /mark handled for jess/i });
+    fireEvent.click(button);
+    expect(onHandled).toHaveBeenCalledWith('entry-1');
+  });
+
   it('makes chat attention chips clickable and exposes the queued guest list', () => {
     const onInteract = vi.fn();
     const queue = [
