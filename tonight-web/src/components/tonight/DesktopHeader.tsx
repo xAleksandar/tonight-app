@@ -25,6 +25,7 @@ export type DesktopHeaderProps = {
   chatAction?: MobileActionBarProps["chatAction"];
   chatAttentionQueue?: EventChatAttentionPayload[] | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
+  onChatAttentionClearAll?: () => void;
 };
 
 type DesktopChatAction = NonNullable<MobileActionBarProps["chatAction"]>;
@@ -49,6 +50,7 @@ export function DesktopHeader({
   chatAction,
   chatAttentionQueue,
   onChatAttentionEntryHandled,
+  onChatAttentionClearAll,
 }: DesktopHeaderProps) {
   const messagesDisabled = typeof onNavigateMessages !== "function";
   const canToggleView = viewMode && typeof onViewModeChange === "function";
@@ -74,12 +76,21 @@ export function DesktopHeader({
     [chatAttentionEntries]
   );
   const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
+  const chatAttentionHasEntries = chatAttentionEntries.length > 0;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
       setAttentionPickerOpen(false);
     }
   }, [chatAttentionPickerAvailable, attentionPickerOpen]);
+
+  const handleMarkAllHandled = () => {
+    if (!chatAttentionHasEntries) {
+      return;
+    }
+    setAttentionPickerOpen(false);
+    onChatAttentionClearAll?.();
+  };
 
   const handleChatAttentionNavigate = () => {
     chatAction?.onInteract?.();
@@ -160,6 +171,16 @@ export function DesktopHeader({
               <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
                 <span>{chatAttentionLabel}</span>
+                {chatAttentionHasEntries && onChatAttentionClearAll ? (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllHandled}
+                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                    aria-label="Mark all chat attention entries as handled"
+                  >
+                    Mark all handled
+                  </button>
+                ) : null}
               </div>
             ) : null}
             {chatAttentionLeadLabel || chatAttentionWaitingLabel ? (
@@ -268,6 +289,18 @@ export function DesktopHeader({
                     );
                   })}
                 </ul>
+                {chatAttentionHasEntries && onChatAttentionClearAll ? (
+                  <div className="mt-2 text-right">
+                    <button
+                      type="button"
+                      onClick={handleMarkAllHandled}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      aria-label="Mark all chat attention entries as handled"
+                    >
+                      Mark all handled
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {!chatAction?.attentionActive && chatAction?.helperText ? (

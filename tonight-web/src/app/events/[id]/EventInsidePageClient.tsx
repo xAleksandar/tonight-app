@@ -6,6 +6,7 @@ import type { EventChatAttentionPayload, EventInsideExperienceProps } from "@/co
 import { EventInsideExperience } from "@/components/tonight/event-inside/EventInsideExperience";
 import { buildMobileChatAction } from "@/lib/buildMobileChatAction";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
+import { showSuccessToast } from "@/lib/toast";
 
 import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 
@@ -55,6 +56,29 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       chatAttentionTimeoutRef.current = null;
     }
   }, []);
+
+  const handleChatAttentionClearAll = useCallback(() => {
+    const queueLength = chatAttentionQueue.length;
+    if (queueLength === 0) {
+      return;
+    }
+
+    const confirmMessage = queueLength === 1
+      ? "Mark the current chat ping as handled? This will clear the live attention alert."
+      : `Mark all ${queueLength} chat pings as handled? This will clear every live attention alert.`;
+
+    const confirmed = typeof window === "undefined" ? true : window.confirm(confirmMessage);
+    if (!confirmed) {
+      return;
+    }
+
+    clearChatAttention();
+
+    const helperCopy = queueLength === 1
+      ? "Cleared the pending attention alert."
+      : `Cleared ${queueLength} queued attention alerts.`;
+    showSuccessToast("Attention cleared", helperCopy);
+  }, [chatAttentionQueue.length, clearChatAttention]);
 
   const handleChatAttentionChange = useCallback(
     (active: boolean, payload?: EventChatAttentionPayload) => {
@@ -163,6 +187,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
       chatAction={chatAction}
       chatAttentionQueue={chatAttentionQueue}
       onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
+      onChatAttentionClearAll={handleChatAttentionClearAll}
     >
       <EventInsideExperience
         {...experience}
@@ -171,6 +196,7 @@ export function EventInsidePageClient({ experience, layoutProps }: EventInsidePa
         chatAttentionQueue={chatAttentionQueue}
         onChatAttentionChange={handleChatAttentionChange}
         onChatAttentionEntryHandled={handleChatAttentionEntryHandled}
+        onChatAttentionClearAll={handleChatAttentionClearAll}
       />
     </EventLayout>
   );

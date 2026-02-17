@@ -19,6 +19,7 @@ export type EventChatAttentionToastProps = {
   onInteract?: () => void;
   attentionQueue?: EventChatAttentionPayload[];
   onMarkHandled?: (entryId: string) => void;
+  onMarkAllHandled?: () => void;
 };
 
 const TOAST_CONTAINER_CLASS =
@@ -36,6 +37,7 @@ export function EventChatAttentionToast({
   onInteract,
   attentionQueue,
   onMarkHandled,
+  onMarkAllHandled,
 }: EventChatAttentionToastProps) {
   const attentionItems = useMemo(() => {
     if (!attentionQueue?.length) {
@@ -125,6 +127,14 @@ export function EventChatAttentionToast({
     [onMarkHandled]
   );
 
+  const handleMarkAllHandled = useCallback(() => {
+    if (!attentionItems.length) {
+      return;
+    }
+    setAttentionPickerOpen(false);
+    onMarkAllHandled?.();
+  }, [attentionItems.length, onMarkAllHandled]);
+
   const handleInteract = () => {
     onInteract?.();
   };
@@ -156,16 +166,28 @@ export function EventChatAttentionToast({
                   {queuePositionLabel ? (
                     <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/40">{queuePositionLabel}</p>
                   ) : null}
-                  {onMarkHandled && activeItem?.id ? (
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => handleMarkHandled(activeItem.id)}
-                        className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
-                        aria-label={`Mark handled${resolvedSnippetSender ? ` for ${resolvedSnippetSender}` : ""}`}
-                      >
-                        Mark handled
-                      </button>
+                  {onMarkAllHandled || (onMarkHandled && activeItem?.id) ? (
+                    <div className="mt-3 flex flex-wrap justify-end gap-3">
+                      {onMarkAllHandled ? (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllHandled}
+                          className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          aria-label="Mark all chat attention entries as handled"
+                        >
+                          Mark all handled
+                        </button>
+                      ) : null}
+                      {onMarkHandled && activeItem?.id ? (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkHandled(activeItem.id)}
+                          className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/80 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                          aria-label={`Mark handled${resolvedSnippetSender ? ` for ${resolvedSnippetSender}` : ""}`}
+                        >
+                          Mark handled
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -208,6 +230,16 @@ export function EventChatAttentionToast({
                   ) : (
                     <span className="rounded-full border border-primary/30 px-3 py-1 text-primary/70">{attentionWaitingLabel}</span>
                   )
+                ) : null}
+                {attentionItems.length > 0 && onMarkAllHandled ? (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllHandled}
+                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                    aria-label="Mark all chat attention entries as handled"
+                  >
+                    Mark all handled
+                  </button>
                 ) : null}
               </div>
             ) : null}
@@ -264,6 +296,18 @@ export function EventChatAttentionToast({
                     );
                   })}
                 </ul>
+                {attentionItems.length > 0 && onMarkAllHandled ? (
+                  <div className="mt-2 text-right">
+                    <button
+                      type="button"
+                      onClick={handleMarkAllHandled}
+                      className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      aria-label="Mark all chat attention entries as handled"
+                    >
+                      Mark all handled
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">

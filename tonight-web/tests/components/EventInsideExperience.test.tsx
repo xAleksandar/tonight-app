@@ -264,6 +264,39 @@ describe('EventInsideExperience', () => {
     expect(onHandled).toHaveBeenCalledWith('msg-1');
   });
 
+  it('clears the entire chat attention queue via the bulk action', () => {
+    const onClearAll = vi.fn();
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Another guest waiting',
+            authorName: 'Aaron',
+            helperText: 'Aaron pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+        ]}
+        onChatAttentionClearAll={onClearAll}
+      />
+    );
+
+    const markAllButtons = screen.getAllByRole('button', { name: /mark all chat attention entries as handled/i });
+    fireEvent.click(markAllButtons[0]);
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+  });
+
   it('exposes a quick picker for queued chat attention entries', () => {
     render(
       <EventInsideExperience

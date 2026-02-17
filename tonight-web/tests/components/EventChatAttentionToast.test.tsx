@@ -189,6 +189,32 @@ describe('EventChatAttentionToast', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
+  it('clears the toast queue with the bulk mark-all action', () => {
+    const onMarkAllHandled = vi.fn();
+
+    render(
+      <EventChatAttentionToast
+        href="/chat/default"
+        label="Open chat"
+        onMarkAllHandled={onMarkAllHandled}
+        attentionQueue={[
+          {
+            id: 'mira',
+            snippet: 'Mira needs a quick reply',
+            authorName: 'Mira',
+            timestampISO: '2026-02-17T00:30:00Z',
+            href: '/chat/mira',
+            helperText: 'Mira sent a new ping',
+          },
+        ]}
+      />
+    );
+
+    const bulkButtons = screen.getAllByRole('button', { name: /mark all chat attention entries as handled/i });
+    fireEvent.click(bulkButtons[0]);
+    expect(onMarkAllHandled).toHaveBeenCalledTimes(1);
+  });
+
   it('lets hosts mark queued guests as handled directly from the toast', () => {
     const onMarkHandled = vi.fn();
 

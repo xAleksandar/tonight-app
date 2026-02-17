@@ -39,6 +39,7 @@ export type MobileActionBarProps = {
   chatAction?: MobileChatAction | null;
   chatAttentionQueue?: EventChatAttentionPayload[] | null;
   onChatAttentionEntryHandled?: (entryId: string) => void;
+  onChatAttentionClearAll?: () => void;
 };
 
 type NavItem = {
@@ -66,6 +67,7 @@ export function MobileActionBar({
   chatAction,
   chatAttentionQueue,
   onChatAttentionEntryHandled,
+  onChatAttentionClearAll,
 }: MobileActionBarProps) {
   const navItems: NavItem[] = [
     { id: "discover" as const, label: "Discover", icon: Compass, onPress: onNavigateDiscover },
@@ -99,12 +101,21 @@ export function MobileActionBar({
     [chatAttentionEntries]
   );
   const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
+  const chatAttentionHasEntries = chatAttentionEntries.length > 0;
 
   useEffect(() => {
     if (!chatAttentionPickerAvailable && attentionPickerOpen) {
       setAttentionPickerOpen(false);
     }
   }, [chatAttentionPickerAvailable, attentionPickerOpen]);
+
+  const handleMarkAllHandled = () => {
+    if (!chatAttentionHasEntries) {
+      return;
+    }
+    setAttentionPickerOpen(false);
+    onChatAttentionClearAll?.();
+  };
 
   const handleChatAttentionNavigate = () => {
     chatAction?.onInteract?.();
@@ -153,7 +164,17 @@ export function MobileActionBar({
             <div className="mt-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
               <span>{chatAttentionLabel}</span>
-            </div>
+            {chatAttentionHasEntries && onChatAttentionClearAll ? (
+              <button
+                type="button"
+                onClick={handleMarkAllHandled}
+                className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                aria-label="Mark all chat attention entries as handled"
+              >
+                Mark all handled
+              </button>
+            ) : null}
+          </div>
           ) : null}
           {chatAttentionLeadLabel || chatAttentionWaitingLabel ? (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide">
@@ -261,6 +282,18 @@ export function MobileActionBar({
                   );
                 })}
               </ul>
+              {chatAttentionHasEntries && onChatAttentionClearAll ? (
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={handleMarkAllHandled}
+                    className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                    aria-label="Mark all chat attention entries as handled"
+                  >
+                    Mark all handled
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {chatAction?.helperText ? (

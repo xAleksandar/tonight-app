@@ -379,3 +379,10 @@ Each run should:
 - Extended the EventLayout + page client plumbing and refreshed the EventInsideExperience/DesktopHeader/MobileActionBar test suites to cover the new controls.
 - Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx`.
 - Next: add a bulk "Mark all handled" control that clears every queued chat attention entry at once (with confirm + toast) so hosts can dismiss stale pings quickly.
+
+## 2026-02-17 04:07 EET — Bulk clear for chat attention queues
+- Added a shared `handleChatAttentionClearAll` pathway inside `EventInsidePageClient` that confirms before clearing, drops every queued payload, and shows a success toast summarizing how many alerts were dismissed.
+- Threaded the bulk control through EventInsideExperience, DesktopHeader, MobileActionBar, and EventChatAttentionToast so every surface (hero chips, desktop header, mobile bar, floating toast) exposes the new "Mark all handled" action without duplicating state.
+- Updated the chat attention picker + chip UIs to close automatically when the bulk action fires and refreshed the component test suites to assert the new buttons + callbacks, along with the top-level layout/client plumbing.
+- Tests: `cd tonight-web && npx vitest run tests/components/EventInsideExperience.test.tsx tests/components/DesktopHeader.test.tsx tests/components/MobileActionBar.test.tsx tests/components/EventChatAttentionToast.test.tsx`.
+- Next: add a "Snooze chat pings" affordance that mutes the attention pulse for ~5 minutes (with reminder copy + toast) so hosts can pause alerts without clearing the queue when they're mid-conversation elsewhere.

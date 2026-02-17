@@ -139,6 +139,8 @@ export type EventInsideExperienceProps = {
   onChatAttentionChange?: (active: boolean, payload?: EventChatAttentionPayload) => void;
   /** Fired when the host manually marks a queued chat attention entry as handled */
   onChatAttentionEntryHandled?: (entryId: string) => void;
+  /** Clears the entire chat attention queue in one action */
+  onChatAttentionClearAll?: () => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -280,6 +282,7 @@ export function EventInsideExperience({
   chatAttentionQueue = [],
   onChatAttentionChange,
   onChatAttentionEntryHandled,
+  onChatAttentionClearAll,
 }: EventInsideExperienceProps) {
   const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
   const chatPreview = chatPreviewState ?? initialChatPreview;
@@ -1001,6 +1004,14 @@ export function EventInsideExperience({
       setChatAttentionPickerOpen(false);
     }
   }, [chatAttentionPickerAvailable, chatAttentionPickerOpen]);
+
+  const handleChatAttentionClearAll = useCallback(() => {
+    if (!chatAttentionQueueEntries.length) {
+      return;
+    }
+    setChatAttentionPickerOpen(false);
+    onChatAttentionClearAll?.();
+  }, [chatAttentionQueueEntries.length, onChatAttentionClearAll]);
 
   const heroChatSummaryCopy =
     chatPreview?.lastMessageSnippet ??
@@ -2224,6 +2235,16 @@ export function EventInsideExperience({
                       </span>
                     )
                   ) : null}
+                  {heroChatAttentionHasQueue && onChatAttentionClearAll ? (
+                    <button
+                      type="button"
+                      onClick={handleChatAttentionClearAll}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      aria-label="Mark all chat attention entries as handled"
+                    >
+                      Mark all handled
+                    </button>
+                  ) : null}
                 </div>
               </div>
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -2328,6 +2349,18 @@ export function EventInsideExperience({
                     );
                   })}
                 </ul>
+                {heroChatAttentionHasQueue && onChatAttentionClearAll ? (
+                  <div className="mt-3 text-right">
+                    <button
+                      type="button"
+                      onClick={handleChatAttentionClearAll}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-primary/70 transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
+                      aria-label="Mark all chat attention entries as handled"
+                    >
+                      Mark all handled
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {!chatCtaHref && chatCtaDisabledReason ? (

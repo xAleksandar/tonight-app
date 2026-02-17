@@ -112,14 +112,21 @@ describe('DesktopHeader', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
-  it('lets hosts mark chat attention entries as handled from the desktop chips', () => {
-    const onHandled = vi.fn();
+  it('clears every queued chat attention entry via the bulk action', () => {
+    const onClearAll = vi.fn();
     const queue = [
       {
         id: 'entry-1',
         authorName: 'Jess',
         snippet: 'Need a quick update',
         href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mira',
+        snippet: 'Any dress code?',
+        href: '/chat/mira',
         timestampISO: new Date().toISOString(),
       },
     ];
@@ -132,17 +139,19 @@ describe('DesktopHeader', () => {
         chatAction={{
           href: '/chat/demo',
           label: 'Open chat',
-          badgeLabel: '1 ping',
+          badgeLabel: 'Queue',
           badgeTone: 'highlight',
+          attentionActive: true,
+          attentionLabel: 'New chat ping',
         }}
         chatAttentionQueue={queue}
-        onChatAttentionEntryHandled={onHandled}
+        onChatAttentionClearAll={onClearAll}
       />
     );
 
-    const heroButton = screen.getByRole('button', { name: /mark handled for jess/i });
-    fireEvent.click(heroButton);
-    expect(onHandled).toHaveBeenCalledWith('entry-1');
+    const markAllButton = screen.getByRole('button', { name: /mark all chat attention entries as handled/i });
+    fireEvent.click(markAllButton);
+    expect(onClearAll).toHaveBeenCalledTimes(1);
   });
 
   it('makes chat attention chips actionable and exposes the queued guest list', () => {

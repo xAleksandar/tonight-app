@@ -168,14 +168,21 @@ describe('MobileActionBar', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
-  it('lets hosts mark chat attention entries as handled from the mobile chips', () => {
-    const onHandled = vi.fn();
+  it('clears queued chat attention entries via the bulk action control', () => {
+    const onClearAll = vi.fn();
     const queue = [
       {
         id: 'entry-1',
         authorName: 'Jess',
         snippet: 'Need a quick update',
         href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mia',
+        snippet: 'Can I bring a friend?',
+        href: '/chat/mia',
         timestampISO: new Date().toISOString(),
       },
     ];
@@ -191,17 +198,19 @@ describe('MobileActionBar', () => {
         chatAction={{
           href: '/chat/abc',
           label: 'Open chat',
-          badgeLabel: 'Ping',
+          badgeLabel: 'Queue',
           badgeTone: 'highlight',
+          attentionActive: true,
+          attentionLabel: 'New chat ping',
         }}
         chatAttentionQueue={queue}
-        onChatAttentionEntryHandled={onHandled}
+        onChatAttentionClearAll={onClearAll}
       />
     );
 
-    const button = screen.getByRole('button', { name: /mark handled for jess/i });
-    fireEvent.click(button);
-    expect(onHandled).toHaveBeenCalledWith('entry-1');
+    const markAllButton = screen.getByRole('button', { name: /mark all chat attention entries as handled/i });
+    fireEvent.click(markAllButton);
+    expect(onClearAll).toHaveBeenCalledTimes(1);
   });
 
   it('makes chat attention chips clickable and exposes the queued guest list', () => {
