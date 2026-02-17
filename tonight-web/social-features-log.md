@@ -502,3 +502,9 @@ Each run should:
 - Hydrated the `/chat/[joinRequestId]` composer from the new storage, auto-saved changes after hydration, and cleared entries once messages send or drafts empty out.
 - Covered the storage helper with a dedicated Vitest suite and reran the chat properties + socket suites to ensure regressions stay caught (`npx vitest run tests/lib/chatDraftStorage.test.ts tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`).
 - Next: surface the saved-draft indicator + manual clear affordance in the chat composer so hosts know when a message is staged before jumping threads.
+
+## 2026-02-17 11:24 EET — Chat composer surfaces saved drafts
+- Added a composer-level draft indicator that lights up whenever a stored message is present, so hosts/guests immediately know they have text staged before hopping threads.
+- Introduced a clear-draft control that wipes the textarea, purges localStorage, refocuses the composer, and toasts confirmation so people can reset with one tap.
+- Tests: `cd tonight-web && npx vitest run tests/lib/chatDraftStorage.test.ts tests/properties/chat-messages.test.ts tests/hooks/useSocket.test.tsx`.
+- Next: bubble the saved-draft state into the /messages conversation list (badges + clear affordance) so you can spot and manage drafts without opening each chat.

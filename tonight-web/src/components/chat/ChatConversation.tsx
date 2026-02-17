@@ -860,6 +860,7 @@ export default function ChatConversation({
       ? `Snoozed · ${chatAttentionSnoozeCountdownLabel}`
       : 'Snoozed'
     : null;
+  const hasSavedComposerDraft = hasHydratedComposerDraft && composerValue.trim().length > 0;
   const chatAttentionToastHelperText = (() => {
     const helper = chatAttentionLeadEntry?.helperText?.trim();
     if (helper?.length) {
@@ -1130,6 +1131,18 @@ export default function ChatConversation({
     setChatAttentionToastDismissed(true);
     setChatAttentionPickerOpen(false);
   }, []);
+
+  const handleClearComposerDraft = useCallback(() => {
+    if (!hasSavedComposerDraft) {
+      return;
+    }
+    setComposerValue('');
+    clearChatDraftFromStorage(joinRequestId);
+    if (composerRef.current) {
+      composerRef.current.focus();
+    }
+    showSuccessToast('Draft cleared', 'Start fresh whenever you're ready.');
+  }, [hasSavedComposerDraft, joinRequestId, showSuccessToast]);
 
   return (
     <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
@@ -1508,6 +1521,21 @@ export default function ChatConversation({
                 <Send className="h-4 w-4" />
               </button>
             </div>
+            {hasSavedComposerDraft ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-3 py-2 text-[11px] font-semibold text-primary">
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                  Draft saved locally
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearComposerDraft}
+                  className="text-primary underline-offset-2 transition hover:underline"
+                >
+                  Clear draft
+                </button>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
               {hasBlockedCounterpart ? (
                 <p>You blocked this user. Manage safety settings from your profile if you change your mind.</p>
