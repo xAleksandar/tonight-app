@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
-import { MobileActionBar } from "@/components/tonight/MobileActionBar";
+import { MobileActionBar, type MobileActionBarProps } from "@/components/tonight/MobileActionBar";
+import { EventChatAttentionToast } from "@/components/tonight/EventChatAttentionToast";
+import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { CategoryId } from "@/lib/categories";
 
 type EventLayoutProps = {
@@ -14,6 +16,14 @@ type EventLayoutProps = {
   userDisplayName: string | null;
   userEmail: string | null;
   userPhotoUrl: string | null;
+  chatAction?: MobileActionBarProps['chatAction'];
+  chatAttentionQueue?: EventChatAttentionPayload[];
+  chatAttentionSnoozedUntil?: string | null;
+  chatAttentionPreferredSnoozeMinutes?: number | null;
+  onChatAttentionEntryHandled?: (entryId: string) => void;
+  onChatAttentionClearAll?: () => void;
+  onChatAttentionSnooze?: (durationMinutes?: number) => void;
+  onChatAttentionResume?: () => void;
 };
 
 export function EventLayout({
@@ -23,9 +33,22 @@ export function EventLayout({
   userDisplayName,
   userEmail,
   userPhotoUrl,
+  chatAction,
+  chatAttentionQueue,
+  chatAttentionSnoozedUntil,
+  chatAttentionPreferredSnoozeMinutes,
+  onChatAttentionEntryHandled,
+  onChatAttentionClearAll,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
 }: EventLayoutProps) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+  const showChatAttentionToast = Boolean(
+    chatAction?.href &&
+    chatAttentionQueue?.length &&
+    (chatAction?.attentionActive || chatAttentionSnoozedUntil)
+  );
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -49,13 +72,43 @@ export function EventLayout({
             userDisplayName={userDisplayName}
             userEmail={userEmail}
             userPhotoUrl={userPhotoUrl}
+            chatAction={chatAction}
+            chatAttentionQueue={chatAttentionQueue}
+            chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+            chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+            onChatAttentionEntryHandled={onChatAttentionEntryHandled}
+            onChatAttentionClearAll={onChatAttentionClearAll}
+            onChatAttentionSnooze={onChatAttentionSnooze}
+            onChatAttentionResume={onChatAttentionResume}
           />
 
           <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
-            {children}
+            <div className="mx-auto w-full max-w-[1344px]">
+              {children}
+            </div>
           </main>
         </div>
       </div>
+
+      {showChatAttentionToast ? (
+        <EventChatAttentionToast
+          href={chatAction!.href}
+          label={chatAction!.label}
+          helperText={chatAction?.helperText}
+          attentionLabel={chatAction?.attentionLabel}
+          snippet={chatAction?.lastMessageSnippet}
+          snippetSender={chatAction?.lastMessageAuthorName}
+          snippetTimestamp={chatAction?.lastMessageAtISO}
+          onInteract={chatAction?.onInteract}
+          attentionQueue={chatAttentionQueue}
+          chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+          chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+          onMarkHandled={onChatAttentionEntryHandled}
+          onMarkAllHandled={onChatAttentionClearAll}
+          onSnooze={onChatAttentionSnooze}
+          onResume={onChatAttentionResume}
+        />
+      ) : null}
 
       <MobileActionBar
         active={null}
@@ -64,6 +117,14 @@ export function EventLayout({
         onNavigateMessages={() => router.push('/messages')}
         onCreate={() => router.push('/events/create')}
         onOpenProfile={() => router.push('/profile')}
+        chatAction={chatAction}
+        chatAttentionQueue={chatAttentionQueue}
+        chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+        chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+        onChatAttentionEntryHandled={onChatAttentionEntryHandled}
+        onChatAttentionClearAll={onChatAttentionClearAll}
+        onChatAttentionSnooze={onChatAttentionSnooze}
+        onChatAttentionResume={onChatAttentionResume}
       />
     </div>
   );

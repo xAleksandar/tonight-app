@@ -1,15 +1,42 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Flag, Info, Send } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Flag, Info, MapPin, Send, Share2, X } from 'lucide-react';
 
 import BlockUserButton from '@/components/BlockUserButton';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
+import { EventChatAttentionToast } from '@/components/tonight/EventChatAttentionToast';
+import { useSnoozeCountdown } from '@/hooks/useSnoozeCountdown';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
-import { showErrorToast } from '@/lib/toast';
+import {
+  CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES,
+  DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES,
+  type ChatAttentionSnoozeOptionMinutes,
+} from '@/lib/chatAttentionSnoozeOptions';
+import {
+  CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE,
+  CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
+  CHAT_ATTENTION_SNOOZE_STORAGE_KEY,
+} from '@/lib/chatAttentionStorage';
+import { buildChatAttentionLabels } from '@/lib/buildChatAttentionLabels';
+import { buildChatAttentionLinkLabel, formatRelativeTime } from '@/lib/chatAttentionHelpers';
+import {
+  readChatAttentionQueueFromStorage,
+  subscribeToChatAttentionQueueStorage,
+  writeChatAttentionQueueToStorage,
+} from '@/lib/chatAttentionQueueStorage';
+import {
+  clearChatDraftFromStorage,
+  readChatDraftFromStorage,
+  writeChatDraftToStorage,
+} from '@/lib/chatDraftStorage';
+import type { EventChatAttentionPayload } from '@/components/tonight/event-inside/EventInsideExperience';
+import type { SocketReadReceiptEventPayload } from '@/lib/socket-shared';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 export type ChatParticipantSummary = {
   id: string;
@@ -107,6 +134,16 @@ const createClientMessageId = () => {
 const classNames = (...classes: Array<string | boolean | null | undefined>) =>
   classes.filter(Boolean).join(' ');
 
+const chatAttentionQueuesMatch = (
+  a: EventChatAttentionPayload[],
+  b: EventChatAttentionPayload[]
+): boolean => {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((entry, index) => entry.id === b[index]?.id);
+};
+
 export default function ChatConversation({
   joinRequestId,
   currentUserId,
@@ -114,10 +151,12 @@ export default function ChatConversation({
   context,
 }: ChatConversationProps) {
   const router = useRouter();
+  const eventSheetTitleId = useId();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [messagesStatus, setMessagesStatus] = useState<MessagesStatus>('loading');
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [composerValue, setComposerValue] = useState('');
+  const [hasHydratedComposerDraft, setHasHydratedComposerDraft] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending'>('idle');
   const [socketNotice, setSocketNotice] = useState<string | null>(null);
@@ -125,16 +164,254 @@ export default function ChatConversation({
   const [queuedMessageCount, setQueuedMessageCount] = useState(0);
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
   const [isCurrentlyTyping, setIsCurrentlyTyping] = useState(false);
+  const [isEventSheetOpen, setIsEventSheetOpen] = useState(false);
+  const [isCopyingLocation, setIsCopyingLocation] = useState(false);
+  const [isCalendarExporting, setIsCalendarExporting] = useState(false);
+  const [eventShareUrl, setEventShareUrl] = useState<string | null>(`https://tonight.app/events/${context.event.id}`);
+  const [eventShareCopyState, setEventShareCopyState] = useState<'idle' | 'copying' | 'copied'>('idle');
+  const [eventShareShareState, setEventShareShareState] = useState<'idle' | 'sharing'>('idle');
+  const [eventShareSupported, setEventShareSupported] = useState(false);
+  const [chatAttentionSnoozedUntil, setChatAttentionSnoozedUntil] = useState<string | null>(null);
+  const [chatAttentionPreferredSnoozeMinutes, setChatAttentionPreferredSnoozeMinutes] = useState<ChatAttentionSnoozeOptionMinutes>(
+    DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES
+  );
+  const [hasHydratedChatAttentionSnooze, setHasHydratedChatAttentionSnooze] = useState(false);
+  const [chatAttentionQueue, setChatAttentionQueue] = useState<EventChatAttentionPayload[]>([]);
+  const [chatAttentionPickerOpen, setChatAttentionPickerOpen] = useState(false);
+  const [chatAttentionToastDismissed, setChatAttentionToastDismissed] = useState(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const queuedMessagesRef = useRef<QueuedMessageRecord[]>([]);
   const queuedFlushInFlightRef = useRef(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatAttentionSnoozeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingChatAttentionWriteRef = useRef<EventChatAttentionPayload[] | null>(null);
+
+  const clearChatAttentionSnoozeTimeout = useCallback(() => {
+    if (chatAttentionSnoozeTimeoutRef.current) {
+      clearTimeout(chatAttentionSnoozeTimeoutRef.current);
+      chatAttentionSnoozeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleChatAttentionSnoozeWake = useCallback(
+    (targetISO: string | null) => {
+      clearChatAttentionSnoozeTimeout();
+      if (!targetISO) {
+        return;
+      }
+      const timestamp = Date.parse(targetISO);
+      if (Number.isNaN(timestamp)) {
+        return;
+      }
+      const delay = Math.max(timestamp - Date.now(), 0);
+      chatAttentionSnoozeTimeoutRef.current = setTimeout(() => {
+        chatAttentionSnoozeTimeoutRef.current = null;
+        setChatAttentionSnoozedUntil(null);
+        showSuccessToast('Chat alerts back on', "We'll nudge you again when guests reach out.");
+      }, delay);
+    },
+    [clearChatAttentionSnoozeTimeout, showSuccessToast]
+  );
+
+  const isHostViewer = context.requesterRole === 'host';
+  const chatAttentionEntries = useMemo(
+    () => (chatAttentionQueue ?? []).filter((entry): entry is EventChatAttentionPayload => Boolean(entry && entry.id)),
+    [chatAttentionQueue]
+  );
+  const chatAttentionLabels = useMemo(() => buildChatAttentionLabels(chatAttentionEntries), [chatAttentionEntries]);
+  const chatAttentionLeadEntry = chatAttentionLabels.leadEntry;
+  const chatAttentionLeadLabel = chatAttentionLabels.leadLabel;
+  const chatAttentionLeadHref = chatAttentionLeadEntry?.href?.trim();
+  const chatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(chatAttentionLeadEntry ?? null);
+  const chatAttentionWaitingLabel = chatAttentionLabels.waitingLabel;
+  const chatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? 'New chat ping';
+  const chatAttentionPickerEntries = useMemo(
+    () =>
+      chatAttentionEntries.filter(
+        (entry): entry is EventChatAttentionPayload & { href: string } =>
+          typeof entry.href === 'string' && entry.href.trim().length > 0
+      ),
+    [chatAttentionEntries]
+  );
+  const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
+  const chatAttentionQueueLength = chatAttentionEntries.length;
+  const chatAttentionHasEntries = chatAttentionQueueLength > 0;
+  const chatAttentionQueueSignature = useMemo(
+    () => chatAttentionEntries.map((entry) => entry.id).join('|'),
+    [chatAttentionEntries]
+  );
+
+  useEffect(() => {
+    setChatAttentionToastDismissed(false);
+  }, [chatAttentionQueueSignature]);
 
   const counterpart = useMemo(() => {
-    return context.requesterRole === 'host' ? context.participant : context.host;
-  }, [context]);
+    return isHostViewer ? context.participant : context.host;
+  }, [context, isHostViewer]);
+
+  useEffect(() => {
+    setHasHydratedComposerDraft(false);
+    const storedDraft = readChatDraftFromStorage(joinRequestId);
+    setComposerValue(storedDraft);
+    setHasHydratedComposerDraft(true);
+  }, [joinRequestId]);
+
+  useEffect(() => {
+    if (!hasHydratedComposerDraft) {
+      return;
+    }
+    if (!composerValue.length) {
+      clearChatDraftFromStorage(joinRequestId);
+      return;
+    }
+    writeChatDraftToStorage(joinRequestId, composerValue);
+  }, [composerValue, hasHydratedComposerDraft, joinRequestId]);
+
+  useEffect(() => {
+    if (!chatAttentionPickerAvailable && chatAttentionPickerOpen) {
+      setChatAttentionPickerOpen(false);
+    }
+  }, [chatAttentionPickerAvailable, chatAttentionPickerOpen]);
+
+  const counterpartId = counterpart.id;
 
   const eventTimeLabel = useMemo(() => formatDateTime(context.event.datetime), [context.event.datetime]);
+  const eventInviteShareText = useMemo(
+    () => buildChatEventInviteShareText(context.event.title, eventTimeLabel, context.event.locationName),
+    [context.event.locationName, context.event.title, eventTimeLabel]
+  );
+  const eventStartDate = useMemo(() => {
+    const date = new Date(context.event.datetime);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }, [context.event.datetime]);
+  const mapsUrl = useMemo(() => {
+    if (!context.event.locationName) {
+      return null;
+    }
+    const query = encodeURIComponent(context.event.locationName);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+  }, [context.event.locationName]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const origin = window.location?.origin?.trim().length ? window.location.origin : 'https://tonight.app';
+    setEventShareUrl(`${origin}/events/${context.event.id}`);
+  }, [context.event.id]);
+
+  useEffect(() => {
+    setEventShareSupported(typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+  }, []);
+
+  useEffect(() => {
+    if (!isHostViewer) {
+      setChatAttentionQueue([]);
+      setChatAttentionPickerOpen(false);
+      pendingChatAttentionWriteRef.current = null;
+      return;
+    }
+    setChatAttentionQueue(readChatAttentionQueueFromStorage());
+    return subscribeToChatAttentionQueueStorage((nextQueue) => {
+      setChatAttentionQueue((current) => (chatAttentionQueuesMatch(current, nextQueue) ? current : nextQueue));
+    });
+  }, [isHostViewer]);
+
+  useEffect(() => {
+    if (!isHostViewer) {
+      pendingChatAttentionWriteRef.current = null;
+      return;
+    }
+    if (pendingChatAttentionWriteRef.current) {
+      writeChatAttentionQueueToStorage(pendingChatAttentionWriteRef.current);
+      pendingChatAttentionWriteRef.current = null;
+    }
+  }, [chatAttentionQueue, isHostViewer]);
+
+  useEffect(() => {
+    if (!isHostViewer) {
+      setChatAttentionSnoozedUntil(null);
+      setHasHydratedChatAttentionSnooze(false);
+      clearChatAttentionSnoozeTimeout();
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      setHasHydratedChatAttentionSnooze(true);
+      return;
+    }
+
+    const storedSnoozeUntil = window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY);
+    if (storedSnoozeUntil) {
+      const timestamp = Date.parse(storedSnoozeUntil);
+      if (!Number.isNaN(timestamp) && timestamp > Date.now()) {
+        setChatAttentionSnoozedUntil(storedSnoozeUntil);
+        scheduleChatAttentionSnoozeWake(storedSnoozeUntil);
+      } else {
+        window.localStorage.removeItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY);
+        setChatAttentionSnoozedUntil(null);
+      }
+    } else {
+      setChatAttentionSnoozedUntil(null);
+    }
+
+    const storedPreferenceRaw = window.localStorage.getItem(CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY);
+    if (storedPreferenceRaw) {
+      const parsed = Number(storedPreferenceRaw);
+      if (CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.includes(parsed as ChatAttentionSnoozeOptionMinutes)) {
+        setChatAttentionPreferredSnoozeMinutes(parsed as ChatAttentionSnoozeOptionMinutes);
+      }
+    }
+
+    setHasHydratedChatAttentionSnooze(true);
+  }, [
+    isHostViewer,
+    scheduleChatAttentionSnoozeWake,
+    clearChatAttentionSnoozeTimeout,
+  ]);
+
+  useEffect(() => {
+    if (!isHostViewer || !hasHydratedChatAttentionSnooze) {
+      return;
+    }
+
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      if (chatAttentionSnoozedUntil) {
+        root.dataset[CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE] = chatAttentionSnoozedUntil;
+      } else {
+        delete root.dataset[CHAT_ATTENTION_SNOOZE_DATA_ATTRIBUTE];
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      if (chatAttentionSnoozedUntil) {
+        window.localStorage.setItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY, chatAttentionSnoozedUntil);
+      } else {
+        window.localStorage.removeItem(CHAT_ATTENTION_SNOOZE_STORAGE_KEY);
+      }
+    }
+  }, [chatAttentionSnoozedUntil, hasHydratedChatAttentionSnooze, isHostViewer]);
+
+  useEffect(() => {
+    if (!isHostViewer || !hasHydratedChatAttentionSnooze) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(
+      CHAT_ATTENTION_SNOOZE_PREFERENCE_STORAGE_KEY,
+      String(chatAttentionPreferredSnoozeMinutes)
+    );
+  }, [chatAttentionPreferredSnoozeMinutes, hasHydratedChatAttentionSnooze, isHostViewer]);
+
+  useEffect(() => {
+    return () => {
+      clearChatAttentionSnoozeTimeout();
+    };
+  }, [clearChatAttentionSnoozeTimeout]);
 
   const appendMessage = useCallback((message: SerializedMessage) => {
     setMessages((previous) => {
@@ -181,6 +458,37 @@ export default function ChatConversation({
     }
   }, [joinRequestId]);
 
+  const handleReadReceipt = useCallback(
+    (payload: SocketReadReceiptEventPayload) => {
+      if (payload.joinRequestId !== joinRequestId) {
+        return;
+      }
+      if (payload.readerId === currentUserId) {
+        return;
+      }
+      setMessages((previous) => {
+        let changed = false;
+        const receiptMap = new Map(payload.receipts.map((entry) => [entry.messageId, entry.readAt]));
+        const next = previous.map((message) => {
+          if (!receiptMap.has(message.id)) {
+            return message;
+          }
+          const alreadyAcknowledged = (message.readBy ?? []).some((entry) => entry.userId === payload.readerId);
+          if (alreadyAcknowledged) {
+            return message;
+          }
+          changed = true;
+          return {
+            ...message,
+            readBy: [...(message.readBy ?? []), { userId: payload.readerId, readAt: receiptMap.get(message.id)! }],
+          };
+        });
+        return changed ? next : previous;
+      });
+    },
+    [currentUserId, joinRequestId]
+  );
+
   useEffect(() => {
     fetchMessages().catch((error) => {
       console.error('Unexpected chat fetch failure', error);
@@ -189,6 +497,15 @@ export default function ChatConversation({
       fetchAbortRef.current?.abort();
     };
   }, [fetchMessages]);
+
+  const handleIncomingMessage = useCallback(
+    (payload: SerializedMessage) => {
+      if (payload.joinRequestId === joinRequestId) {
+        appendMessage(payload);
+      }
+    },
+    [joinRequestId, appendMessage]
+  );
 
   const {
     connectionState,
@@ -201,11 +518,7 @@ export default function ChatConversation({
   } = useSocket({
     token: socketToken,
     readinessEndpoint: '/api/socket/io',
-    onMessage: (payload) => {
-      if (payload.joinRequestId === joinRequestId) {
-        appendMessage(payload);
-      }
-    },
+    onMessage: handleIncomingMessage,
     onError: (error) => {
       console.error('Socket connection error', error);
       setSocketNotice('Real-time updates are unavailable. Sending messages will still work.');
@@ -225,6 +538,7 @@ export default function ChatConversation({
         setIsOtherUserTyping(false);
       }
     },
+    onReadReceipt: handleReadReceipt,
   });
 
   useEffect(() => {
@@ -292,6 +606,16 @@ export default function ChatConversation({
     }
   }, [isCurrentlyTyping, joinRequestId, sendTypingStart, sendTypingStop]);
 
+  useLayoutEffect(() => {
+    if (!composerRef.current) {
+      return;
+    }
+    const textarea = composerRef.current;
+    textarea.style.height = '0px';
+    const nextHeight = Math.min(textarea.scrollHeight, 220);
+    textarea.style.height = `${nextHeight}px`;
+  }, [composerValue]);
+
   const queueMessageForSend = useCallback(
     (content: string) => {
       const clientReferenceId = `queued-${createClientMessageId()}`;
@@ -303,6 +627,7 @@ export default function ChatConversation({
         content,
         createdAt: new Date().toISOString(),
         deliveryStatus: 'queued',
+        readBy: [],
       };
 
       queuedMessagesRef.current.push({ clientReferenceId, content });
@@ -512,14 +837,321 @@ export default function ChatConversation({
           ? 'Realtime is unavailable, but you can keep chatting.'
           : null);
 
+  const hasLocationDetails = Boolean(context.event.locationName && context.event.locationName.trim().length > 0);
+  const quickActionButtonClass = (disabled?: boolean) =>
+    classNames(
+      'inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border/60 px-4 py-3 text-sm font-semibold transition',
+      disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-background/80'
+    );
+  const inlineChipClass = (disabled?: boolean) =>
+    classNames(
+      'inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs font-semibold transition',
+      disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-background/80'
+    );
+
+  const { isActive: chatAttentionIsSnoozed, label: chatAttentionSnoozeCountdownLabel } = useSnoozeCountdown(
+    isHostViewer ? chatAttentionSnoozedUntil : null
+  );
+  const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+  const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
+  const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
+  const chatAttentionSnoozeBadgeLabel = chatAttentionIsSnoozed
+    ? chatAttentionSnoozeCountdownLabel
+      ? `Snoozed · ${chatAttentionSnoozeCountdownLabel}`
+      : 'Snoozed'
+    : null;
+  const hasSavedComposerDraft = hasHydratedComposerDraft && composerValue.trim().length > 0;
+  const chatAttentionToastHelperText = (() => {
+    const helper = chatAttentionLeadEntry?.helperText?.trim();
+    if (helper?.length) {
+      return helper;
+    }
+    if (!chatAttentionHasEntries) {
+      return null;
+    }
+    if (chatAttentionQueueLength > 1) {
+      return `${chatAttentionQueueLength} guests are waiting across your chats.`;
+    }
+    return 'A guest is waiting for a reply in another chat thread.';
+  })();
+  const chatAttentionToastLabel = chatAttentionLeadEntry?.authorName
+    ? `Jump to ${chatAttentionLeadEntry.authorName}`
+    : 'Jump into chat';
+  const chatAttentionToastHref = chatAttentionLeadHref ?? `/chat/${joinRequestId}`;
+  const showChatAttentionToast = isHostViewer && chatAttentionHasEntries && !chatAttentionToastDismissed;
+
+  const applyChatAttentionQueueUpdate = useCallback(
+    (updater: (prev: EventChatAttentionPayload[]) => EventChatAttentionPayload[]) => {
+      if (!isHostViewer) {
+        return null;
+      }
+      let updatedQueue: EventChatAttentionPayload[] | null = null;
+      setChatAttentionQueue((previous) => {
+        const next = updater(previous);
+        if (chatAttentionQueuesMatch(previous, next)) {
+          return previous;
+        }
+        updatedQueue = next;
+        pendingChatAttentionWriteRef.current = next;
+        return next;
+      });
+      return updatedQueue;
+    },
+    [isHostViewer]
+  );
+
+  const handleChatAttentionSnooze = useCallback(
+
+    (durationMinutes: number = quickSnoozeMinutes) => {
+      if (!isHostViewer) {
+        return;
+      }
+      const safeMinutes = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : quickSnoozeMinutes;
+      const snoozeUntil = new Date(Date.now() + safeMinutes * 60 * 1000).toISOString();
+      setChatAttentionSnoozedUntil(snoozeUntil);
+      const durationLabel = safeMinutes === 1 ? 'minute' : 'minutes';
+      showSuccessToast('Chat alerts snoozed', `We'll remind you again in about ${safeMinutes} ${durationLabel}.`);
+      scheduleChatAttentionSnoozeWake(snoozeUntil);
+      if (CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.includes(safeMinutes as ChatAttentionSnoozeOptionMinutes)) {
+        setChatAttentionPreferredSnoozeMinutes(safeMinutes as ChatAttentionSnoozeOptionMinutes);
+      }
+    },
+    [isHostViewer, quickSnoozeMinutes, scheduleChatAttentionSnoozeWake, showSuccessToast]
+  );
+
+  const handleChatAttentionResume = useCallback(() => {
+    if (!isHostViewer || !chatAttentionSnoozedUntil) {
+      return;
+    }
+    clearChatAttentionSnoozeTimeout();
+    setChatAttentionSnoozedUntil(null);
+    showSuccessToast('Chat alerts back on', "We'll nudge you again when guests reach out.");
+  }, [chatAttentionSnoozedUntil, clearChatAttentionSnoozeTimeout, isHostViewer, showSuccessToast]);
+
+  const handleChatAttentionEntryHandled = useCallback(
+    (entryId?: string | null) => {
+      if (!entryId) {
+        return;
+      }
+      const nextQueue = applyChatAttentionQueueUpdate((previous) => previous.filter((entry) => entry.id !== entryId));
+      if (nextQueue) {
+        const remaining = nextQueue.length;
+        const helperCopy = remaining > 0
+          ? `Keeping ${remaining === 1 ? 'one guest' : `${remaining} guests`} on your radar.`
+          : 'No more guests are waiting right now.';
+        showSuccessToast('Marked handled', helperCopy);
+      }
+    },
+    [applyChatAttentionQueueUpdate, showSuccessToast]
+  );
+
+  const handleChatAttentionClearAll = useCallback(() => {
+    if (!chatAttentionHasEntries) {
+      return;
+    }
+    const queueLength = chatAttentionQueueLength;
+    const confirmMessage = queueLength === 1
+      ? 'Mark the current chat ping as handled? This will clear the attention alert.'
+      : `Mark all ${queueLength} chat pings as handled? This will clear every attention alert.`;
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(confirmMessage);
+      if (!confirmed) {
+        return;
+      }
+    }
+    const clearedQueue = applyChatAttentionQueueUpdate(() => []);
+    if (clearedQueue) {
+      setChatAttentionPickerOpen(false);
+      const helperCopy = queueLength === 1
+        ? 'Cleared the pending attention alert.'
+        : `Cleared ${queueLength} queued attention alerts.`;
+      showSuccessToast('Attention queue cleared', helperCopy);
+    }
+  }, [applyChatAttentionQueueUpdate, chatAttentionHasEntries, chatAttentionQueueLength, showSuccessToast]);
+
+  const handleCopyAddress = useCallback(async () => {
+    if (!hasLocationDetails || !context.event.locationName) {
+      showErrorToast('Location coming soon', 'The host will drop the full address shortly.');
+      return;
+    }
+    try {
+      setIsCopyingLocation(true);
+      const value = context.event.locationName.trim();
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } else {
+        throw new Error('Clipboard unavailable');
+      }
+      showSuccessToast('Address copied', value);
+    } catch (error) {
+      console.error('Failed to copy address', error);
+      showErrorToast('Unable to copy the address', 'Please copy it manually for now.');
+    } finally {
+      setIsCopyingLocation(false);
+    }
+  }, [context.event.locationName, hasLocationDetails]);
+
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!eventShareUrl) {
+      showErrorToast('Invite link not ready', 'The invite link is still loading. Try again in a moment.');
+      return;
+    }
+    try {
+      setEventShareCopyState('copying');
+      await copyTextToClipboard(eventShareUrl);
+      setEventShareCopyState('copied');
+      showSuccessToast('Invite link copied', 'Drop it anywhere to fast-pass your friends.');
+    } catch (error) {
+      setEventShareCopyState('idle');
+      const message = (error as Error)?.message ?? 'Copy the link manually for now.';
+      showErrorToast('Copy failed', message);
+    }
+  }, [eventShareUrl]);
+
+  const handleShareInviteLink = useCallback(async () => {
+    if (!eventShareUrl) {
+      showErrorToast('Share unavailable', 'The invite link is still loading. Try again shortly.');
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+      await handleCopyInviteLink();
+      return;
+    }
+
+    try {
+      setEventShareShareState('sharing');
+      await navigator.share({
+        title: context.event.title,
+        text: eventInviteShareText,
+        url: eventShareUrl,
+      });
+      showSuccessToast('Share sheet ready', 'Pick any app to send this plan.');
+    } catch (error) {
+      const dismissed =
+        error instanceof DOMException
+          ? error.name === 'AbortError'
+          : typeof error === 'object' && error !== null && 'name' in error && (error as { name?: string }).name === 'AbortError';
+      if (!dismissed) {
+        const message = (error as Error)?.message ?? 'Copy the link instead.';
+        showErrorToast('Share failed', message);
+      }
+    } finally {
+      setEventShareShareState('idle');
+    }
+  }, [context.event.title, eventInviteShareText, eventShareUrl, handleCopyInviteLink]);
+
+  const handleOpenMaps = useCallback(() => {
+    if (!mapsUrl) {
+      showErrorToast('Location coming soon', 'Maps will unlock once the host shares the venue.');
+      return;
+    }
+    if (typeof window === 'undefined') {
+      showErrorToast('Maps unavailable in this view', 'Open this chat in a browser to launch maps.');
+      return;
+    }
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  }, [mapsUrl]);
+
+  const handleAddToCalendar = useCallback(() => {
+    if (!eventStartDate) {
+      showErrorToast('Schedule not ready', 'Add to calendar will unlock once the host locks the time.');
+      return;
+    }
+    if (typeof document === 'undefined') {
+      showErrorToast('Export unavailable', 'Open this chat in a browser to save the invite.');
+      return;
+    }
+    const formatForICS = (value: Date) => value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const escapeForICS = (value: string) =>
+      value
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\n/g, '\\n');
+    try {
+      setIsCalendarExporting(true);
+      const defaultDurationMs = 2 * 60 * 60 * 1000;
+      const endsAt = new Date(eventStartDate.getTime() + defaultDurationMs);
+      const title = (context.event.title || 'Tonight plan').trim();
+      const locationLabel = context.event.locationName?.trim() ?? '';
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tonight.app';
+      const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Tonight//Chat//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        'BEGIN:VEVENT',
+        `UID:${joinRequestId}@tonight.app`,
+        `DTSTAMP:${formatForICS(new Date())}`,
+        `DTSTART:${formatForICS(eventStartDate)}`,
+        `DTEND:${formatForICS(endsAt)}`,
+        `SUMMARY:${escapeForICS(title)}`,
+      ];
+      if (locationLabel) {
+        lines.push(`LOCATION:${escapeForICS(locationLabel)}`);
+      }
+      lines.push(
+        `DESCRIPTION:${escapeForICS(`Chat thread: ${origin}/chat/${joinRequestId}`)}`,
+        `URL:${origin}/events/${context.event.id}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+      );
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const trigger = document.createElement('a');
+      trigger.href = url;
+      const fileTitle = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tonight-plan';
+      trigger.download = `${fileTitle}.ics`;
+      document.body.appendChild(trigger);
+      trigger.click();
+      document.body.removeChild(trigger);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      showSuccessToast('Calendar invite ready', 'Import it to block off your night.');
+    } catch (error) {
+      console.error('Failed to generate calendar invite', error);
+      showErrorToast('Unable to create calendar invite', 'Please try again in a moment.');
+    } finally {
+      setIsCalendarExporting(false);
+    }
+  }, [context.event.id, context.event.locationName, context.event.title, eventStartDate, joinRequestId]);
+
+  const handleChatAttentionToastInteract = useCallback(() => {
+    setChatAttentionToastDismissed(true);
+    setChatAttentionPickerOpen(false);
+  }, []);
+
+  const handleClearComposerDraft = useCallback(() => {
+    if (!hasSavedComposerDraft) {
+      return;
+    }
+    setComposerValue('');
+    clearChatDraftFromStorage(joinRequestId);
+    if (composerRef.current) {
+      composerRef.current.focus();
+    }
+    showSuccessToast('Draft cleared', "Start fresh whenever you're ready.");
+  }, [hasSavedComposerDraft, joinRequestId, showSuccessToast]);
+
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3">
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-full border border-border/60 p-2 text-muted-foreground transition hover:text-foreground"
+            className="rounded-full border border-border/60 bg-background/50 p-2 text-muted-foreground transition hover:bg-background/80 hover:text-foreground"
             aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -533,115 +1165,561 @@ export default function ChatConversation({
           </div>
           <button
             type="button"
-            title="Event details coming soon"
-            className="rounded-xl border border-border/60 bg-card/60 p-2 text-muted-foreground"
+            onClick={() => setIsEventSheetOpen(true)}
+            className="rounded-xl border border-border/60 bg-card/60 p-2 text-muted-foreground transition hover:text-foreground"
             aria-label="Event info"
           >
             <Info className="h-4 w-4" />
           </button>
+          <Link
+            href={`/events/${context.event.id}`}
+            prefetch
+            target="_blank"
+            rel="noreferrer"
+            className="hidden items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/20 sm:inline-flex"
+          >
+            View plan
+          </Link>
+        </div>
+        <div className="mx-auto w-full max-w-4xl px-4 pb-3">
+          <div
+            className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            data-testid="chat-inline-actions"
+          >
+            <button
+              type="button"
+              onClick={handleCopyAddress}
+              disabled={!hasLocationDetails || isCopyingLocation}
+              className={inlineChipClass(!hasLocationDetails || isCopyingLocation)}
+              title={!hasLocationDetails ? 'Location details coming soon' : undefined}
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {isCopyingLocation ? 'Copying…' : 'Copy address'}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenMaps}
+              disabled={!mapsUrl}
+              className={inlineChipClass(!mapsUrl)}
+              title={!mapsUrl ? 'Maps unlock once the host confirms the venue.' : undefined}
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              Open in Maps
+            </button>
+            <button
+              type="button"
+              onClick={handleAddToCalendar}
+              disabled={!eventStartDate || isCalendarExporting}
+              className={inlineChipClass(!eventStartDate || isCalendarExporting)}
+              title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
+            </button>
+            {isHostViewer ? (
+              <>
+                <span className="mx-1 hidden h-4 w-px self-center bg-border/40 sm:block" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={handleCopyInviteLink}
+                  disabled={!eventShareUrl || eventShareCopyState === 'copying'}
+                  className={inlineChipClass(!eventShareUrl || eventShareCopyState === 'copying')}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {eventShareCopyState === 'copying'
+                    ? 'Copying…'
+                    : eventShareCopyState === 'copied'
+                      ? 'Link copied'
+                      : 'Copy invite link'}
+                </button>
+                {eventShareSupported ? (
+                  <button
+                    type="button"
+                    onClick={handleShareInviteLink}
+                    disabled={!eventShareUrl || eventShareShareState === 'sharing'}
+                    className={inlineChipClass(!eventShareUrl || eventShareShareState === 'sharing')}
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {eventShareShareState === 'sharing' ? 'Sharing…' : 'Share invite'}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          {isHostViewer && chatAttentionHasEntries ? (
+            <div className="mt-3 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-primary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                  {chatAttentionIndicatorLabel}
+                </span>
+                {chatAttentionLeadLabel ? (
+                  chatAttentionLeadHref ? (
+                    <Link
+                      href={chatAttentionLeadHref}
+                      prefetch={false}
+                      aria-label={chatAttentionLeadAriaLabel}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-primary transition hover:border-primary/60"
+                      onClick={() => setChatAttentionPickerOpen(false)}
+                    >
+                      {chatAttentionLeadLabel}
+                      <span aria-hidden className="text-[10px]">↗</span>
+                    </Link>
+                  ) : (
+                    <span className="rounded-full border border-primary/20 px-3 py-1 text-primary">{chatAttentionLeadLabel}</span>
+                  )
+                ) : null}
+                {chatAttentionLeadEntry?.id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleChatAttentionEntryHandled(chatAttentionLeadEntry.id)}
+                    className="text-primary/80 underline-offset-2 transition hover:underline"
+                    aria-label={`Mark handled${chatAttentionLeadEntry.authorName ? ` for ${chatAttentionLeadEntry.authorName}` : ''}`}
+                  >
+                    Mark handled
+                  </button>
+                ) : null}
+                {chatAttentionWaitingLabel ? (
+                  chatAttentionPickerAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => setChatAttentionPickerOpen((previous) => !previous)}
+                      aria-expanded={chatAttentionPickerOpen}
+                      aria-controls="chat-header-attention-picker"
+                      aria-label={`View queued guests (${chatAttentionWaitingLabel})`}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-primary transition hover:border-primary/60"
+                    >
+                      {chatAttentionWaitingLabel}
+                      <ChevronDown
+                        className={classNames('h-3 w-3 transition-transform', chatAttentionPickerOpen ? 'rotate-180' : undefined)}
+                        aria-hidden
+                      />
+                    </button>
+                  ) : (
+                    <span className="rounded-full border border-primary/20 px-3 py-1 text-primary/80">{chatAttentionWaitingLabel}</span>
+                  )
+                ) : null}
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  onClick={handleChatAttentionClearAll}
+                  className="text-primary/80 underline-offset-2 transition hover:underline"
+                  aria-label="Mark all chat attention entries as handled"
+                >
+                  Mark all handled
+                </button>
+              </div>
+              {chatAttentionPickerAvailable && chatAttentionPickerOpen ? (
+                <div id="chat-header-attention-picker" className="mt-3 space-y-2">
+                  {chatAttentionPickerEntries.map((entry) => {
+                    const href = entry.href?.trim();
+                    const relativeTime = formatRelativeTime(entry.timestampISO);
+                    const entryLabel = buildChatAttentionLinkLabel(entry);
+                    return (
+                      <div key={entry.id} className="rounded-xl border border-border/60 bg-background/60 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {href ? (
+                            <Link
+                              href={href}
+                              prefetch={false}
+                              aria-label={entryLabel}
+                              className="text-sm font-semibold text-foreground transition hover:text-primary"
+                              onClick={() => setChatAttentionPickerOpen(false)}
+                            >
+                              {entry.authorName ?? 'Guest thread'}
+                            </Link>
+                          ) : (
+                            <span className="text-sm font-semibold text-foreground">{entry.authorName ?? 'Guest thread'}</span>
+                          )}
+                          {relativeTime ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{relativeTime}</span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleChatAttentionEntryHandled(entry.id)}
+                            className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-primary/80 transition hover:text-primary"
+                            aria-label={`Mark handled${entry.authorName ? ` for ${entry.authorName}` : ''}`}
+                          >
+                            Mark handled
+                          </button>
+                        </div>
+                        {entry.snippet ? (
+                          <p className="mt-1 text-xs text-muted-foreground">{entry.snippet}</p>
+                        ) : null}
+                        {entry.helperText ? (
+                          <p className="mt-1 text-[10px] uppercase tracking-wide text-primary/80">{entry.helperText}</p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {isHostViewer && hasHydratedChatAttentionSnooze ? (
+            chatAttentionIsSnoozed ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
+                {chatAttentionSnoozeBadgeLabel ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/40 px-3 py-1 text-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-300" aria-hidden />
+                    {chatAttentionSnoozeBadgeLabel}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleChatAttentionResume}
+                  className="text-primary underline-offset-2 transition hover:underline"
+                  aria-label="Resume chat attention alerts"
+                >
+                  Resume alerts
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => handleChatAttentionSnooze()}
+                  className="rounded-full border border-border/60 bg-card/70 px-3 py-1 text-foreground transition hover:bg-background/80"
+                  aria-label={quickSnoozeAriaLabel}
+                >
+                  {quickSnoozeButtonLabel}
+                </button>
+                <span className="text-muted-foreground/70">Snooze:</span>
+                {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
+                  const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
+                  return (
+                    <button
+                      key={minutes}
+                      type="button"
+                      onClick={() => handleChatAttentionSnooze(minutes)}
+                      className={classNames(
+                        'rounded-full border px-3 py-1 text-[11px] transition',
+                        isPreferred
+                          ? 'border-primary/60 bg-primary/10 text-primary'
+                          : 'border-border/60 text-muted-foreground hover:text-foreground'
+                      )}
+                      aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
+                      aria-pressed={isPreferred}
+                    >
+                      {minutes} min
+                    </button>
+                  );
+                })}
+              </div>
+            )
+          ) : null}
         </div>
       </header>
 
       <main className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-3 px-4 pt-4">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/70 px-4 py-1 text-xs font-semibold text-emerald-900">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Join request accepted
-          </div>
-          <div className="rounded-2xl border border-border bg-card/70 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground">Tonight&apos;s plan</p>
-                <p className="text-base font-semibold text-foreground">{context.event.title}</p>
-                <p className="text-xs text-muted-foreground">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
-              </div>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-semibold">
-                <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
-                {connectionLabel}
-              </span>
+        <section className="mx-auto w-full max-w-3xl px-4 pt-5">
+          <div className="flex flex-col gap-4">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/80 px-4 py-1 text-xs font-semibold text-emerald-900 shadow-inner shadow-emerald-900/30">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              Join request accepted
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{connectionHelperText}</p>
-            {derivedNotice ? <p className="mt-2 text-xs text-amber-600">{derivedNotice}</p> : null}
+            <div className="rounded-3xl border border-border/60 bg-card/70 px-5 py-4 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Tonight&apos;s plan</p>
+                  <p className="text-base font-semibold text-foreground">{context.event.title}</p>
+                  <p className="text-xs text-muted-foreground">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
+                </div>
+                <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold backdrop-blur', connectionAccent)}>
+                  <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
+                  {connectionLabel}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">{connectionHelperText}</p>
+              {derivedNotice ? <p className="mt-2 text-xs text-amber-400">{derivedNotice}</p> : null}
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="flex flex-1 flex-col px-4 pb-28 pt-2">
+        <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-48 pt-4">
           <MessageList
             status={messagesStatus}
             error={messagesError}
             messages={messages}
             currentUserId={currentUserId}
+            counterpartId={counterpartId}
             onRetry={() => fetchMessages().catch(() => {})}
             className="!px-0"
           />
           {isOtherUserTyping && (
-            <div className="px-4 py-2 text-sm text-muted-foreground italic">
+            <div className="mt-4 rounded-2xl border border-border/60 bg-card/70 px-4 py-2 text-xs italic text-muted-foreground" aria-live="polite">
               {counterpart.displayName || counterpart.email.split('@')[0]} is typing...
             </div>
           )}
-        </div>
+        </section>
       </main>
 
-      <div className="flex items-center justify-center gap-4 border-t border-border bg-card/60 px-4 py-2 text-[10px] text-muted-foreground">
-        <BlockUserButton
-          targetUserId={counterpart.id}
-          targetDisplayName={counterpart.displayName ?? counterpart.email}
-          className="items-center text-[10px]"
-          label="Block"
-          confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
-          confirmMessage="They won’t be able to message you, join your events, or see your plans."
-          disabled={hasBlockedCounterpart}
-          onBlocked={() => {
-            setHasBlockedCounterpart(true);
-            setComposerValue('');
-            setSendError('You blocked this user. Messages are now disabled.');
-          }}
-        />
-        <span className="h-3 w-px bg-border" />
-        <button
-          type="button"
-          title="Reporting will be available soon"
-          className="flex items-center gap-1 text-[10px] text-muted-foreground"
-          disabled
-        >
-          <Flag className="h-3 w-3" />
-          Report
-        </button>
-      </div>
+      <footer className="sticky bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur">
+        <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
+            <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold', connectionAccent)}>
+              <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
+              {connectionLabel}
+            </span>
+            <div className="flex items-center gap-4">
+              <BlockUserButton
+                targetUserId={counterpart.id}
+                targetDisplayName={counterpart.displayName ?? counterpart.email}
+                className="items-center text-[11px]"
+                label="Block"
+                confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
+                confirmMessage="They won’t be able to message you, join your events, or see your plans."
+                disabled={hasBlockedCounterpart}
+                onBlocked={() => {
+                  setHasBlockedCounterpart(true);
+                  setComposerValue('');
+                  setSendError('You blocked this user. Messages are now disabled.');
+                }}
+              />
+              <span className="hidden h-3 w-px bg-border/70 sm:block" />
+              <button
+                type="button"
+                title="Reporting will be available soon"
+                className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                disabled
+              >
+                <Flag className="h-3 w-3" />
+                Report
+              </button>
+            </div>
+          </div>
 
-      <div className="border-t border-border bg-background px-4 py-3">
-        <form onSubmit={handleSend} className="flex items-end gap-2">
-          <label htmlFor="chat-message" className="sr-only">
-            Message
-          </label>
-          <textarea
-            id="chat-message"
-            value={composerValue}
-            onChange={handleInputChange}
-            placeholder="Type a message"
-            rows={1}
-            disabled={hasBlockedCounterpart}
-            className="min-h-[48px] flex-1 rounded-xl border border-border bg-card/60 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-          />
+          <form onSubmit={handleSend} className="flex flex-col gap-3 rounded-3xl border border-border/80 bg-card/80 p-4 shadow-[0_25px_120px_rgba(0,0,0,0.45)]">
+            <div className="flex items-end gap-3">
+              <label htmlFor="chat-message" className="sr-only">
+                Message
+              </label>
+              <textarea
+                id="chat-message"
+                ref={composerRef}
+                value={composerValue}
+                onChange={handleInputChange}
+                placeholder={
+                  hasBlockedCounterpart
+                    ? "Blocked"
+                    : connectionState === 'connected'
+                    ? "Type a message"
+                    : connectionState === 'connecting'
+                    ? "Connecting..."
+                    : "Reconnecting..."
+                }
+                rows={1}
+                disabled={hasBlockedCounterpart || connectionState !== 'connected'}
+                className="max-h-48 min-h-[52px] w-full flex-1 resize-none rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart || connectionState !== 'connected'}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
+                aria-label="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+            {hasSavedComposerDraft ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-3 py-2 text-[11px] font-semibold text-primary">
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden />
+                  Draft saved locally
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearComposerDraft}
+                  className="text-primary underline-offset-2 transition hover:underline"
+                >
+                  Clear draft
+                </button>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+              {hasBlockedCounterpart ? (
+                <p>You blocked this user. Manage safety settings from your profile if you change your mind.</p>
+              ) : null}
+              {queuedHelperText ? <p className="text-amber-400">{queuedHelperText}</p> : null}
+              {sendError ? <p className="text-destructive">{sendError}</p> : null}
+            </div>
+          </form>
+        </div>
+      </footer>
+
+      {isEventSheetOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={eventSheetTitleId}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 py-6 sm:items-center"
+        >
           <button
-            type="submit"
-            disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
-            aria-label="Send message"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </form>
-        {hasBlockedCounterpart ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            You blocked this user. Manage safety settings from your profile if you change your mind.
-          </p>
-        ) : null}
-        {queuedHelperText ? (
-          <p className="mt-2 text-xs text-amber-600">{queuedHelperText}</p>
-        ) : null}
-        {sendError ? <p className="mt-2 text-xs text-destructive">{sendError}</p> : null}
-      </div>
+            type="button"
+            className="absolute inset-0 h-full w-full"
+            aria-label="Close event info"
+            onClick={() => setIsEventSheetOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-3xl border border-border/70 bg-card/95 p-6 shadow-[0_35px_120px_rgba(0,0,0,0.55)] backdrop-blur">
+            <button
+              type="button"
+              onClick={() => setIsEventSheetOpen(false)}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="space-y-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Tonight's plan</p>
+                <h2 id={eventSheetTitleId} className="mt-2 text-2xl font-semibold text-foreground">
+                  {context.event.title}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ') || 'Details coming soon'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/40 p-3">
+                <UserAvatar
+                  size="sm"
+                  displayName={context.host.displayName ?? undefined}
+                  email={context.host.email}
+                  photoUrl={context.host.photoUrl ?? undefined}
+                />
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Hosted by</p>
+                  <p className="text-sm font-semibold">{context.host.displayName ?? context.host.email}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-2xl border border-border/60 bg-background/40 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Where</span>
+                  <span className="font-medium text-foreground">{context.event.locationName ?? 'TBA'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">When</span>
+                  <span className="font-medium text-foreground">{eventTimeLabel ?? 'TBA'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-background/40 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick actions</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={handleCopyAddress}
+                    disabled={!hasLocationDetails || isCopyingLocation}
+                    className={quickActionButtonClass(!hasLocationDetails || isCopyingLocation)}
+                    title={!hasLocationDetails ? 'Location details coming soon' : undefined}
+                  >
+                    <Copy className="h-4 w-4" />
+                    {isCopyingLocation ? 'Copying…' : 'Copy address'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenMaps}
+                    disabled={!mapsUrl}
+                    className={quickActionButtonClass(!mapsUrl)}
+                    title={!mapsUrl ? 'Maps unlock once the host confirms the venue.' : undefined}
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Open in Maps
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddToCalendar}
+                    disabled={!eventStartDate || isCalendarExporting}
+                    className={quickActionButtonClass(!eventStartDate || isCalendarExporting)}
+                    title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
+                  >
+                    <CalendarPlus className="h-4 w-4" />
+                    {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href={`/events/${context.event.id}`}
+                  prefetch
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                >
+                  Open full event
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsEventSheetOpen(false)}
+                  className="inline-flex flex-1 items-center justify-center rounded-2xl border border-border/60 px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-background/80"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showChatAttentionToast ? (
+        <EventChatAttentionToast
+          href={chatAttentionToastHref}
+          label={chatAttentionToastLabel}
+          helperText={chatAttentionToastHelperText}
+          attentionLabel={chatAttentionIndicatorLabel}
+          snippet={chatAttentionLeadEntry?.snippet}
+          snippetSender={chatAttentionLeadEntry?.authorName ?? undefined}
+          snippetTimestamp={chatAttentionLeadEntry?.timestampISO}
+          onInteract={handleChatAttentionToastInteract}
+          attentionQueue={chatAttentionQueue}
+          chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
+          chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
+          onMarkHandled={handleChatAttentionEntryHandled}
+          onMarkAllHandled={handleChatAttentionClearAll}
+          onSnooze={handleChatAttentionSnooze}
+          onResume={handleChatAttentionResume}
+        />
+      ) : null}
     </div>
   );
+}
+
+function buildChatEventInviteShareText(title: string, eventMomentLabel: string | null, locationName?: string | null) {
+  const parts: string[] = [`Join me at "${title}"`];
+  if (eventMomentLabel) {
+    parts.push(`on ${eventMomentLabel}`);
+  }
+  const locationLabel = locationName?.trim();
+  if (locationLabel) {
+    parts.push(`near ${locationLabel}`);
+  }
+  parts.push('Request access on Tonight.');
+  return parts.join(' ');
+}
+
+async function copyTextToClipboard(value: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  if (typeof document === 'undefined') {
+    throw new Error('Clipboard unavailable');
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.top = '-1000px';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const successful = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!successful) {
+    throw new Error('Unable to copy to clipboard.');
+  }
 }

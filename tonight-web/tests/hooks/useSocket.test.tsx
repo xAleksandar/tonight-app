@@ -4,8 +4,8 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSocket } from '@/hooks/useSocket';
-import { JOIN_REQUEST_MESSAGE_EVENT, JOIN_REQUEST_JOIN_EVENT } from '@/lib/socket-shared';
-import type { SocketMessagePayload } from '@/lib/socket-shared';
+import { JOIN_REQUEST_MESSAGE_EVENT, JOIN_REQUEST_JOIN_EVENT, JOIN_REQUEST_READ_RECEIPT_EVENT } from '@/lib/socket-shared';
+import type { SocketMessagePayload, SocketReadReceiptEventPayload } from '@/lib/socket-shared';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -135,6 +135,7 @@ describe('useSocket', () => {
       senderId: 'sender',
       content: 'hello',
       createdAt: new Date().toISOString(),
+      readBy: [],
     };
 
     act(() => {
@@ -161,6 +162,7 @@ describe('useSocket', () => {
       senderId: 'sender',
       content: 'Hey',
       createdAt: new Date().toISOString(),
+      readBy: [],
     };
 
     act(() => {
@@ -169,4 +171,30 @@ describe('useSocket', () => {
 
     expect(onMessage).toHaveBeenCalledWith(incoming);
   });
+  it('invokes onReadReceipt handler when server reports seen states', async () => {
+    const onReadReceipt = vi.fn();
+    const { result } = renderHook(() => useSocket({ token: 'jwt-token', autoConnect: false, onReadReceipt }));
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    const socket = getLastSocket();
+    const payload: SocketReadReceiptEventPayload = {
+      joinRequestId: 'jr-abc',
+      readerId: 'user-2',
+      receipts: [
+        { messageId: 'msg-1', readAt: new Date().toISOString() },
+        { messageId: 'msg-2', readAt: new Date().toISOString() },
+      ],
+    };
+
+    act(() => {
+      socket.trigger(JOIN_REQUEST_READ_RECEIPT_EVENT, payload);
+    });
+
+    expect(onReadReceipt).toHaveBeenCalledWith(payload);
+  });
+
+
 });

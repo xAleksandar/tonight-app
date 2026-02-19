@@ -8,40 +8,41 @@ datasource db {
 }
 
 model User {
-  id                 String             @id @default(cuid())
-  email              String             @unique
-  displayName        String?
-  photoUrl           String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  events             Event[]            @relation("UserEvents")
-  joinRequests       JoinRequest[]
-  messages           Message[]          @relation("UserMessages")
-  messageReads       MessageRead[]      @relation("UserMessageReads")
-  blockedUsers       BlockedUser[]      @relation("BlockerRelation")
-  blockedBy          BlockedUser[]      @relation("BlockedRelation")
-  reportsFiled       Report[]           @relation("ReporterRelation")
-  reportsAgainst     Report[]           @relation("ReportedUserRelation")
-  magicLinks         MagicLink[]
-  eventInvitesSent   EventInviteLog[]   @relation("EventInviteLogInviters")
+  id                   String           @id @default(cuid())
+  email                String           @unique
+  displayName          String?
+  photoUrl             String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  events               Event[]          @relation("UserEvents")
+  joinRequests         JoinRequest[]
+  messages             Message[]        @relation("UserMessages")
+  messageReads         MessageRead[]    @relation("UserMessageReads")
+  blockedUsers         BlockedUser[]    @relation("BlockerRelation")
+  blockedBy            BlockedUser[]    @relation("BlockedRelation")
+  reportsFiled         Report[]         @relation("ReporterRelation")
+  reportsAgainst       Report[]         @relation("ReportedUserRelation")
+  magicLinks           MagicLink[]
+  eventInvitesSent     EventInviteLog[] @relation("EventInviteLogInviters")
   eventInvitesReceived EventInviteLog[] @relation("EventInviteLogInvitees")
 }
 
 model Event {
-  id              String            @id @default(cuid())
+  id              String                                @id @default(cuid())
   title           String
   description     String
   datetime        DateTime
   location        Unsupported("geography(Point, 4326)")
   locationName    String
-  maxParticipants Int               @default(2)
-  status          EventStatus       @default(ACTIVE)
+  maxParticipants Int                                   @default(2)
+  status          EventStatus                           @default(ACTIVE)
   hostId          String
-  host            User              @relation("UserEvents", fields: [hostId], references: [id])
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  host            User                                  @relation("UserEvents", fields: [hostId], references: [id])
+  createdAt       DateTime                              @default(now())
+  updatedAt       DateTime                              @updatedAt
   joinRequests    JoinRequest[]
-  reports         Report[]          @relation("EventReportRelation")
+  inviteLogs      EventInviteLog[]
+  reports         Report[]                              @relation("EventReportRelation")
 
   @@index([hostId])
   @@index([status])
@@ -53,17 +54,17 @@ enum EventStatus {
 }
 
 model JoinRequest {
-  id                     String             @id @default(cuid())
-  status                 JoinRequestStatus  @default(PENDING)
+  id                     String            @id @default(cuid())
+  status                 JoinRequestStatus @default(PENDING)
   eventId                String
-  event                  Event              @relation(fields: [eventId], references: [id])
+  event                  Event             @relation(fields: [eventId], references: [id])
   userId                 String
-  user                   User               @relation(fields: [userId], references: [id])
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  user                   User              @relation(fields: [userId], references: [id])
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
   lastSeenHostActivityAt DateTime?
   messages               Message[]
-  eventInviteLogs        EventInviteLog[]   @relation("EventInviteLogSources")
+  eventInviteLogs        EventInviteLog[]  @relation("EventInviteLogSources")
 
   @@unique([eventId, userId])
 }
@@ -101,28 +102,28 @@ model MessageRead {
 }
 
 model BlockedUser {
-  id         String   @id @default(cuid())
-  blockerId  String
-  blockedId  String
-  blocker    User     @relation("BlockerRelation", fields: [blockerId], references: [id])
-  blocked    User     @relation("BlockedRelation", fields: [blockedId], references: [id])
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  blocker   User     @relation("BlockerRelation", fields: [blockerId], references: [id])
+  blocked   User     @relation("BlockedRelation", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
 }
 
 model Report {
-  id              String        @id @default(cuid())
-  reporterId      String
-  reporter        User          @relation("ReporterRelation", fields: [reporterId], references: [id])
-  reportedUserId  String?
-  reportedUser    User?         @relation("ReportedUserRelation", fields: [reportedUserId], references: [id])
-  eventId         String?
-  event           Event?        @relation("EventReportRelation", fields: [eventId], references: [id])
-  reason          String
-  description     String?
-  status          ReportStatus  @default(PENDING)
-  createdAt       DateTime      @default(now())
+  id             String       @id @default(cuid())
+  reporterId     String
+  reporter       User         @relation("ReporterRelation", fields: [reporterId], references: [id])
+  reportedUserId String?
+  reportedUser   User?        @relation("ReportedUserRelation", fields: [reportedUserId], references: [id])
+  eventId        String?
+  event          Event?       @relation("EventReportRelation", fields: [eventId], references: [id])
+  reason         String
+  description    String?
+  status         ReportStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
 }
 
 enum ReportStatus {
@@ -131,14 +132,14 @@ enum ReportStatus {
 }
 
 model MagicLink {
-  id        String   @id @default(cuid())
-  token     String   @unique
+  id        String    @id @default(cuid())
+  token     String    @unique
   email     String
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model EventInviteLog {

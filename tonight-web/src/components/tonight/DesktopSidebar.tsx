@@ -61,7 +61,6 @@ export function DesktopSidebar({
     onClick?: () => void;
   }> = [
     { id: "discover", label: "Discover", icon: Compass, onClick: onNavigateDiscover },
-    { id: "messages", label: "Messages", icon: MessageCircle, onClick: onNavigateMessages },
     { id: "people", label: "People nearby", icon: Users, onClick: onNavigatePeople },
   ];
 

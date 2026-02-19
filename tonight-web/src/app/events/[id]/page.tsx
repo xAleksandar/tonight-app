@@ -1,12 +1,13 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { JoinRequestStatus } from "@/generated/prisma/client";
 import { EventInsideExperience, type EventInsideExperienceProps } from "@/components/tonight/event-inside/EventInsideExperience";
+import type { MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 import { fetchEventById } from "@/lib/events";
 import { listJoinRequestsForEvent, type SerializedJoinRequestWithUser } from "@/lib/join-requests";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/middleware/auth";
-import { EventLayout } from "./EventLayout";
+import { EventInsidePageClient } from "./EventInsidePageClient";
 
 interface PageParams {
   params: Promise<{
@@ -16,6 +17,7 @@ interface PageParams {
 
 const HOST_UNREAD_THREAD_LIMIT = 3;
 const HOST_ACTIVITY_FEED_LIMIT = 3;
+const CHAT_PREVIEW_MESSAGE_LIMIT = 3;
 const HOST_FRIEND_INVITE_LIMIT = 6;
 const HOST_FRIEND_INVITE_COOLDOWN_MS = 15 * 60 * 1000;
 
@@ -175,6 +177,77 @@ const buildHostUnreadThreadSummaries = async ({
   return filtered;
 };
 
+
+const buildHostRecentThreadSummaries = async ({
+  eventId,
+  hostId,
+}: {
+  eventId: string;
+  hostId: string;
+}): Promise<HostUnreadThreadSummary[]> => {
+  const recentMessages = await prisma.message.findMany({
+    where: {
+      joinRequest: {
+        eventId,
+        status: JoinRequestStatus.ACCEPTED,
+      },
+      senderId: {
+        not: hostId,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: HOST_UNREAD_THREAD_LIMIT * 4,
+    select: {
+      content: true,
+      createdAt: true,
+      joinRequestId: true,
+      joinRequest: {
+        select: {
+          user: {
+            select: {
+              displayName: true,
+              email: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!recentMessages.length) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const summaries: HostUnreadThreadSummary[] = [];
+
+  for (const message of recentMessages) {
+    if (!message.joinRequestId || seen.has(message.joinRequestId)) {
+      continue;
+    }
+
+    seen.add(message.joinRequestId);
+    const displayName =
+      message.joinRequest?.user.displayName ?? message.joinRequest?.user.email ?? "Guest";
+
+    summaries.push({
+      joinRequestId: message.joinRequestId,
+      displayName,
+      lastMessageSnippet: message.content,
+      lastMessageAtISO: message.createdAt?.toISOString() ?? null,
+      unreadCount: null,
+    });
+
+    if (summaries.length >= HOST_UNREAD_THREAD_LIMIT) {
+      break;
+    }
+  }
+
+  return summaries;
+};
+
 const buildHostFriendInviteCandidates = async ({
   hostId,
   currentEventId,
@@ -326,11 +399,24 @@ const buildChatPreviewForAcceptedGuest = async ({
   fallbackTimestampISO?: string;
   lastSeenHostActivityAt?: string | null;
 }): Promise<EventInsideExperienceProps["chatPreview"]> => {
-  const [lastMessage, unreadCount, acceptedGuestsCount, latestHostMessages] = await Promise.all([
-    prisma.message.findFirst({
+  const [recentMessages, unreadCount, acceptedGuestsCount, latestHostMessages] = await Promise.all([
+    prisma.message.findMany({
       where: { joinRequestId },
       orderBy: { createdAt: "desc" },
-      select: { content: true, createdAt: true },
+      take: CHAT_PREVIEW_MESSAGE_LIMIT,
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        senderId: true,
+        sender: {
+          select: {
+            displayName: true,
+            email: true,
+            photoUrl: true,
+          },
+        },
+      },
     }),
     prisma.message.count({
       where: {
@@ -364,8 +450,14 @@ const buildChatPreviewForAcceptedGuest = async ({
   const hostActivityCursorSource = hostActivityHasMore ? latestHostMessages[HOST_ACTIVITY_FEED_LIMIT] : undefined;
   const trimmedHostMessages = hostActivityHasMore ? latestHostMessages.slice(0, HOST_ACTIVITY_FEED_LIMIT) : latestHostMessages;
 
+  const lastMessage = recentMessages[0];
   const lastMessageSnippet = lastMessage?.content ?? "No messages yet. Say hi once you're accepted.";
-  const lastMessageAtISO = lastMessage?.createdAt.toISOString() ?? fallbackTimestampISO ?? null;
+  const lastMessageAuthorName = lastMessage
+    ? lastMessage.senderId === viewerId
+      ? "You"
+      : lastMessage.sender?.displayName ?? lastMessage.sender?.email ?? "Guest"
+    : null;
+  const lastMessageAtISO = lastMessage?.createdAt?.toISOString() ?? fallbackTimestampISO ?? null;
   const participantCount = acceptedGuestsCount + 1; // host + accepted guests
   const hostActivityFeed = trimmedHostMessages.map((message) => ({
     id: message.id,
@@ -374,8 +466,20 @@ const buildChatPreviewForAcceptedGuest = async ({
     authorName: hostDisplayName ?? "Host",
   }));
 
+  const guestMessagePreview = recentMessages.map((message) => ({
+    id: message.id,
+    content: message.content,
+    postedAtISO: message.createdAt?.toISOString() ?? null,
+    authorName: message.senderId === viewerId
+      ? "You"
+      : message.sender?.displayName ?? message.sender?.email ?? "Guest",
+    authorAvatarUrl: message.sender?.photoUrl ?? null,
+    isViewer: message.senderId === viewerId,
+  }));
+
   return {
     lastMessageSnippet,
+    lastMessageAuthorName,
     lastMessageAtISO,
     unreadCount: unreadCount > 0 ? unreadCount : null,
     participantCount,
@@ -384,6 +488,7 @@ const buildChatPreviewForAcceptedGuest = async ({
     guestComposer: {
       joinRequestId,
     },
+    guestMessagePreview: guestMessagePreview.length ? guestMessagePreview.reverse() : undefined,
     latestHostActivity: hostActivityFeed[0],
     latestHostActivityFeed: hostActivityFeed.length ? hostActivityFeed : undefined,
     hostActivityFeedPagination:
@@ -434,6 +539,16 @@ const buildChatPreviewForHost = async ({
         content: true,
         createdAt: true,
         joinRequestId: true,
+        joinRequest: {
+          select: {
+            user: {
+              select: {
+                displayName: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.message.count({
@@ -461,6 +576,18 @@ const buildChatPreviewForHost = async ({
     buildHostUnreadThreadSummaries({ eventId, hostId }),
   ]);
 
+  const lastGuestAuthorName = latestGuestMessage
+    ? latestGuestMessage.joinRequest?.user.displayName ?? latestGuestMessage.joinRequest?.user.email ?? "Guest"
+    : null;
+
+  let hostRecentThreads: HostUnreadThreadSummary[] = [];
+  if (hostUnreadThreads.length === 0) {
+    hostRecentThreads = await buildHostRecentThreadSummaries({
+      eventId,
+      hostId,
+    });
+  }
+
   const participantCount = acceptedGuestCount > 0 ? acceptedGuestCount + 1 : null;
 
   if (!acceptedGuestCount) {
@@ -477,19 +604,24 @@ const buildChatPreviewForHost = async ({
       ctaLabel: "Open guest chats",
       ctaDisabledReason: "Guests can message you once they DM the host.",
       hostUnreadThreads: hostUnreadThreads.length ? hostUnreadThreads : undefined,
+      hostRecentThreads: hostUnreadThreads.length === 0 && hostRecentThreads.length ? hostRecentThreads : undefined,
     };
   }
 
   return {
     participantCount,
     lastMessageSnippet: latestGuestMessage.content,
+    lastMessageAuthorName: lastGuestAuthorName ?? "Guest",
     lastMessageAtISO: latestGuestMessage.createdAt.toISOString(),
     unreadCount: unreadCount > 0 ? unreadCount : null,
     ctaLabel: unreadCount > 0 ? "Reply to guests" : "Open latest chat",
     ctaHref: "/chat/" + latestGuestMessage.joinRequestId,
     hostUnreadThreads: hostUnreadThreads.length ? hostUnreadThreads : undefined,
+    hostRecentThreads: hostUnreadThreads.length === 0 && hostRecentThreads.length ? hostRecentThreads : undefined,
   };
 };
+
+
 
 export default async function EventInsidePage({ params }: PageParams) {
   const resolvedParams = await params;
@@ -584,6 +716,17 @@ export default async function EventInsidePage({ params }: PageParams) {
   const pendingRequests = isHostViewer ? mapPendingJoinRequests(joinRequests) : [];
   const attendeeUserIds = attendees.map((attendee) => attendee.id);
 
+  const hostChatParticipants = isHostViewer
+    ? joinRequests
+        .filter((request) => request.status === JoinRequestStatus.ACCEPTED)
+        .map((request) => ({
+          joinRequestId: request.id,
+          userId: request.user.id,
+          displayName: request.user.displayName ?? request.user.email ?? "Guest",
+          avatarUrl: request.user.photoUrl,
+        }))
+    : undefined;
+
   let hostFriendInvites: EventInsideExperienceProps["hostFriendInvites"];
   if (isHostViewer) {
     hostFriendInvites = await buildHostFriendInviteCandidates({
@@ -642,6 +785,12 @@ export default async function EventInsidePage({ params }: PageParams) {
       description: eventRecord.description,
       startDateISO: eventRecord.datetime.toISOString(),
       locationName: eventRecord.locationName,
+      location: eventRecord.latitude && eventRecord.longitude
+        ? {
+            latitude: typeof eventRecord.latitude === 'string' ? parseFloat(eventRecord.latitude) : eventRecord.latitude,
+            longitude: typeof eventRecord.longitude === 'string' ? parseFloat(eventRecord.longitude) : eventRecord.longitude,
+          }
+        : null,
       capacityLabel: `${eventRecord.maxParticipants} spots`,
     },
     host: {
@@ -655,11 +804,34 @@ export default async function EventInsidePage({ params }: PageParams) {
     viewerRole,
     chatPreview,
     hostFriendInvites,
+    hostChatParticipants,
     socketToken: authenticatedUser?.token,
     pendingJoinRequestId: viewerRole === "pending" && viewerJoinRequest ? viewerJoinRequest.id : null,
+    viewerUser: authenticatedUser
+      ? {
+          id: authenticatedUser.userId,
+          displayName: currentUserProfile?.displayName ?? null,
+          email: currentUserProfile?.email ?? authenticatedUser.email,
+          photoUrl: currentUserProfile?.photoUrl ?? null,
+        }
+      : null,
   };
 
-  // Content that appears in both authenticated and unauthenticated views
+  if (authenticatedUser && currentUserProfile) {
+    return (
+      <EventInsidePageClient
+        experience={experience}
+        layoutProps={{
+          eventTitle: eventRecord.title,
+          eventLocation: eventRecord.locationName,
+          userDisplayName: currentUserProfile.displayName,
+          userEmail: currentUserProfile.email,
+          userPhotoUrl: currentUserProfile.photoUrl,
+        }}
+      />
+    );
+  }
+
   const content = (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <EventInsideExperience {...experience} />
@@ -669,22 +841,6 @@ export default async function EventInsidePage({ params }: PageParams) {
     </div>
   );
 
-  // Authenticated users get full layout with sidebar, header, and mobile action bar
-  if (authenticatedUser && currentUserProfile) {
-    return (
-      <EventLayout
-        eventTitle={eventRecord.title}
-        eventLocation={eventRecord.locationName}
-        userDisplayName={currentUserProfile.displayName}
-        userEmail={currentUserProfile.email}
-        userPhotoUrl={currentUserProfile.photoUrl}
-      >
-        {content}
-      </EventLayout>
-    );
-  }
-
-  // Unauthenticated users get minimal view for public sharing
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-0">
       {content}

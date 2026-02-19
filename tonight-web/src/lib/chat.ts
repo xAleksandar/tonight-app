@@ -16,12 +16,18 @@ export class ChatJoinRequestNotAcceptedError extends ChatError {}
 export class ChatMessageValidationError extends ChatError {}
 export class ChatBlockedError extends ChatError {}
 
+export type SerializedMessageReadReceipt = {
+  userId: string;
+  readAt: string;
+};
+
 export type SerializedMessage = {
   id: string;
   joinRequestId: string;
   senderId: string;
   content: string;
   createdAt: string;
+  readBy: SerializedMessageReadReceipt[];
 };
 
 export type ChatAccessInput = {
@@ -55,12 +61,18 @@ type JoinRequestAccessRecord = {
 
 export const CHAT_MESSAGE_MAX_LENGTH = 1000;
 
-const serializeMessage = (record: Message): SerializedMessage => ({
+const serializeMessage = (
+  record: Message & { readBy?: Array<{ userId: string; readAt: Date }> }
+): SerializedMessage => ({
   id: record.id,
   joinRequestId: record.joinRequestId,
   senderId: record.senderId,
   content: record.content,
   createdAt: record.createdAt.toISOString(),
+  readBy: (record.readBy ?? []).map((entry) => ({
+    userId: entry.userId,
+    readAt: entry.readAt.toISOString(),
+  })),
 });
 
 const normalizeParticipantRole = (joinRequest: JoinRequestAccessRecord, userId: string) => {
@@ -156,6 +168,14 @@ export const listMessagesForJoinRequest = async (
     orderBy: {
       createdAt: 'asc',
     },
+    include: {
+      readBy: {
+        select: {
+          userId: true,
+          readAt: true,
+        },
+      },
+    },
   });
 
   return messages.map((record) => serializeMessage(record));
@@ -187,6 +207,14 @@ export const createMessageForJoinRequest = async (
       joinRequestId: context.joinRequestId,
       senderId: input.userId,
       content,
+    },
+    include: {
+      readBy: {
+        select: {
+          userId: true,
+          readAt: true,
+        },
+      },
     },
   });
 

@@ -2,13 +2,89 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
-import { CheckCircle2, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock3, Copy, MapPin, MessageCircle, Send, Share2, Shield, Sparkles, Users } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const EventMapView = dynamic(() => import("@/components/EventMapView"), { ssr: false });
 
 import UserAvatar from "@/components/UserAvatar";
+import MessageList, { type ChatMessage, type MessageListStatus } from "@/components/chat/MessageList";
 import { useSocket } from "@/hooks/useSocket";
+import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 import { classNames } from "@/lib/classNames";
+import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES, DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
+import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
+import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
 import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+
+type EventChatPreview = {
+  lastMessageSnippet?: string | null;
+  lastMessageAuthorName?: string | null;
+  lastMessageAtISO?: string | null;
+  unreadCount?: number | null;
+  participantCount?: number | null;
+  ctaLabel?: string | null;
+  ctaHref?: string | null;
+  ctaDisabledReason?: string | null;
+  latestHostActivity?: {
+    message: string;
+    postedAtISO?: string | null;
+    authorName?: string | null;
+  };
+  latestHostActivityFeed?: Array<{
+    id: string;
+    message: string;
+    postedAtISO?: string | null;
+    authorName?: string | null;
+  }>;
+  hostUnreadThreads?: Array<{
+    joinRequestId: string;
+    displayName: string;
+    lastMessageSnippet: string;
+    lastMessageAtISO?: string | null;
+    unreadCount?: number | null;
+  }>;
+  hostRecentThreads?: Array<{
+    joinRequestId: string;
+    displayName: string;
+    lastMessageSnippet: string;
+    lastMessageAtISO?: string | null;
+  }>;
+  guestComposer?: {
+    joinRequestId?: string | null;
+    disabledReason?: string | null;
+  };
+  guestMessagePreview?: Array<{
+    id: string;
+    authorName: string;
+    authorAvatarUrl?: string | null;
+    content: string;
+    postedAtISO?: string | null;
+    isViewer?: boolean;
+  }>;
+  hostActivityFeedPagination?: {
+    hasMore: boolean;
+    nextCursor?: string | null;
+  };
+  hostActivityLastSeenAt?: string | null;
+};
+
+type ViewerUserProfile = {
+  id: string;
+  displayName: string | null;
+  email: string;
+  photoUrl: string | null;
+};
+
+export type EventChatAttentionPayload = {
+  id: string;
+  snippet: string;
+  authorName?: string | null;
+  timestampISO?: string | null;
+  helperText?: string | null;
+  href?: string | null;
+};
 
 export type EventInsideExperienceProps = {
   event: {
@@ -17,6 +93,7 @@ export type EventInsideExperienceProps = {
     description?: string | null;
     startDateISO?: string | null;
     locationName?: string | null;
+    location?: { latitude: number; longitude: number } | null;
     vibeTags?: string[];
     entryNotes?: string[];
     capacityLabel?: string;
@@ -44,42 +121,7 @@ export type EventInsideExperienceProps = {
     mutualFriends?: number | null;
   }>;
   viewerRole: "host" | "guest" | "pending" | "public";
-  chatPreview?: {
-    lastMessageSnippet?: string | null;
-    lastMessageAtISO?: string | null;
-    unreadCount?: number | null;
-    participantCount?: number | null;
-    ctaLabel?: string | null;
-    ctaHref?: string | null;
-    ctaDisabledReason?: string | null;
-    latestHostActivity?: {
-      message: string;
-      postedAtISO?: string | null;
-      authorName?: string | null;
-    };
-    latestHostActivityFeed?: Array<{
-      id: string;
-      message: string;
-      postedAtISO?: string | null;
-      authorName?: string | null;
-    }>;
-    hostUnreadThreads?: Array<{
-      joinRequestId: string;
-      displayName: string;
-      lastMessageSnippet: string;
-      lastMessageAtISO?: string | null;
-      unreadCount?: number | null;
-    }>;
-    guestComposer?: {
-      joinRequestId?: string | null;
-      disabledReason?: string | null;
-    };
-    hostActivityFeedPagination?: {
-      hasMore: boolean;
-      nextCursor?: string | null;
-    };
-    hostActivityLastSeenAt?: string | null;
-  };
+  chatPreview?: EventChatPreview;
   hostFriendInvites?: Array<{
     joinRequestId: string;
     userId: string;
@@ -91,10 +133,37 @@ export type EventInsideExperienceProps = {
     nextInviteAvailableAtISO?: string | null;
     currentEventInviteAtISO?: string | null;
   }>;
+  viewerUser?: ViewerUserProfile | null;
+  hostChatParticipants?: Array<{
+    joinRequestId: string;
+    userId: string;
+    displayName: string;
+    avatarUrl?: string | null;
+  }>;
   /** JWT token for the realtime socket connection */
   socketToken?: string | null;
   /** Join request ID for pending guests to receive approval notifications */
   pendingJoinRequestId?: string | null;
+  /** Callback fired whenever the chat preview snapshot changes (e.g., realtime events) */
+  onChatPreviewRefresh?: (next: EventChatPreview | undefined) => void;
+  /** Controls the chat CTA attention indicator (true = pulse) */
+  chatAttentionActive?: boolean;
+  /** Active queue of attention payloads (used for chips + inline context) */
+  chatAttentionQueue?: EventChatAttentionPayload[];
+  /** Preferred snooze window in minutes (to highlight default pills) */
+  chatAttentionPreferredSnoozeMinutes?: number | null;
+  /** When set, attention pulses are snoozed until this ISO timestamp */
+  chatAttentionSnoozedUntil?: string | null;
+  /** Fired when realtime events request the attention indicator to toggle */
+  onChatAttentionChange?: (active: boolean, payload?: EventChatAttentionPayload) => void;
+  /** Fired when the host manually marks a queued chat attention entry as handled */
+  onChatAttentionEntryHandled?: (entryId: string) => void;
+  /** Clears the entire chat attention queue in one action */
+  onChatAttentionClearAll?: () => void;
+  /** Snoozes chat attention pulses for a configurable window */
+  onChatAttentionSnooze?: (durationMinutes?: number) => void;
+  /** Resumes chat attention pulses immediately */
+  onChatAttentionResume?: () => void;
 };
 
 const viewerRoleCopy: Record<EventInsideExperienceProps["viewerRole"], { label: string; tone: string }> = {
@@ -124,6 +193,7 @@ const HOST_ANNOUNCEMENT_MAX_LENGTH = 1000;
 const HOST_ACTIVITY_SCROLL_THRESHOLD = 16;
 
 const HOST_FRIEND_INVITE_COOLDOWN_MS = 15 * 60 * 1000;
+const GUEST_CHAT_PREVIEW_LIMIT = 3;
 
 type HostFriendInviteTemplateId = "save-spot" | "last-minute" | "vibe-match";
 
@@ -186,12 +256,38 @@ const HOST_FRIEND_INVITE_TEMPLATE_DEFINITIONS: HostFriendInviteTemplateDefinitio
 
 const DEFAULT_HOST_FRIEND_TEMPLATE_ID: HostFriendInviteTemplateId = "save-spot";
 
+type HostFriendInviteEntry = NonNullable<EventInsideExperienceProps["hostFriendInvites"]>[number];
+
+type HostFriendSelectionBlockedEntry = {
+  friend: HostFriendInviteEntry;
+  reason: string;
+  type: "cooldown" | "event";
+  nextInviteAvailableAtISO?: string | null;
+  currentEventInviteAtISO?: string | null;
+  eventInviteOverrideAvailable: boolean;
+  eventInviteCoolingDown: boolean;
+};
+
+type HostFriendSelectionEligibility = {
+  eligible: boolean;
+  blockedEntry?: HostFriendSelectionBlockedEntry;
+};
+
 type JoinRequestActionState = "approving" | "rejecting";
-type HostUnreadThread = NonNullable<NonNullable<EventInsideExperienceProps["chatPreview"]>["hostUnreadThreads"]>[number];
+type HostUnreadThread = NonNullable<NonNullable<EventChatPreview["hostUnreadThreads"]>[number]>;
+
+type HostRecentThread = NonNullable<NonNullable<EventChatPreview["hostRecentThreads"]>[number]>;
 
 type HostFriendInviteDispatchResult = { joinRequestId: string; status: "sent" | "failed"; error?: string };
 
 type HostFriendInviteGuardrailState = Record<string, { lastInviteAtISO: string | null; nextInviteAvailableAtISO: string | null }>;
+
+type HostFriendSelectionSummary = {
+  sentCount: number;
+  skippedCount: number;
+  failedCount: number;
+  timestampISO: string;
+};
 
 export function EventInsideExperience({
   event,
@@ -199,11 +295,25 @@ export function EventInsideExperience({
   attendees,
   joinRequests,
   viewerRole,
-  chatPreview,
+  chatPreview: initialChatPreview,
   hostFriendInvites,
+  hostChatParticipants: hostChatParticipantsProp,
+  viewerUser,
   socketToken,
   pendingJoinRequestId,
+  onChatPreviewRefresh,
+  chatAttentionActive = false,
+  chatAttentionQueue = [],
+  chatAttentionPreferredSnoozeMinutes,
+  chatAttentionSnoozedUntil,
+  onChatAttentionChange,
+  onChatAttentionEntryHandled,
+  onChatAttentionClearAll,
+  onChatAttentionSnooze,
+  onChatAttentionResume,
 }: EventInsideExperienceProps) {
+  const [chatPreviewState, setChatPreviewState] = useState(initialChatPreview);
+  const chatPreview = chatPreviewState ?? initialChatPreview;
   const [pendingRequests, setPendingRequests] = useState(joinRequests);
   const [roster, setRoster] = useState(attendees);
   const [requestActionState, setRequestActionState] = useState<Record<string, JoinRequestActionState | undefined>>({});
@@ -217,17 +327,43 @@ export function EventInsideExperience({
   const [hostFriendComposerState, setHostFriendComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
   const [hostFriendSelectionState, setHostFriendSelectionState] = useState<Record<string, boolean>>({});
   const [hostFriendSelectionStatus, setHostFriendSelectionStatus] = useState<"idle" | "sending">("idle");
+  const [hostFriendSelectionSkippedExpanded, setHostFriendSelectionSkippedExpanded] = useState(false);
+  const [hostFriendSelectionSkippedHistory, setHostFriendSelectionSkippedHistory] = useState<string[]>([]);
   const [hostFriendInviteGuardrails, setHostFriendInviteGuardrails] = useState<HostFriendInviteGuardrailState>({});
   const [hostFriendEventInviteState, setHostFriendEventInviteState] = useState<Record<string, string | null>>({});
+  const [hostFriendEventInviteOverrides, setHostFriendEventInviteOverrides] = useState<Record<string, string | null>>({});
+  const [hostFriendSelectionSummary, setHostFriendSelectionSummary] = useState<HostFriendSelectionSummary | null>(null);
 
   const [hostFriendTemplateId, setHostFriendTemplateId] = useState<HostFriendInviteTemplateId>(DEFAULT_HOST_FRIEND_TEMPLATE_ID);
+  const [chatAttentionPickerOpen, setChatAttentionPickerOpen] = useState(false);
 
   const hostFriendTemplateSelectId = "host-friend-template-select";
   const hostFriendSearchInputId = "host-friend-search-input";
 
   const [quickReplyState, setQuickReplyState] = useState<Record<string, "sending" | undefined>>({});
   const [inlineComposerState, setInlineComposerState] = useState<Record<string, { value: string; status?: "sending" }>>({});
+  const [mapStyle, setMapStyle] = useState<"light" | "dark">("dark");
   const guestComposerConfig = viewerRole === "guest" ? chatPreview?.guestComposer : undefined;
+  const guestMessagePreviewEntries = viewerRole === "guest" ? chatPreview?.guestMessagePreview ?? [] : [];
+  const hostUnreadPreviewEntries = viewerRole === "host" ? hostUnreadThreads.slice(0, 3) : [];
+  const hostUnreadPreviewOverflow = viewerRole === "host" ? Math.max(hostUnreadThreads.length - hostUnreadPreviewEntries.length, 0) : 0;
+  const hostRecentThreadSnapshots: HostRecentThread[] =
+    viewerRole === "host" && hostUnreadThreads.length === 0 ? chatPreview?.hostRecentThreads ?? [] : [];
+  const hostRecentPreviewEntries = hostRecentThreadSnapshots.slice(0, 3);
+  const hostRecentPreviewOverflow = Math.max(hostRecentThreadSnapshots.length - hostRecentPreviewEntries.length, 0);
+  const hostPreviewHasUnread = hostUnreadPreviewEntries.length > 0;
+  const hostThreadPreviewEntries = hostPreviewHasUnread ? hostUnreadPreviewEntries : hostRecentPreviewEntries;
+  const hostThreadPreviewOverflow = hostPreviewHasUnread ? hostUnreadPreviewOverflow : hostRecentPreviewOverflow;
+  const hostThreadPreviewTitle = hostPreviewHasUnread ? "Latest guest pings" : "Recent guest activity";
+  const hostThreadPreviewOverflowCopy = hostThreadPreviewOverflow > 0
+    ? hostPreviewHasUnread
+      ? hostThreadPreviewOverflow === 1
+        ? "1 more guest is waiting in the replies list below."
+        : `${hostThreadPreviewOverflow} more guests are waiting in the replies list below.`
+      : hostThreadPreviewOverflow === 1
+        ? "1 more guest recently checked in — open the chat view for full context."
+        : `${hostThreadPreviewOverflow} more guests have fresh activity inside chat.`
+    : null;
   const [guestComposerValue, setGuestComposerValue] = useState("");
   const [guestComposerStatus, setGuestComposerStatus] = useState<"idle" | "sending">("idle");
   const [joinRequestStatus, setJoinRequestStatus] = useState<"idle" | "submitting" | "submitted">("idle");
@@ -239,6 +375,29 @@ export function EventInsideExperience({
     () => (isHostViewer ? hostFriendInvites ?? [] : []),
     [isHostViewer, hostFriendInvites]
   );
+  const hostChatParticipants = useMemo(
+    () => (isHostViewer ? hostChatParticipantsProp ?? [] : []),
+    [hostChatParticipantsProp, isHostViewer]
+  );
+  const hostChatParticipantMap = useMemo(() => {
+    if (!hostChatParticipants.length) {
+      return new Map<string, { displayName: string; avatarUrl?: string | null }>();
+    }
+    return new Map(
+      hostChatParticipants.map((participant) => [
+        participant.joinRequestId,
+        {
+          displayName: participant.displayName,
+          avatarUrl: participant.avatarUrl ?? null,
+        },
+      ])
+    );
+  }, [hostChatParticipants]);
+  const hostChatJoinRequestIds = useMemo(
+    () => hostChatParticipants.map((participant) => participant.joinRequestId).filter((value): value is string => Boolean(value)),
+    [hostChatParticipants]
+  );
+  const hostChatJoinRequestIdSet = useMemo(() => new Set(hostChatJoinRequestIds), [hostChatJoinRequestIds]);
   const hostActivityListRef = useRef<HTMLUListElement | null>(null);
   const [hasHostActivityNotice, setHasHostActivityNotice] = useState(false);
   const initialHostActivityEntries: Array<{ id: string; message: string; postedAtISO?: string | null; authorName?: string | null }> = useMemo(
@@ -268,12 +427,39 @@ export function EventInsideExperience({
   const [hostAnnouncementValue, setHostAnnouncementValue] = useState("");
   const [hostAnnouncementStatus, setHostAnnouncementStatus] = useState<"idle" | "sending">("idle");
   const guestJoinRequestId = guestComposerConfig?.joinRequestId?.trim() || null;
-  const realtimeHostActivityEnabled = Boolean(socketToken && isGuestViewer && guestJoinRequestId);
+  const guestRealtimeChatEnabled = Boolean(socketToken && guestJoinRequestId);
+  const hostRealtimeChatEnabled = Boolean(socketToken && isHostViewer && hostChatJoinRequestIds.length > 0);
+  const realtimeChatUpdatesEnabled = guestRealtimeChatEnabled || hostRealtimeChatEnabled;
+  const realtimeHostActivityEnabled = Boolean(guestRealtimeChatEnabled && isGuestViewer);
   const realtimeJoinApprovalEnabled = Boolean(socketToken && isPendingViewer && pendingJoinRequestId);
   const activeJoinRequestId = guestJoinRequestId || pendingJoinRequestId || null;
-  const socketEnabled = realtimeHostActivityEnabled || realtimeJoinApprovalEnabled;
+  const socketEnabled = realtimeChatUpdatesEnabled || realtimeJoinApprovalEnabled;
   const latestHostActivityTimestamp = hostActivityEntries.length ? hostActivityEntries[0]?.postedAtISO ?? null : null;
   const eventInviteShareText = useMemo(() => buildEventInviteShareText(event), [event]);
+  const requestChatAttention = useCallback(
+    (payload?: EventChatAttentionPayload) => onChatAttentionChange?.(true, payload),
+    [onChatAttentionChange]
+  );
+  const acknowledgeChatAttention = useCallback(() => onChatAttentionChange?.(false), [onChatAttentionChange]);
+  const handleChatAttentionEntryHandled = useCallback(
+    (entryId?: string | null) => {
+      if (!entryId) {
+        return;
+      }
+      onChatAttentionEntryHandled?.(entryId);
+    },
+    [onChatAttentionEntryHandled]
+  );
+
+  useEffect(() => {
+    setChatPreviewState(initialChatPreview);
+  }, [initialChatPreview]);
+
+  useEffect(() => {
+    if (onChatPreviewRefresh) {
+      onChatPreviewRefresh(chatPreview);
+    }
+  }, [chatPreview, onChatPreviewRefresh]);
 
   useEffect(() => {
     setPendingRequests(joinRequests);
@@ -358,6 +544,12 @@ export function EventInsideExperience({
 
   useEffect(() => {
     if (!hostFriendInviteEntries.length) {
+      setHostFriendSelectionSummary(null);
+    }
+  }, [hostFriendInviteEntries.length]);
+
+  useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
       setHostFriendInviteGuardrails({});
       return;
     }
@@ -423,6 +615,38 @@ export function EventInsideExperience({
   }, [hostFriendInviteEntries]);
 
   useEffect(() => {
+    if (!hostFriendInviteEntries.length) {
+      setHostFriendEventInviteOverrides({});
+      return;
+    }
+
+    setHostFriendEventInviteOverrides((prev) => {
+      const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+      let mutated = false;
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (!activeIds.has(key)) {
+          delete next[key];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendInviteEntries]);
+
+  useEffect(() => {
+    if (!hostFriendSelectionSkippedHistory.length) {
+      return;
+    }
+
+    const activeIds = new Set(hostFriendInviteEntries.map((entry) => entry.joinRequestId));
+    setHostFriendSelectionSkippedHistory((prev) => {
+      const filtered = prev.filter((id) => activeIds.has(id));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [hostFriendInviteEntries, hostFriendSelectionSkippedHistory]);
+
+  useEffect(() => {
     if (!Object.keys(hostFriendInviteGuardrails).length) {
       return;
     }
@@ -439,6 +663,22 @@ export function EventInsideExperience({
       return mutated ? next : prev;
     });
   }, [hostFriendInviteGuardrails]);
+
+  useEffect(() => {
+    setHostFriendSelectionState((prev) => {
+      let mutated = false;
+      const next = { ...prev };
+      for (const joinRequestId of Object.keys(prev)) {
+        const currentEventInviteAtISO = hostFriendEventInviteState[joinRequestId];
+        const overrideToken = hostFriendEventInviteOverrides[joinRequestId];
+        if (currentEventInviteAtISO && overrideToken !== currentEventInviteAtISO) {
+          delete next[joinRequestId];
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [hostFriendEventInviteOverrides, hostFriendEventInviteState]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location) {
@@ -533,7 +773,6 @@ export function EventInsideExperience({
   }, [acknowledgeHostActivityUpdates, hasHostActivityNotice, hostActivityEntries.length, latestHostActivityTimestamp]);
 
   const groupedAttendees = useMemo(() => groupAttendees(roster), [roster]);
-  const stats = useMemo(() => buildStats(event, groupedAttendees), [event, groupedAttendees]);
   const eventMomentLabel = useMemo(() => formatEventShareMoment(event.startDateISO), [event.startDateISO]);
   const resolvedEventShareUrl = eventShareUrl ?? `https://tonight.app/events/${event.id}`;
   const hostFriendInviteTemplateOptions = useMemo(
@@ -576,13 +815,6 @@ export function EventInsideExperience({
   const hostFriendInviteEmptyCopy = hostFriendSearchActive
     ? "No friends match this search yet."
     : "We’ll surface your recent Tonight friends here as they RSVP to your events.";
-  const hostFriendSelectedEntries = useMemo(
-    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
-    [hostFriendInviteEntries, hostFriendSelectionState]
-  );
-  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
-  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
-  const hostFriendSelectionCtaLabel = hostFriendSelectedCount === 1 ? "Send template to 1 friend" : `Send template to ${hostFriendSelectedCount} friends`;
   const getHostFriendGuardrailFor = useCallback(
     (joinRequestId: string) => {
       const stateEntry = hostFriendInviteGuardrails[joinRequestId];
@@ -597,6 +829,122 @@ export function EventInsideExperience({
     },
     [hostFriendInviteEntries, hostFriendInviteGuardrails]
   );
+  const evaluateHostFriendSelectionEligibility = useCallback(
+    (friend: HostFriendInviteEntry): HostFriendSelectionEligibility => {
+      const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
+      const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO ?? null;
+      const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
+      const currentEventInviteAtISO = hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
+      const overrideToken = hostFriendEventInviteOverrides[friend.joinRequestId] ?? null;
+      const eventInviteLocked = Boolean(currentEventInviteAtISO && overrideToken !== currentEventInviteAtISO);
+      const eventInviteCooldownUntilISO = getEventInviteCooldownUntil(currentEventInviteAtISO);
+      const eventInviteCoolingDown = Boolean(currentEventInviteAtISO) && isInviteGuardrailActive(eventInviteCooldownUntilISO);
+      const eventInviteOverrideAvailable = eventInviteLocked && !eventInviteCoolingDown;
+
+      if (inviteGuardrailActive || eventInviteLocked) {
+        return {
+          eligible: false,
+          blockedEntry: {
+            friend,
+            reason: inviteGuardrailActive
+              ? nextInviteAvailableAtISO
+                ? `Cooling down — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
+                : "Cooling down — invited moments ago."
+              : eventInviteCoolingDown && eventInviteCooldownUntilISO
+                ? `Already pinged for this event — try again ${formatRelativeTime(eventInviteCooldownUntilISO)}.`
+                : `Already invited to ${event.title}.`,
+            type: inviteGuardrailActive ? "cooldown" : "event",
+            nextInviteAvailableAtISO,
+            currentEventInviteAtISO,
+            eventInviteOverrideAvailable,
+            eventInviteCoolingDown,
+          },
+        };
+      }
+
+      return { eligible: true };
+    },
+    [event.title, getHostFriendGuardrailFor, hostFriendEventInviteOverrides, hostFriendEventInviteState]
+  );
+  const hostFriendSelectedEntries = useMemo(
+    () => hostFriendInviteEntries.filter((friend) => Boolean(hostFriendSelectionState[friend.joinRequestId])),
+    [hostFriendInviteEntries, hostFriendSelectionState]
+  );
+  const hostFriendSelectedCount = hostFriendSelectedEntries.length;
+  const hostFriendSelectionActive = hostFriendSelectedCount > 0;
+  const hostFriendSelectionBreakdown = useMemo(() => {
+    return hostFriendSelectedEntries.reduce(
+      (acc, friend) => {
+        const { eligible, blockedEntry } = evaluateHostFriendSelectionEligibility(friend);
+        if (!eligible && blockedEntry) {
+          acc.blockedEntries.push(blockedEntry);
+          return acc;
+        }
+
+        acc.eligibleEntries.push(friend);
+        return acc;
+      },
+      { eligibleEntries: [] as HostFriendInviteEntry[], blockedEntries: [] as HostFriendSelectionBlockedEntry[] }
+    );
+  }, [evaluateHostFriendSelectionEligibility, hostFriendSelectedEntries]);
+  const hostFriendSelectionEligibleEntries = hostFriendSelectionBreakdown.eligibleEntries;
+  const hostFriendSelectionBlockedEntries = hostFriendSelectionBreakdown.blockedEntries;
+  const hostFriendSelectionEligibleCount = hostFriendSelectionEligibleEntries.length;
+  const hostFriendSelectionSkippedCount = hostFriendSelectionBlockedEntries.length;
+  const hostFriendSelectionHasSkipped = hostFriendSelectionSkippedCount > 0;
+  const hostFriendSelectionReadyLabel =
+    hostFriendSelectionEligibleCount === 1
+      ? "1 friend ready to ping"
+      : `${hostFriendSelectionEligibleCount} friends ready to ping`;
+  const hostFriendSelectionSkippedLabel =
+    hostFriendSelectionSkippedCount === 1
+      ? "1 selection paused"
+      : `${hostFriendSelectionSkippedCount} selections paused`;
+  const hostFriendSelectionSkippedHelperLabel = hostFriendSelectionSkippedCount === 1 ? "that friend" : "those friends";
+  const hostFriendSelectionCtaLabel =
+    hostFriendSelectionEligibleCount === 0
+      ? "No eligible friends right now"
+      : hostFriendSelectionEligibleCount === 1
+        ? "Send template to 1 friend"
+        : `Send template to ${hostFriendSelectionEligibleCount} friends`;
+  const hostFriendSelectionSkippedHistorySet = useMemo(
+    () => new Set(hostFriendSelectionSkippedHistory),
+    [hostFriendSelectionSkippedHistory]
+  );
+  const hostFriendSelectionSkippedHistoryEntries = useMemo(() => {
+    if (!hostFriendSelectionSkippedHistorySet.size) {
+      return [];
+    }
+    return hostFriendInviteEntries.filter((friend) => hostFriendSelectionSkippedHistorySet.has(friend.joinRequestId));
+  }, [hostFriendInviteEntries, hostFriendSelectionSkippedHistorySet]);
+  const hostFriendSelectionSkippedHistoryCount = hostFriendSelectionSkippedHistoryEntries.length;
+  const hostFriendSelectionSkippedReselectableEntries = useMemo(
+    () =>
+      hostFriendSelectionSkippedHistoryEntries.filter((friend) => evaluateHostFriendSelectionEligibility(friend).eligible),
+    [evaluateHostFriendSelectionEligibility, hostFriendSelectionSkippedHistoryEntries]
+  );
+  const hostFriendSelectionSkippedReselectableCount = hostFriendSelectionSkippedReselectableEntries.length;
+  const hostFriendSelectionSkippedReadyLabel =
+    hostFriendSelectionSkippedReselectableCount === 1
+      ? "1 friend ready again"
+      : `${hostFriendSelectionSkippedReselectableCount} friends ready again`;
+  const hostFriendSelectionSummaryRelativeTime = hostFriendSelectionSummary?.timestampISO
+    ? formatRelativeTime(hostFriendSelectionSummary.timestampISO)
+    : null;
+  const hostFriendSelectionSummaryHasSkipped = Boolean(hostFriendSelectionSummary?.skippedCount);
+  const hostFriendSelectionSummaryHasFailures = Boolean(hostFriendSelectionSummary?.failedCount);
+
+  useEffect(() => {
+    if (!hostFriendSelectionActive) {
+      setHostFriendSelectionSkippedExpanded(false);
+    }
+  }, [hostFriendSelectionActive]);
+
+  useEffect(() => {
+    if (!hostFriendSelectionHasSkipped) {
+      setHostFriendSelectionSkippedExpanded(false);
+    }
+  }, [hostFriendSelectionHasSkipped]);
   const stampHostFriendInviteGuardrail = useCallback((joinRequestId: string, lastInviteSourceISO?: string) => {
     const baseTimestamp = lastInviteSourceISO ? new Date(lastInviteSourceISO) : new Date();
     const nextTimestamp = new Date(baseTimestamp.getTime() + HOST_FRIEND_INVITE_COOLDOWN_MS);
@@ -639,6 +987,14 @@ export function EventInsideExperience({
           ...prev,
           [friend.joinRequestId]: invitedAtISO,
         }));
+        setHostFriendEventInviteOverrides((prev) => {
+          if (!prev[friend.joinRequestId]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[friend.joinRequestId];
+          return next;
+        });
       } catch (error) {
         console.error("Failed to log event invite", error);
       }
@@ -649,6 +1005,88 @@ export function EventInsideExperience({
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+  const chatAttentionQueueEntries = useMemo(
+    () => (chatAttentionQueue ?? []).filter((entry): entry is EventChatAttentionPayload => Boolean(entry && entry.id)),
+    [chatAttentionQueue]
+  );
+  const chatAttentionLabels = buildChatAttentionLabels(chatAttentionQueueEntries);
+  const chatAttentionPickerEntries = useMemo(
+    () =>
+      chatAttentionQueueEntries.filter(
+        (entry): entry is EventChatAttentionPayload & { href: string } =>
+          typeof entry?.href === "string" && entry.href.trim().length > 0
+      ),
+    [chatAttentionQueueEntries]
+  );
+  const chatAttentionPickerAvailable = chatAttentionPickerEntries.length > 1;
+  const heroChatAttentionLeadChip = chatAttentionLabels.leadLabel;
+  const heroChatAttentionWaitingChip = chatAttentionLabels.waitingLabel;
+  const heroChatAttentionIndicatorLabel = chatAttentionLabels.indicatorLabel ?? "New chat ping";
+  const heroChatAttentionHasQueue = (chatAttentionQueue?.length ?? 0) > 0;
+  const { isActive: chatAttentionIsSnoozed, label: chatAttentionSnoozeCountdownLabel } = useSnoozeCountdown(chatAttentionSnoozedUntil);
+  const chatAttentionSnoozeLabel = chatAttentionIsSnoozed
+    ? chatAttentionSnoozeCountdownLabel ?? (chatAttentionSnoozedUntil ? `Resumes ${formatRelativeTime(chatAttentionSnoozedUntil)}` : "Snoozed")
+    : null;
+  const chatAttentionSnoozeBadgeText = chatAttentionIsSnoozed
+    ? `Snoozed${chatAttentionSnoozeLabel ? ` · ${chatAttentionSnoozeLabel}` : ""}`
+    : null;
+  const heroChatAttentionLeadEntry = chatAttentionLabels.leadEntry;
+  const heroChatAttentionLeadHref = heroChatAttentionLeadEntry?.href ?? chatCtaHref;
+  const heroChatAttentionLeadAriaLabel = buildChatAttentionLinkLabel(heroChatAttentionLeadEntry);
+  const quickSnoozeMinutes = chatAttentionPreferredSnoozeMinutes ?? DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES;
+  const quickSnoozeButtonLabel = `Snooze for ${quickSnoozeMinutes} min`;
+  const quickSnoozeAriaLabel = `Quick snooze chat attention alerts · ${quickSnoozeMinutes} min`;
+
+  useEffect(() => {
+    if (!chatAttentionPickerAvailable && chatAttentionPickerOpen) {
+      setChatAttentionPickerOpen(false);
+    }
+  }, [chatAttentionPickerAvailable, chatAttentionPickerOpen]);
+
+  const handleChatAttentionClearAll = useCallback(() => {
+    if (!chatAttentionQueueEntries.length) {
+      return;
+    }
+    setChatAttentionPickerOpen(false);
+    onChatAttentionClearAll?.();
+  }, [chatAttentionQueueEntries.length, onChatAttentionClearAll]);
+
+  const heroChatSummaryCopy =
+    chatPreview?.lastMessageSnippet ??
+    (isHostViewer
+      ? "Guest pings will show up here once someone reaches out."
+      : isGuestViewer
+        ? "Host updates will surface here once the thread gets activity."
+        : isPendingViewer
+          ? "Chat unlocks right after the host approves you."
+          : "Request access to unlock this chat.");
+
+  const hasUnreadMessages = typeof chatPreview?.unreadCount === "number" && (chatPreview?.unreadCount ?? 0) > 0;
+
+  const heroChatBadge: { label: string; tone: string } | null = hasUnreadMessages
+    ? {
+        label: `${chatPreview!.unreadCount} unread`,
+        tone: "bg-primary/20 text-primary",
+      }
+    : isHostViewer || isGuestViewer
+      ? { label: "You're caught up", tone: "bg-emerald-400/15 text-emerald-200" }
+      : isPendingViewer
+        ? { label: "Approval required", tone: "bg-white/10 text-white/70" }
+        : { label: "Login required", tone: "bg-white/10 text-white/70" };
+
+  const heroChatTimestampChip = chatPreview?.lastMessageAtISO ? `Updated ${formatRelativeTime(chatPreview.lastMessageAtISO)}` : null;
+  const heroChatParticipantChip =
+    chatPreview?.participantCount && chatPreview.participantCount > 0
+      ? `${chatPreview.participantCount} ${chatPreview.participantCount === 1 ? "person" : "people"} in chat`
+      : null;
+  const heroChatFallbackChip =
+    !heroChatTimestampChip && !heroChatParticipantChip
+      ? isHostViewer || isGuestViewer
+        ? "No messages yet"
+        : isPendingViewer
+          ? "Waiting on host approval"
+          : "Chat locked"
+      : null;
 
   const hostActivityListShouldScroll = hostActivityEntries.length > 3;
   const hostActivityListClasses = classNames(
@@ -727,47 +1165,186 @@ export function EventInsideExperience({
     setHasHostActivityNotice(false);
   }, []);
 
-  const handleRealtimeHostActivity = useCallback(
+  const handleRealtimeChatMessage = useCallback(
     (payload: SocketMessagePayload) => {
-      if (!realtimeHostActivityEnabled || !guestJoinRequestId) {
+      if (!realtimeChatUpdatesEnabled) {
         return;
       }
 
-      if (payload.joinRequestId !== guestJoinRequestId || payload.senderId !== host.id) {
+      const createdAtISO = payload.createdAt ?? new Date().toISOString();
+      const isHostSender = payload.senderId === host.id;
+
+      if (guestRealtimeChatEnabled && guestJoinRequestId && payload.joinRequestId === guestJoinRequestId) {
+        setChatPreviewState((prev) => {
+          const reference = prev ?? initialChatPreview;
+          if (!reference) {
+            return prev ?? reference;
+          }
+
+          const nextPreview: EventChatPreview = {
+            ...reference,
+            lastMessageSnippet: payload.content,
+            lastMessageAuthorName: isHostSender ? host.displayName ?? host.email ?? "Host" : "You",
+            lastMessageAtISO: createdAtISO,
+          };
+
+          if (isHostSender) {
+            const previousUnread = typeof reference.unreadCount === "number" ? reference.unreadCount : 0;
+            nextPreview.unreadCount = previousUnread + 1;
+          } else {
+            nextPreview.unreadCount = null;
+          }
+
+          const existingPreview = reference.guestMessagePreview ?? [];
+          if (!existingPreview.some((entry) => entry.id === payload.id)) {
+            const nextEntry = {
+              id: payload.id,
+              content: payload.content,
+              postedAtISO: createdAtISO,
+              authorName: isHostSender ? host.displayName ?? host.email ?? "Host" : "You",
+              authorAvatarUrl: isHostSender ? host.avatarUrl ?? null : null,
+              isViewer: !isHostSender,
+            };
+            const normalized = [...existingPreview, nextEntry];
+            if (normalized.length > GUEST_CHAT_PREVIEW_LIMIT) {
+              normalized.splice(0, normalized.length - GUEST_CHAT_PREVIEW_LIMIT);
+            }
+            nextPreview.guestMessagePreview = normalized;
+          } else {
+            nextPreview.guestMessagePreview = existingPreview;
+          }
+
+          return nextPreview;
+        });
+
+        if (isHostSender) {
+          const attentionId = payload.id ?? `${guestJoinRequestId ?? 'guest'}-${createdAtISO}`;
+          requestChatAttention({
+            id: attentionId,
+            snippet: payload.content,
+            authorName: host.displayName ?? host.email ?? "Host",
+            timestampISO: payload.createdAt ?? createdAtISO,
+            helperText: "Host just shared a new update",
+            href: guestJoinRequestId ? `/chat/${guestJoinRequestId}` : chatPreview?.ctaHref ?? undefined,
+          });
+        }
+
+        if (!isHostSender || !realtimeHostActivityEnabled) {
+          return;
+        }
+
+        setHostActivityEntries((prev) => {
+          if (prev.some((entry) => entry.id === payload.id)) {
+            return prev;
+          }
+          const nextEntry = {
+            id: payload.id,
+            message: payload.content,
+            postedAtISO: payload.createdAt,
+            authorName: host.displayName ?? host.email ?? "Host",
+          };
+          const listEl = hostActivityListRef.current;
+          const scrolledAway = listEl ? listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD : false;
+          if (scrolledAway) {
+            setHasHostActivityNotice(true);
+          } else {
+            scrollHostActivityToTop();
+            void acknowledgeHostActivityUpdates(payload.createdAt ?? latestHostActivityTimestamp);
+          }
+          return [nextEntry, ...prev];
+        });
         return;
       }
 
-      setHostActivityEntries((prev) => {
-        if (prev.some((entry) => entry.id === payload.id)) {
-          return prev;
+      if (hostRealtimeChatEnabled && hostChatJoinRequestIdSet.has(payload.joinRequestId)) {
+        const participant = hostChatParticipantMap.get(payload.joinRequestId);
+        const participantDisplayName = participant?.displayName ?? 'Guest';
+        if (isHostSender) {
+          setChatPreviewState((prev) => {
+            const reference = prev ?? initialChatPreview;
+            if (!reference) {
+              return prev ?? reference;
+            }
+
+            return {
+              ...reference,
+              lastMessageSnippet: payload.content,
+              lastMessageAuthorName: "You",
+              lastMessageAtISO: createdAtISO,
+              ctaHref: `/chat/${payload.joinRequestId}`,
+            };
+          });
+          return;
         }
-        const nextEntry = {
-          id: payload.id,
-          message: payload.content,
-          postedAtISO: payload.createdAt,
-          authorName: host.displayName ?? host.email ?? "Host",
-        };
-        const listEl = hostActivityListRef.current;
-        const scrolledAway = listEl ? listEl.scrollTop > HOST_ACTIVITY_SCROLL_THRESHOLD : false;
-        if (scrolledAway) {
-          setHasHostActivityNotice(true);
-        } else {
-          scrollHostActivityToTop();
-          void acknowledgeHostActivityUpdates(payload.createdAt ?? latestHostActivityTimestamp);
-        }
-        return [nextEntry, ...prev];
-      });
+
+        setChatPreviewState((prev) => {
+          const reference = prev ?? initialChatPreview;
+          if (!reference) {
+            return prev ?? reference;
+          }
+
+          const previousUnread = typeof reference.unreadCount === "number" ? reference.unreadCount : 0;
+          const totalUnread = previousUnread + 1;
+
+          return {
+            ...reference,
+            lastMessageSnippet: payload.content,
+            lastMessageAuthorName: participantDisplayName,
+            lastMessageAtISO: createdAtISO,
+            unreadCount: totalUnread,
+            ctaLabel: totalUnread > 0 ? "Reply to guests" : reference.ctaLabel,
+            ctaHref: `/chat/${payload.joinRequestId}`,
+          };
+        });
+
+        requestChatAttention({
+          id: payload.id ?? `${payload.joinRequestId}-${createdAtISO}`,
+          snippet: payload.content,
+          authorName: participantDisplayName,
+          timestampISO: payload.createdAt ?? createdAtISO,
+          helperText: participant?.displayName ? `${participantDisplayName} sent a new message` : "Guest sent a new message",
+          href: `/chat/${payload.joinRequestId}`,
+        });
+
+        setHostUnreadThreads((prev) => {
+          const participant = hostChatParticipantMap.get(payload.joinRequestId);
+          const existingEntry = prev.find((thread) => thread.joinRequestId === payload.joinRequestId);
+          const previousUnread = typeof existingEntry?.unreadCount === "number" ? existingEntry.unreadCount : 0;
+          const normalizedEntry: HostUnreadThread = {
+            joinRequestId: payload.joinRequestId,
+            displayName: participant?.displayName ?? "Guest",
+            lastMessageSnippet: payload.content,
+            lastMessageAtISO: createdAtISO,
+            unreadCount: previousUnread + 1,
+          };
+          const filtered = prev.filter((thread) => thread.joinRequestId !== payload.joinRequestId);
+          return [normalizedEntry, ...filtered];
+        });
+      }
     },
     [
       acknowledgeHostActivityUpdates,
       guestJoinRequestId,
+      guestRealtimeChatEnabled,
+      host.avatarUrl,
       host.displayName,
       host.email,
       host.id,
+      hostChatJoinRequestIdSet,
+      hostChatParticipantMap,
+      hostRealtimeChatEnabled,
+      initialChatPreview,
       latestHostActivityTimestamp,
+      realtimeChatUpdatesEnabled,
       realtimeHostActivityEnabled,
+      scrollHostActivityToTop,
     ]
   );
+
+  const handleChatAttentionNavigation = useCallback(() => {
+    acknowledgeChatAttention();
+    setChatAttentionPickerOpen(false);
+  }, [acknowledgeChatAttention]);
 
   const handleJoinRequestStatusChanged = useCallback(
     (payload: JoinRequestStatusChangedPayload) => {
@@ -878,16 +1455,42 @@ export function EventInsideExperience({
     token: socketEnabled ? socketToken ?? undefined : undefined,
     autoConnect: socketEnabled,
     readinessEndpoint: "/api/socket/io",
-    onMessage: realtimeHostActivityEnabled ? handleRealtimeHostActivity : undefined,
+    onMessage: realtimeChatUpdatesEnabled ? handleRealtimeChatMessage : undefined,
     onJoinRequestStatusChanged: socketEnabled ? handleJoinRequestStatusChanged : undefined,
   });
 
   useEffect(() => {
-    if (!socketEnabled || !isConnected || !activeJoinRequestId) {
+    if (!socketEnabled || !isConnected) {
       return;
     }
-    joinRoom(activeJoinRequestId);
-  }, [activeJoinRequestId, isConnected, joinRoom, socketEnabled]);
+
+    const rooms = new Set<string>();
+    if (guestRealtimeChatEnabled && guestJoinRequestId) {
+      rooms.add(guestJoinRequestId);
+    }
+    if (hostRealtimeChatEnabled) {
+      hostChatJoinRequestIds.forEach((id) => rooms.add(id));
+    }
+    if (realtimeJoinApprovalEnabled && pendingJoinRequestId) {
+      rooms.add(pendingJoinRequestId);
+    }
+
+    rooms.forEach((roomId) => {
+      if (roomId) {
+        joinRoom(roomId);
+      }
+    });
+  }, [
+    socketEnabled,
+    isConnected,
+    joinRoom,
+    guestRealtimeChatEnabled,
+    guestJoinRequestId,
+    hostRealtimeChatEnabled,
+    hostChatJoinRequestIds,
+    realtimeJoinApprovalEnabled,
+    pendingJoinRequestId,
+  ]);
 
   const handleMarkThreadAsRead = async (joinRequestId: string) => {
     const fallback = "Unable to mark this thread as read.";
@@ -1196,6 +1799,22 @@ export function EventInsideExperience({
     });
   };
 
+  const handleHostFriendEventInviteOverride = (joinRequestId: string, invitedAtISO?: string | null) => {
+    if (!invitedAtISO) {
+      return;
+    }
+    if (isEventInviteCooldownActive(invitedAtISO)) {
+      showErrorToast("Still cooling down", "Give them a little more time before re-inviting.");
+      return;
+    }
+
+    setHostFriendEventInviteOverrides((prev) => ({
+      ...prev,
+      [joinRequestId]: invitedAtISO,
+    }));
+    showSuccessToast("Re-invite enabled", "You can nudge this friend again.");
+  };
+
   const handleHostFriendSelectionClear = () => {
     setHostFriendSelectionState((prev) => {
       if (Object.keys(prev).length === 0) {
@@ -1205,21 +1824,59 @@ export function EventInsideExperience({
     });
   };
 
+  const handleHostFriendSelectionReselectSkipped = () => {
+    if (hostFriendSelectionStatus === "sending") {
+      return;
+    }
+
+    if (!hostFriendSelectionSkippedReselectableEntries.length) {
+      showErrorToast("Still cooling down", "We’ll light this back up once friends are ready again.");
+      return;
+    }
+
+    setHostFriendSelectionState((prev) => {
+      const next = { ...prev };
+      for (const friend of hostFriendSelectionSkippedReselectableEntries) {
+        next[friend.joinRequestId] = true;
+      }
+      return next;
+    });
+
+    setHostFriendSelectionSkippedHistory((prev) => {
+      if (!prev.length) {
+        return prev;
+      }
+      const readyIds = new Set(hostFriendSelectionSkippedReselectableEntries.map((friend) => friend.joinRequestId));
+      const filtered = prev.filter((id) => !readyIds.has(id));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+
+    const readyCount = hostFriendSelectionSkippedReselectableEntries.length;
+    const label = readyCount === 1 ? "Friend reselected" : "Friends reselected";
+    const helper = readyCount === 1 ? "They’re back in your selection." : `${readyCount} friends are ready again.`;
+    showSuccessToast(label, helper);
+  };
+
+  const triggerHostFriendSkippedReselect = () => {
+    setHostFriendSelectionSkippedExpanded(true);
+    handleHostFriendSelectionReselectSkipped();
+  };
+
   const handleHostFriendSelectionSend = async () => {
     if (!hostFriendSelectedEntries.length) {
       showErrorToast("No friends selected", "Pick at least one friend before sending.");
       return;
     }
 
-    const eligibleEntries = hostFriendSelectedEntries.filter((friend) => {
-      const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
-      return !isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO);
-    });
+    const eligibleEntries = hostFriendSelectionEligibleEntries;
 
     if (!eligibleEntries.length) {
       showErrorToast("Invite cooling down", "Everyone you selected was invited recently. Give them a moment before re-sending.");
       return;
     }
+
+    const skippedEntries = hostFriendSelectionBlockedEntries;
+    setHostFriendSelectionSkippedHistory(skippedEntries.map((entry) => entry.friend.joinRequestId));
 
     setHostFriendSelectionStatus("sending");
     const invites = eligibleEntries.map((friend) => ({
@@ -1234,10 +1891,49 @@ export function EventInsideExperience({
       const successes = results.filter((result) => result.status === "sent");
 
       if (successes.length > 0) {
-        const label = successes.length === 1 ? "Invite sent" : "Invites sent";
-        const helper =
-          successes.length === 1 ? "Template delivered to 1 friend." : `Template delivered to ${successes.length} friends.`;
-        showSuccessToast(label, helper);
+        const sentCount = successes.length;
+        const skippedCount = skippedEntries.length;
+        const failedCount = failures.size;
+        const summaryLabel = sentCount === 1 ? "Invite sent" : "Invites sent";
+        const summaryTextSegments: string[] = [
+          sentCount === 1 ? "1 invite delivered." : `${sentCount} invites delivered.`,
+        ];
+        if (skippedCount > 0) {
+          summaryTextSegments.push(
+            skippedCount === 1 ? "1 friend skipped (cooldown)." : `${skippedCount} friends skipped (cooldown).`
+          );
+        }
+        if (failedCount > 0) {
+          summaryTextSegments.push(
+            failedCount === 1 ? "1 invite failed (see error)." : `${failedCount} invites failed (see error).`
+          );
+        }
+
+        setHostFriendSelectionSummary({
+          sentCount,
+          skippedCount,
+          failedCount,
+          timestampISO: new Date().toISOString(),
+        });
+
+        const toastDescription = (
+          <div className="space-y-2">
+            <p className="text-sm">
+              {summaryTextSegments.join(" ")}
+            </p>
+            {skippedCount > 0 ? (
+              <button
+                type="button"
+                onClick={triggerHostFriendSkippedReselect}
+                className="rounded-full border border-foreground/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-foreground transition hover:border-foreground/40"
+              >
+                Reselect skipped friends
+              </button>
+            ) : null}
+          </div>
+        );
+
+        showSuccessToast(summaryLabel, toastDescription);
         successes.forEach((result) => {
           stampHostFriendInviteGuardrail(result.joinRequestId);
         });
@@ -1274,6 +1970,21 @@ export function EventInsideExperience({
     if (isInviteGuardrailActive(guardrail.nextInviteAvailableAtISO)) {
       showErrorToast("Invite cooling down", "Give them a moment before sending another DM.");
       return;
+    }
+
+    const friend = hostFriendInviteEntries.find((entry) => entry.joinRequestId === joinRequestId);
+    const currentEventInviteAtISO = hostFriendEventInviteState[joinRequestId] ?? friend?.currentEventInviteAtISO ?? null;
+    if (currentEventInviteAtISO) {
+      const overrideToken = hostFriendEventInviteOverrides[joinRequestId];
+      const overrideActive = overrideToken === currentEventInviteAtISO;
+      if (!overrideActive) {
+        if (isEventInviteCooldownActive(currentEventInviteAtISO)) {
+          showErrorToast("Invite cooling down", "Give them a little more time before nudging this event again.");
+        } else {
+          showErrorToast("Already invited", '"Re-invite anyway" unlocks this friend once you\'re sure.');
+        }
+        return;
+      }
     }
 
     const entry = hostFriendComposerState[joinRequestId];
@@ -1442,56 +2153,77 @@ export function EventInsideExperience({
 
   return (
     <section className="space-y-8">
-      <header className="rounded-3xl border border-white/15 bg-white/5 p-6 text-white shadow-2xl shadow-primary/5 backdrop-blur">
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={classNames(
-              "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-              viewerRoleCopy[viewerRole].tone
-            )}
-          >
-            {viewerRoleCopy[viewerRole].label}
-          </span>
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <Clock3 className="h-4 w-4" />
-            <span>{formatDateTime(event.startDateISO) ?? "Time TBA"}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <MapPin className="h-4 w-4" />
-            <span>{event.locationName ?? "Location coming soon"}</span>
-          </div>
-        </div>
-        <div className="mt-6 space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">{event.title}</h1>
-          {event.description ? <p className="text-base text-white/70">{event.description}</p> : null}
-          {event.vibeTags && event.vibeTags.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {event.vibeTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/70"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="space-y-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="min-w-0 flex-[3] space-y-6">
           <Card>
             <SectionHeading icon={Sparkles} title="Tonight's plan" subtitle="Everything guests need once they're inside" />
-            <dl className="grid gap-4 sm:grid-cols-3">
-              {stats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-white/60">{stat.label}</dt>
-                  <dd className="mt-2 text-lg font-semibold text-white">{stat.value}</dd>
-                  {stat.subLabel ? <p className="text-xs text-white/60">{stat.subLabel}</p> : null}
+
+            {/* Confirmation status moved from header */}
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <span
+                className={classNames(
+                  "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide",
+                  viewerRoleCopy[viewerRole].tone
+                )}
+              >
+                {viewerRoleCopy[viewerRole].label}
+              </span>
+              <div className="flex items-center gap-2 text-sm text-white/70">
+                <Clock3 className="h-4 w-4" />
+                <span>{formatDateTime(event.startDateISO) ?? "Time TBA"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-white/70">
+                <MapPin className="h-4 w-4" />
+                <span>{event.locationName ?? "Location coming soon"}</span>
+              </div>
+            </div>
+
+            {/* Event map */}
+            {event.location && (
+              <div className="mt-6 relative">
+                {/* Map style toggle button */}
+                <div className="absolute top-3 right-14 z-10 flex items-center gap-2 rounded-lg bg-black/80 backdrop-blur-sm border border-white/20 px-3 py-1.5 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setMapStyle("light")}
+                    className={classNames(
+                      "text-xs font-semibold uppercase tracking-wide transition-colors",
+                      mapStyle === "light" ? "text-white" : "text-white/50 hover:text-white/70"
+                    )}
+                  >
+                    Light
+                  </button>
+                  <span className="h-3 w-px bg-white/30" aria-hidden />
+                  <button
+                    type="button"
+                    onClick={() => setMapStyle("dark")}
+                    className={classNames(
+                      "text-xs font-semibold uppercase tracking-wide transition-colors",
+                      mapStyle === "dark" ? "text-white" : "text-white/50 hover:text-white/70"
+                    )}
+                  >
+                    Dark
+                  </button>
                 </div>
-              ))}
-            </dl>
+
+                <EventMapView
+                  events={[
+                    {
+                      id: event.id,
+                      title: event.title,
+                      locationName: event.locationName ?? "Event location",
+                      location: event.location,
+                      datetimeISO: event.startDateISO ?? new Date().toISOString(),
+                    },
+                  ]}
+                  selectedEventId={event.id}
+                  height={360}
+                  className="w-full rounded-xl overflow-hidden border border-white/10"
+                  mapStyle={mapStyle === "light" ? "mapbox://styles/mapbox/streets-v12" : "mapbox://styles/mapbox/dark-v11"}
+                />
+              </div>
+            )}
+
             {event.entryNotes && event.entryNotes.length ? (
               <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-200">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">Entrance checklist</p>
@@ -1502,104 +2234,17 @@ export function EventInsideExperience({
                 </ul>
               </div>
             ) : null}
-            {hostActivityEntries.length > 0 ? (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
-                    {hostActivityEntries.length > 1 ? "Host updates" : "Latest host update"}
-                  </p>
-                  {isGuestViewer && hostActivityHeaderUnseenLabel ? (
-                    <span
-                      data-testid="host-updates-unseen-count"
-                      className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                    >
-                      {hostActivityHeaderUnseenLabel}
-                    </span>
-                  ) : null}
-                </div>
-                {hasHostActivityNotice ? (
-                  <div className="mt-3 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        scrollHostActivityToTop();
-                        void acknowledgeHostActivityUpdates(latestHostActivityTimestamp);
-                      }}
-                      disabled={hostActivityCursorStatus === "saving"}
-                      className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/60 disabled:opacity-60"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                      {hostActivityCursorStatus === "saving" ? "Marking seen…" : `${hostActivityNoticeCtaLabel} · Jump to latest`}
-                    </button>
-                  </div>
-                ) : null}
-                <ul
-                  ref={hostActivityListRef}
-                  data-testid="host-updates-list"
-                  className={hostActivityListClasses}
-                >
-                  {hostActivityEntries.map((activity, index) => {
-                    const entryTimestamp = parseIsoTimestamp(activity?.postedAtISO);
-                    const isNewEntry = Boolean(
-                      isGuestViewer && (!hostActivityLastSeenTimestamp || (entryTimestamp && entryTimestamp > hostActivityLastSeenTimestamp))
-                    );
-
-                    return (
-                      <Fragment key={activity.id}>
-                        {hostActivityDividerIndex === index ? (
-                          <li className="relative flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
-                            <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
-                            <span>New since you last checked</span>
-                            <span className="h-px flex-1 rounded-full bg-primary/30" aria-hidden />
-                          </li>
-                        ) : null}
-                        <li className="rounded-xl border border-white/5 bg-white/5 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm text-white/80">{activity.message}</p>
-                            {isNewEntry ? (
-                              <span
-                                data-testid="host-update-new-pill"
-                                className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                              >
-                                New
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 text-xs text-white/50">
-                            {activity.authorName ?? host.displayName}
-                            {" · "}
-                            {formatRelativeTime(activity.postedAtISO)}
-                          </p>
-                        </li>
-                      </Fragment>
-                    );
-                  })}
-                </ul>
-                {hostActivityPagination?.hasMore ? (
-                  <button
-                    type="button"
-                    onClick={handleLoadMoreHostUpdates}
-                    className="mt-4 w-full rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={hostActivityLoading}
-                  >
-                    {hostActivityLoading ? "Loading…" : "See earlier updates"}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
           </Card>
 
           <Card>
             <SectionHeading icon={Users} title="Attendees" subtitle="Confirmed + pending guests" />
             <div className="mt-4 grid gap-6 lg:grid-cols-2">
-              {(["confirmed", "pending", "waitlist"] as const).map((bucket) => {
-                const bucketLabel = bucket === "confirmed" ? "Confirmed" : bucket === "pending" ? "Awaiting reply" : "Waitlist";
+              {(["confirmed", "waitlist"] as const).map((bucket) => {
+                const bucketLabel = bucket === "confirmed" ? "Confirmed" : "Waitlist";
                 const bucketColor =
                   bucket === "confirmed"
                     ? "text-emerald-300"
-                    : bucket === "pending"
-                      ? "text-sky-300"
-                      : "text-zinc-300";
+                    : "text-zinc-300";
                 const people = groupedAttendees[bucket];
                 return (
                   <div key={bucket} className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -1628,74 +2273,78 @@ export function EventInsideExperience({
           </Card>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <SectionHeading icon={CheckCircle2} title="Join requests" subtitle="Hosts see who's waiting" />
-            {pendingRequests.length === 0 ? (
-              <p className="mt-4 text-sm text-white/60">No new requests right now.</p>
-            ) : (
-              <ul className="mt-4 space-y-3">
-                {pendingRequests.map((request) => {
-                  const actionState = requestActionState[request.id];
-                  const isApproving = actionState === "approving";
-                  const isRejecting = actionState === "rejecting";
-                  const busy = Boolean(actionState);
-                  return (
-                    <li key={request.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="flex items-start gap-3">
-                        <UserAvatar displayName={request.displayName} size="sm" />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-white">{request.displayName}</p>
-                          <p className="text-xs text-white/60">
-                            Sent {formatRelativeTime(request.submittedAtISO)}
-                            {typeof request.mutualFriends === "number" && request.mutualFriends > 0
-                              ? ` · ${request.mutualFriends} mutual`
-                              : ""}
-                          </p>
-                          {request.intro ? <p className="mt-2 text-sm text-white/80">“{request.intro}”</p> : null}
+        <div className="min-w-0 flex-[2] space-y-6">
+          {isHostViewer ? (
+            <Card>
+              <SectionHeading icon={CheckCircle2} title="Join requests" subtitle="Hosts see who's waiting" />
+              {pendingRequests.length === 0 ? (
+                <p className="mt-4 text-sm text-white/60">No new requests right now.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {pendingRequests.map((request) => {
+                    const actionState = requestActionState[request.id];
+                    const isApproving = actionState === "approving";
+                    const isRejecting = actionState === "rejecting";
+                    const busy = Boolean(actionState);
+                    return (
+                      <li key={request.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/[0.07]">
+                        <div className="flex items-start gap-3">
+                          <UserAvatar displayName={request.displayName} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white">{request.displayName}</p>
+                            <p className="mt-0.5 text-xs text-white/50">
+                              Sent {formatRelativeTime(request.submittedAtISO)}
+                              {typeof request.mutualFriends === "number" && request.mutualFriends > 0
+                                ? ` · ${request.mutualFriends} mutual`
+                                : ""}
+                            </p>
+                            {request.intro ? (
+                              <p className="mt-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs italic text-white/70">
+                                "{request.intro}"
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleJoinRequestDecision({
-                              requestId: request.id,
-                              userId: request.userId,
-                              displayName: request.displayName,
-                              nextStatus: "accepted",
-                            })
-                          }
-                          className="flex-1 rounded-xl bg-emerald-500/80 px-3 py-2 text-sm font-semibold text-emerald-950"
-                          disabled={busy}
-                        >
-                          {isApproving ? "Approving…" : "Approve"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleJoinRequestDecision({
-                              requestId: request.id,
-                              userId: request.userId,
-                              displayName: request.displayName,
-                              nextStatus: "rejected",
-                            })
-                          }
-                          className="flex-1 rounded-xl border border-white/20 px-3 py-2 text-sm font-semibold text-white/80"
-                          disabled={busy}
-                        >
-                          {isRejecting ? "Passing…" : "Pass"}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            <p className="mt-4 text-xs text-white/50">
-              Actions update the live join-requests API, so every tap stays in sync with the host tools page.
-            </p>
-            {isHostViewer ? (
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleJoinRequestDecision({
+                                requestId: request.id,
+                                userId: request.userId,
+                                displayName: request.displayName,
+                                nextStatus: "accepted",
+                              })
+                            }
+                            className="flex-1 rounded-xl bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-60"
+                            disabled={busy}
+                          >
+                            {isApproving ? "Approving…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleJoinRequestDecision({
+                                requestId: request.id,
+                                userId: request.userId,
+                                displayName: request.displayName,
+                                nextStatus: "rejected",
+                              })
+                            }
+                            className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm font-semibold text-white/70 transition hover:border-white/30 hover:text-white disabled:opacity-60"
+                            disabled={busy}
+                          >
+                            {isRejecting ? "Passing…" : "Pass"}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p className="mt-4 text-xs text-white/50">
+                Actions update the live join-requests API, so every tap stays in sync with the host tools page.
+              </p>
               <div className="mt-5 space-y-5">
                 <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">Share event invite</p>
@@ -1731,216 +2380,44 @@ export function EventInsideExperience({
 
                 {hostFriendInviteEntries.length ? (
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Invite Tonight friends</p>
-                        <p className="mt-1 text-xs text-white/60">Pick a past guest and DM them without leaving this page.</p>
-                      </div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                        <div className="w-full sm:w-56">
-                          <label
-                            htmlFor={hostFriendSearchInputId}
-                            className="text-[11px] font-semibold uppercase tracking-wide text-white/60"
-                          >
-                            Search friends
-                          </label>
-                          <input
-                            id={hostFriendSearchInputId}
-                            type="search"
-                            value={hostFriendSearchValue}
-                            onChange={(event) => setHostFriendSearchValue(event.target.value)}
-                            placeholder="Search by name"
-                            className="mt-1 w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          />
-                        </div>
-                        {hostFriendTemplateOptionsAvailable ? (
-                          <div className="w-full sm:w-56">
-                            <label
-                              htmlFor={hostFriendTemplateSelectId}
-                              className="text-[11px] font-semibold uppercase tracking-wide text-white/60"
-                            >
-                              Invite template
-                            </label>
-                            <select
-                              id={hostFriendTemplateSelectId}
-                              value={hostFriendTemplateId}
-                              onChange={(event) => setHostFriendTemplateId(event.target.value as HostFriendInviteTemplateId)}
-                              className="mt-1 w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                            >
-                              {hostFriendInviteTemplateOptions.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                    {hostFriendTemplateOptionsAvailable ? (
-                      <p className="mt-2 text-[11px] text-white/60">{hostFriendTemplateHelperCopy}</p>
-                    ) : null}
-                    {hostFriendSelectionActive ? (
-                      <div className="mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">Multi-send ready</p>
-                          <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                            {hostFriendSelectedCount}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs text-white/70">
-                          We’ll send the {activeHostFriendTemplate?.label ?? "default"} template to each friend with their name auto-filled.
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {hostFriendSelectedEntries.map((friend) => (
-                            <button
-                              key={friend.joinRequestId}
-                              type="button"
-                              onClick={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
-                              className="group inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/80 transition hover:border-white/40"
-                              disabled={hostFriendSelectionStatus === "sending"}
-                            >
-                              {friend.displayName}
-                              <span aria-hidden className="text-white/50 transition group-hover:text-white">×</span>
-                            </button>
-                          ))}
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleHostFriendSelectionSend}
-                            className="rounded-full bg-primary/80 px-4 py-1.5 text-xs font-semibold text-black transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={hostFriendSelectionStatus === "sending"}
-                          >
-                            {hostFriendSelectionStatus === "sending" ? "Sending…" : hostFriendSelectionCtaLabel}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleHostFriendSelectionClear}
-                            className="text-[11px] font-semibold text-white/70 transition hover:text-white"
-                            disabled={hostFriendSelectionStatus === "sending"}
-                          >
-                            Clear selection
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                    {filteredHostFriendInvites.length === 0 ? (
-                      <p className="mt-4 text-xs text-white/60">{hostFriendInviteEmptyCopy}</p>
-                    ) : (
-                      <ul className="mt-4 space-y-3">
-                        {filteredHostFriendInvites.map((friend) => {
-                          const composerEntry = hostFriendComposerState[friend.joinRequestId];
-                          const composerValue = composerEntry?.value ?? "";
-                          const composerBusy = composerEntry?.status === "sending";
-                          const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
-                          const lastInviteAtISO = guardrail.lastInviteAtISO;
-                          const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO;
-                          const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
-                          const sendDisabled = composerBusy || composerValue.trim().length === 0 || inviteGuardrailActive;
-                          const lastActiveLabel = friend.lastInteractionAtISO
-                            ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
-                            : "Recently active";
-                          const inviteHistoryLabel = lastInviteAtISO ? `Invited ${formatRelativeTime(lastInviteAtISO)}` : null;
-                          const currentEventInviteAtISO =
-                            hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
-                          const inviteCooldownLabel =
-                            inviteGuardrailActive && nextInviteAvailableAtISO
-                              ? `Give them a moment — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
-                              : null;
-                          const alreadyInvitedLabel = currentEventInviteAtISO
-                            ? `Already invited to ${event.title} · ${formatRelativeTime(currentEventInviteAtISO)}`
-                            : null;
-                          const isSelected = Boolean(hostFriendSelectionState[friend.joinRequestId]);
-
-                          return (
-                            <li key={friend.joinRequestId} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                              <div className="flex flex-wrap items-start gap-3">
-                                <UserAvatar
-                                  displayName={friend.displayName}
-                                  photoUrl={friend.avatarUrl ?? undefined}
-                                  size="sm"
-                                />
-                                <div className="min-w-[160px] flex-1">
-                                  <p className="text-sm font-semibold text-white">{friend.displayName}</p>
-                                  {friend.lastEventTitle ? (
-                                    <p className="text-xs text-white/60">Last joined: {friend.lastEventTitle}</p>
-                                  ) : null}
-                                  <p className="text-[11px] text-white/50">{lastActiveLabel}</p>
-                                  {inviteHistoryLabel ? (
-                                    <p className="text-[11px] text-white/50">{inviteHistoryLabel}</p>
-                                  ) : null}
-                                  {alreadyInvitedLabel ? (
-                                    <p className="text-[11px] font-semibold text-primary/80">{alreadyInvitedLabel}</p>
-                                  ) : null}
-                                  {inviteCooldownLabel ? (
-                                    <p className="text-[11px] font-semibold text-amber-300">{inviteCooldownLabel}</p>
-                                  ) : null}
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName, hostFriendTemplateId)
-                                    }
-                                    className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
-                                    disabled={composerBusy || inviteGuardrailActive}
-                                  >
-                                    Use template
-                                  </button>
-                                  <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/60">
-                                    <input
-                                      type="checkbox"
-                                      className="h-3.5 w-3.5 rounded border border-white/30 bg-black/40 text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-                                      checked={isSelected}
-                                      onChange={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
-                                      aria-label={`Select ${friend.displayName}`}
-                                      disabled={hostFriendSelectionStatus === "sending" || inviteGuardrailActive}
-                                    />
-                                    <span>{isSelected ? "Selected" : "Select"}</span>
-                                  </label>
-                                </div>
-                              </div>
-                              <textarea
-                                rows={2}
-                                value={composerValue}
-                                onChange={(event) => handleHostFriendComposerChange(friend.joinRequestId, event.target.value)}
-                                placeholder={`Tell ${friend.displayName.split(' ')[0] ?? friend.displayName} why this night fits them`}
-                                className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                disabled={composerBusy || inviteGuardrailActive}
-                              />
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleHostFriendInviteSend(friend.joinRequestId)}
-                                  className="rounded-xl bg-primary/80 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                                  disabled={sendDisabled}
-                                >
-                                  {composerBusy ? "Sending…" : "Send DM"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleHostFriendComposerClear(friend.joinRequestId)}
-                                  className="text-[11px] font-semibold text-white/60 transition hover:text-white"
-                                  disabled={composerBusy || composerValue.length === 0}
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                    <p className="text-sm font-semibold text-white">Invite a friend</p>
+                    <input
+                      id={hostFriendSearchInputId}
+                      type="search"
+                      value={hostFriendSearchValue}
+                      onChange={(event) => setHostFriendSearchValue(event.target.value)}
+                      placeholder="Search past guests by name…"
+                      className="mt-3 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                    <button
+                      type="button"
+                      disabled={!hostFriendSearchValue.trim() || filteredHostFriendInvites.length === 0}
+                      className="mt-3 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Send invite
+                    </button>
                   </div>
                 ) : null}
               </div>
-            ) : null}
-          </Card>
+            </Card>
+          ) : null}
 
           <Card>
             <SectionHeading icon={MessageCircle} title="Event chat" subtitle="Hosts + guests coordinate here" />
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            {viewerRole === "guest" && guestJoinRequestId && viewerUser ? (
+              <MiniEventChat
+                joinRequestId={guestJoinRequestId}
+                currentUser={viewerUser}
+                counterpart={{
+                  id: host.id,
+                  displayName: host.displayName,
+                  email: host.email ?? `${host.displayName ?? "host"}@tonight.app`,
+                  photoUrl: host.avatarUrl ?? null,
+                }}
+                socketToken={socketToken}
+              />
+            ) : (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-center gap-3">
                 <div className="rounded-full bg-primary/20 p-3 text-primary">
                   <MessageCircle className="h-5 w-5" />
@@ -1962,6 +2439,53 @@ export function EventInsideExperience({
                   </span>
                 ) : null}
               </div>
+              {isGuestViewer && guestMessagePreviewEntries.length > 0 ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Latest in chat</p>
+                  <ul className="mt-2 space-y-2">
+                    {guestMessagePreviewEntries.map((message) => (
+                      <li key={message.id} className="rounded-xl border border-white/5 bg-black/30 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3 text-[11px] text-white/60">
+                          <p className="font-semibold text-white">
+                            {message.isViewer ? "You" : message.authorName}
+                          </p>
+                          <span>{formatRelativeTime(message.postedAtISO)}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-white/70 line-clamp-2">{message.content}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {isHostViewer && hostThreadPreviewEntries.length > 0 ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">{hostThreadPreviewTitle}</p>
+                  <ul className="mt-2 space-y-2">
+                    {hostThreadPreviewEntries.map((thread) => (
+                      <li key={thread.joinRequestId}>
+                        <Link
+                          href={`/chat/${thread.joinRequestId}`}
+                          className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-black/30 p-3 text-left transition hover:border-primary/40"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-white line-clamp-1">{thread.displayName}</p>
+                            <p className="text-xs text-white/70 line-clamp-2">{thread.lastMessageSnippet}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
+                            <span>{formatRelativeTime(thread.lastMessageAtISO)}</span>
+                            {thread.unreadCount ? (
+                              <span className="rounded-full bg-primary/30 px-2 py-0.5 text-primary">{thread.unreadCount} new</span>
+                            ) : null}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  {hostThreadPreviewOverflowCopy ? (
+                    <p className="mt-2 text-[11px] text-white/60">{hostThreadPreviewOverflowCopy}</p>
+                  ) : null}
+                </div>
+              ) : null}
               {chatCtaHref ? (
                 <Link
                   href={chatCtaHref}
@@ -1991,6 +2515,7 @@ export function EventInsideExperience({
                 <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
               ) : null}
             </div>
+            )}
             {isHostViewer ? (
               <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Broadcast to guests</p>
@@ -2027,50 +2552,6 @@ export function EventInsideExperience({
                     {hostAnnouncementValue.length}/{HOST_ANNOUNCEMENT_MAX_LENGTH}
                   </span>
                 </div>
-              </div>
-            ) : null}
-            {viewerRole === "guest" && guestComposerConfig ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Message the host</p>
-                <p className="mt-1 text-xs text-white/60">Send a quick update without leaving this screen.</p>
-                <textarea
-                  rows={3}
-                  value={guestComposerValue}
-                  onChange={(event) => setGuestComposerValue(event.target.value)}
-                  placeholder="Share an update or ask a quick question"
-                  className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                  disabled={
-                    guestComposerStatus === "sending" ||
-                    Boolean(guestComposerConfig.disabledReason) ||
-                    !guestComposerConfig.joinRequestId
-                  }
-                />
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGuestComposerSend}
-                    className="rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={
-                      guestComposerStatus === "sending" ||
-                      Boolean(guestComposerConfig.disabledReason) ||
-                      !guestComposerConfig.joinRequestId ||
-                      guestComposerValue.trim().length === 0
-                    }
-                  >
-                    {guestComposerStatus === "sending" ? "Sending…" : "Send message"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGuestComposerValue("")}
-                    className="text-xs font-semibold text-white/60 transition hover:text-white"
-                    disabled={guestComposerStatus === "sending" || guestComposerValue.length === 0}
-                  >
-                    Clear
-                  </button>
-                </div>
-                {guestComposerConfig.disabledReason ? (
-                  <p className="mt-2 text-xs text-white/60">{guestComposerConfig.disabledReason}</p>
-                ) : null}
               </div>
             ) : null}
             {hostUnreadThreads.length > 0 ? (
@@ -2202,6 +2683,22 @@ const SectionHeading = ({
 const isInviteGuardrailActive = (value?: string | null) => {
   const timestamp = parseIsoTimestamp(value);
   return typeof timestamp === "number" && timestamp > Date.now();
+};
+
+const getEventInviteCooldownUntil = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+  const timestamp = parseIsoTimestamp(value);
+  if (typeof timestamp !== "number") {
+    return null;
+  }
+  return new Date(timestamp + HOST_FRIEND_INVITE_COOLDOWN_MS).toISOString();
+};
+
+const isEventInviteCooldownActive = (value?: string | null) => {
+  const cooldownUntil = getEventInviteCooldownUntil(value);
+  return isInviteGuardrailActive(cooldownUntil);
 };
 
 const groupAttendees = (
@@ -2345,27 +2842,6 @@ const formatDateTime = (value?: string | null) => {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(date);
 };
 
-const formatRelativeTime = (value?: string | null) => {
-  if (!value) return "moments ago";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "moments ago";
-  const deltaMs = date.getTime() - Date.now();
-  const deltaMinutes = Math.round(deltaMs / (1000 * 60));
-  if (Math.abs(deltaMinutes) < 1) {
-    return "just now";
-  }
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (Math.abs(deltaMinutes) < 60) {
-    return formatter.format(Math.round(deltaMinutes), "minute");
-  }
-  const deltaHours = Math.round(deltaMinutes / 60);
-  if (Math.abs(deltaHours) < 24) {
-    return formatter.format(deltaHours, "hour");
-  }
-  const deltaDays = Math.round(deltaHours / 24);
-  return formatter.format(deltaDays, "day");
-};
-
 const parseIsoTimestamp = (value?: string | null): number | null => {
   if (!value) {
     return null;
@@ -2373,6 +2849,160 @@ const parseIsoTimestamp = (value?: string | null): number | null => {
   const date = new Date(value);
   const timestamp = date.getTime();
   return Number.isNaN(timestamp) ? null : timestamp;
+};
+
+type MiniEventChatProps = {
+  joinRequestId: string;
+  currentUser: ViewerUserProfile;
+  counterpart: ViewerUserProfile;
+  socketToken?: string | null;
+};
+
+const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socketToken }: MiniEventChatProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesStatus, setMessagesStatus] = useState<MessageListStatus>("loading");
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [composer, setComposer] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const appendMessage = useCallback((message: ChatMessage) => {
+    setMessages((prev) => {
+      if (prev.some((entry) => entry.id === message.id)) {
+        return prev;
+      }
+      const next = [...prev, message].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      return next;
+    });
+  }, []);
+
+  const fetchMessages = useCallback(async () => {
+    setMessagesStatus("loading");
+    setMessagesError(null);
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Unable to load messages.");
+      }
+      const payload = (await response.json()) as { messages?: ChatMessage[] };
+      setMessages((prev) => {
+        const optimistic = prev.filter((m) => m.deliveryStatus);
+        const next = [...(payload.messages ?? []), ...optimistic].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+        return next;
+      });
+      setMessagesStatus("ready");
+    } catch (error) {
+      console.error("Failed to load chat messages", error);
+      setMessagesStatus("error");
+      setMessagesError((error as Error)?.message ?? "Unable to load messages.");
+    }
+  }, [joinRequestId]);
+
+  useEffect(() => {
+    fetchMessages().catch(() => {});
+  }, [fetchMessages]);
+
+  const { isConnected, joinRoom } = useSocket({
+    token: socketToken ?? undefined,
+    autoConnect: Boolean(socketToken),
+    readinessEndpoint: "/api/socket/io",
+    onMessage: (payload) => {
+      if (payload.joinRequestId === joinRequestId) {
+        appendMessage(payload as ChatMessage);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (isConnected) {
+      joinRoom(joinRequestId);
+    }
+  }, [isConnected, joinRequestId, joinRoom]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+    fetch(`/api/chat/${joinRequestId}/mark-read`, { method: "POST" }).catch(() => {});
+  }, [isConnected, joinRequestId]);
+
+  const handleSend = useCallback(async () => {
+    const trimmed = composer.trim();
+    if (!trimmed || sending) {
+      return;
+    }
+    setSending(true);
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: trimmed }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Unable to send message.");
+      }
+      const payload = (await response.json()) as { message: ChatMessage };
+      appendMessage(payload.message);
+      setComposer("");
+    } catch (error) {
+      const message = (error as Error)?.message ?? "Unable to send message.";
+      showErrorToast("Message not sent", message);
+    } finally {
+      setSending(false);
+    }
+  }, [appendMessage, composer, joinRequestId, sending]);
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">Event chat</p>
+          <p className="text-xs text-white/60">Chat with {counterpart.displayName ?? counterpart.email}</p>
+        </div>
+        <Link
+          href={`/chat/${joinRequestId}`}
+          className="rounded-full bg-primary/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          Open full chat
+        </Link>
+      </div>
+
+      <div className="h-80 rounded-2xl border border-white/10 bg-black/30">
+        <MessageList
+          status={messagesStatus}
+          error={messagesError}
+          messages={messages}
+          currentUserId={currentUser.id}
+          counterpartId={counterpart.id}
+          onRetry={() => fetchMessages().catch(() => {})}
+          className="!h-full"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-end gap-3">
+          <textarea
+            rows={1}
+            value={composer}
+            onChange={(event) => setComposer(event.target.value)}
+            placeholder={sending ? "Sending…" : "Type a message"}
+            className="max-h-48 min-h-[52px] w-full flex-1 resize-none rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed"
+            disabled={sending}
+          />
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sending || composer.trim().length === 0}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 async function copyTextToClipboard(value: string) {

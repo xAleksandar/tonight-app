@@ -1378,20 +1378,7 @@ export function DiscoveryList({
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  {hostUpdatesIndicator ? (
-                    <span
-                      data-testid="host-updates-pill"
-                      className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
-                    >
-                      <Sparkles className="h-3 w-3" aria-hidden />
-                      <span>
-                        {hostUpdatesIndicator.value} {hostUpdatesIndicator.plural ? "new host updates" : "new host update"}
-                      </span>
-                    </span>
-                  ) : null}
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
-                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
               </div>
               <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                 {event.datetimeLabel && (
@@ -1404,6 +1391,17 @@ export function DiscoveryList({
                   <span className="inline-flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" />
                     {event.distanceLabel}
+                  </span>
+                )}
+                {hostUpdatesIndicator && (
+                  <span
+                    data-testid="host-updates-pill"
+                    className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
+                  >
+                    <Sparkles className="h-3 w-3" aria-hidden />
+                    <span>
+                      {hostUpdatesIndicator.value} new
+                    </span>
                   </span>
                 )}
               </div>

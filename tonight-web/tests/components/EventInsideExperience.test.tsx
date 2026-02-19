@@ -166,9 +166,175 @@ describe('EventInsideExperience', () => {
   it('exposes an actionable chat link when a CTA href is provided', () => {
     render(<EventInsideExperience {...baseProps} />);
 
-    const link = screen.getByRole('link', { name: /open chat/i });
-    expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', '/chat/jr-1');
+    const links = screen.getAllByRole('link', { name: /open chat/i });
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    expect(links.some((link) => link.getAttribute('href') === '/chat/jr-1')).toBe(true);
+  });
+
+  it('surfaces the chat status badge + chip in the hero CTA', () => {
+    render(<EventInsideExperience {...baseProps} />);
+
+    expect(screen.getByText(/Chat status/i)).toBeInTheDocument();
+    const unreadBadges = screen.getAllByText(/2 unread/i);
+    expect(unreadBadges.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Updated/i)).toBeInTheDocument();
+  });
+
+  it('renders chat attention chips + indicator when queue metadata is provided', () => {
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Second pending guest',
+            authorName: 'Aaron',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Jess pinged')).toBeInTheDocument();
+    expect(screen.getByText('1 more waiting')).toBeInTheDocument();
+    expect(screen.getByText('Jess pinged · +1 waiting')).toBeInTheDocument();
+  });
+
+  it('links the chat attention lead chip to its queued thread', () => {
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Second pending guest',
+            authorName: 'Aaron',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+        ]}
+      />
+    );
+
+    const leadLink = screen.getByRole('link', { name: /open chat with jess/i });
+    expect(leadLink).toHaveAttribute('href', '/chat/jr-2');
+  });
+
+  it('lets hosts mark chat attention entries as handled directly from the hero chips', () => {
+    const onHandled = vi.fn();
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+        ]}
+        onChatAttentionEntryHandled={onHandled}
+      />
+    );
+
+    const markButton = screen.getByRole('button', { name: /mark handled for jess/i });
+    fireEvent.click(markButton);
+    expect(onHandled).toHaveBeenCalledWith('msg-1');
+  });
+
+  it('clears the entire chat attention queue via the bulk action', () => {
+    const onClearAll = vi.fn();
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Another guest waiting',
+            authorName: 'Aaron',
+            helperText: 'Aaron pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+        ]}
+        onChatAttentionClearAll={onClearAll}
+      />
+    );
+
+    const markAllButtons = screen.getAllByRole('button', { name: /mark all chat attention entries as handled/i });
+    fireEvent.click(markAllButtons[0]);
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes a quick picker for queued chat attention entries', () => {
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionActive
+        chatAttentionQueue={[
+          {
+            id: 'msg-1',
+            snippet: 'Need a quick reply',
+            authorName: 'Jess',
+            helperText: 'Jess pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-2',
+          },
+          {
+            id: 'msg-2',
+            snippet: 'Second pending guest',
+            authorName: 'Aaron',
+            helperText: 'Aaron pinged',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-3',
+          },
+          {
+            id: 'msg-3',
+            snippet: 'Another guest waiting',
+            authorName: 'Maya',
+            timestampISO: new Date().toISOString(),
+            href: '/chat/jr-4',
+          },
+        ]}
+      />
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggleButton);
+
+    const pickerLink = screen.getByRole('link', { name: /open chat with aaron/i });
+    expect(pickerLink).toHaveAttribute('href', '/chat/jr-3');
   });
 
   it('shows a disabled chat explanation when no CTA href is present', () => {
@@ -181,9 +347,11 @@ describe('EventInsideExperience', () => {
     };
     render(<EventInsideExperience {...props} />);
 
-    const button = screen.getByRole('button', { name: /no guest chats yet/i });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button', { name: /no guest chats yet/i });
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    buttons.forEach((button) => expect(button).toBeDisabled());
+    const reasons = screen.getAllByText(/approve at least one guest/i);
+    expect(reasons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows a disabled chat explanation when no CTA href is present', () => {
@@ -196,9 +364,11 @@ describe('EventInsideExperience', () => {
     };
     render(<EventInsideExperience {...props} />);
 
-    const button = screen.getByRole('button', { name: /no guest chats yet/i });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/approve at least one guest/i)).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button', { name: /no guest chats yet/i });
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    buttons.forEach((button) => expect(button).toBeDisabled());
+    const reasons = screen.getAllByText(/approve at least one guest/i);
+    expect(reasons.length).toBeGreaterThanOrEqual(1);
   });
 
   it('lets hosts copy the event invite link when Web Share is unavailable', async () => {
@@ -257,10 +427,12 @@ describe('EventInsideExperience', () => {
 
     render(<EventInsideExperience {...props} />);
 
-    expect(screen.getByText(/Guests needing replies/i)).toBeInTheDocument();
-    expect(screen.getByText('Lena')).toBeInTheDocument();
-    expect(screen.getByText(/quick question/i)).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: /Lena/i });
+    const repliesSection = screen.getByText(/Guests needing replies/i).closest('div');
+    expect(repliesSection).not.toBeNull();
+    const repliesScope = within(repliesSection as HTMLElement);
+    expect(repliesScope.getByText('Lena')).toBeInTheDocument();
+    expect(repliesScope.getByText(/quick question/i)).toBeInTheDocument();
+    const link = repliesScope.getByRole('link', { name: /Lena/i });
     expect(link).toHaveAttribute('href', '/chat/jr-thread-1');
   });
 
@@ -391,6 +563,96 @@ describe('EventInsideExperience', () => {
     await waitFor(() => {
       expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('shows the latest guest pings preview for hosts when unread threads exist', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [
+          {
+            joinRequestId: 'jr-latest-1',
+            displayName: 'Sonia',
+            lastMessageSnippet: 'Could you share the door code?',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 3,
+          },
+          {
+            joinRequestId: 'jr-latest-2',
+            displayName: 'Alex',
+            lastMessageSnippet: 'Landing at the venue in 5.',
+            lastMessageAtISO: new Date().toISOString(),
+            unreadCount: 1,
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    const previewSection = screen.getByText(/Latest guest pings/i).closest('div');
+    expect(previewSection).not.toBeNull();
+    const previewScope = within(previewSection as HTMLElement);
+    expect(previewScope.getByText(/Could you share the door code/i)).toBeInTheDocument();
+    expect(previewScope.getByText(/Landing at the venue in 5/i)).toBeInTheDocument();
+  });
+
+  it('falls back to recent guest activity when hosts are caught up', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        hostUnreadThreads: [],
+        hostRecentThreads: [
+          {
+            joinRequestId: 'jr-latest-3',
+            displayName: 'Maya',
+            lastMessageSnippet: 'Need any snacks before I head over?',
+            lastMessageAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/Recent guest activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Need any snacks/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Guests needing replies/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a chat preview for guests when recent messages are provided', () => {
+    const props: EventInsideExperienceProps = {
+      ...baseProps,
+      viewerRole: 'guest',
+      joinRequests: [],
+      chatPreview: {
+        ...baseProps.chatPreview!,
+        ctaHref: '/chat/jr-guest',
+        guestMessagePreview: [
+          {
+            id: 'm1',
+            authorName: 'Aleks',
+            content: 'Doors open at 9:30 — come early for the view.',
+            postedAtISO: new Date().toISOString(),
+          },
+          {
+            id: 'm2',
+            authorName: 'You',
+            isViewer: true,
+            content: 'On my way! Need anything from the store?',
+            postedAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    };
+
+    render(<EventInsideExperience {...props} />);
+
+    expect(screen.getByText(/Latest in chat/i)).toBeInTheDocument();
+    expect(screen.getByText(/Doors open at 9:30/i)).toBeInTheDocument();
+    expect(screen.getByText(/On my way/i)).toBeInTheDocument();
   });
 
   it('renders the guest inline composer when metadata is provided', () => {
@@ -742,13 +1004,14 @@ describe('EventInsideExperience', () => {
       lastSocketOptions?.onMessage?.(payload);
     });
 
-    expect(screen.getByText(/Doors now open/i)).toBeInTheDocument();
+    const hostUpdatesList = screen.getByTestId('host-updates-list');
+    expect(within(hostUpdatesList as HTMLElement).getByText(/Doors now open/i)).toBeInTheDocument();
 
     await act(async () => {
       lastSocketOptions?.onMessage?.(payload);
     });
 
-    expect(screen.getAllByText(/Doors now open/i)).toHaveLength(1);
+    expect(within(hostUpdatesList as HTMLElement).getAllByText(/Doors now open/i)).toHaveLength(1);
   });
 
   it('shows a new update indicator when guests are mid-scroll', async () => {
@@ -1106,6 +1369,96 @@ describe('EventInsideExperience', () => {
     await waitFor(() => {
       expect(screen.queryByText(/multi-send ready/i)).not.toBeInTheDocument();
     });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('multi-send-summary')).toBeInTheDocument();
+      expect(screen.getByText(/last multi-send summary/i)).toBeInTheDocument();
+      expect(screen.getByText(/invites delivered/i)).toBeInTheDocument();
+    });
+  });
+
+  it('exposes snooze and resume controls for chat attention alerts', () => {
+    const onSnooze = vi.fn();
+    const onResume = vi.fn();
+    const queue = [
+      {
+        id: 'msg-1',
+        snippet: 'Need a quick reply',
+        authorName: 'Jess',
+        timestampISO: new Date().toISOString(),
+        href: '/chat/jr-2',
+      },
+    ];
+    const futureISO = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { rerender } = render(
+      <EventInsideExperience {...baseProps} chatAttentionQueue={queue} onChatAttentionSnooze={onSnooze} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for 10 minutes/i }));
+    expect(onSnooze).toHaveBeenCalledWith(10);
+    expect(onSnooze).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionQueue={queue}
+        chatAttentionSnoozedUntil={futureISO}
+        onChatAttentionSnooze={onSnooze}
+        onChatAttentionResume={onResume}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /resume chat attention alerts/i }));
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers a quick snooze shortcut that respects the preferred duration', () => {
+    const onSnooze = vi.fn();
+    const queue = [
+      {
+        id: 'msg-quick',
+        snippet: 'Need help',
+        authorName: 'Nico',
+        timestampISO: new Date().toISOString(),
+        href: '/chat/jr-quick',
+      },
+    ];
+
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={20}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick snooze chat attention alerts.*20 min/i }));
+    expect(onSnooze).toHaveBeenCalledWith(20);
+  });
+
+  it('highlights the preferred snooze duration pill', () => {
+    const queue = [
+      {
+        id: 'msg-2',
+        snippet: 'Ping',
+        authorName: 'Riley',
+        timestampISO: new Date().toISOString(),
+        href: '/chat/jr-9',
+      },
+    ];
+
+    render(
+      <EventInsideExperience
+        {...baseProps}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={10}
+        onChatAttentionSnooze={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /snooze chat attention alerts for 10 minutes/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /snooze chat attention alerts for 5 minutes/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
 });

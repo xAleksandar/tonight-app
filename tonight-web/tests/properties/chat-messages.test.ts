@@ -140,6 +140,7 @@ describe('Property 29: Message Storage Round Trip', () => {
             senderId: userId,
             content: trimmedContent,
             createdAt,
+            readBy: [],
           });
 
           const result = await createMessageForJoinRequest({ joinRequestId, userId, content });
@@ -150,6 +151,14 @@ describe('Property 29: Message Storage Round Trip', () => {
               senderId: userId,
               content: trimmedContent,
             },
+            include: {
+              readBy: {
+                select: {
+                  userId: true,
+                  readAt: true,
+                },
+              },
+            },
           });
 
           expect(result).toEqual({
@@ -158,6 +167,7 @@ describe('Property 29: Message Storage Round Trip', () => {
             senderId: userId,
             content: trimmedContent,
             createdAt: createdAt.toISOString(),
+            readBy: [],
           });
 
           expect(socketService.emitMessage).toHaveBeenCalledWith(joinRequestId, result);
@@ -210,6 +220,7 @@ describe('Property 30: Real-Time Message Delivery', () => {
             senderId: userId,
             content: trimmedContent,
             createdAt,
+            readBy: [],
           });
 
           socketService.emitMessage.mockImplementation(() => {});
@@ -230,6 +241,7 @@ describe('Property 30: Real-Time Message Delivery', () => {
             senderId: userId,
             content: trimmedContent,
             createdAt: createdAt.toISOString(),
+            readBy: [],
           });
 
           if (emitterThrows) {

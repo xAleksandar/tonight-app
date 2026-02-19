@@ -3,6 +3,7 @@
 export const JOIN_REQUEST_ROOM_PREFIX = 'join-request:' as const;
 export const JOIN_REQUEST_MESSAGE_EVENT = 'join-request:message' as const;
 export const JOIN_REQUEST_JOIN_EVENT = 'join-request:join' as const;
+export const JOIN_REQUEST_READ_RECEIPT_EVENT = 'join-request:read-receipt' as const;
 
 // Typing indicator events
 export const CHAT_TYPING_START_EVENT = 'chat:typing_start' as const;
@@ -13,12 +14,27 @@ export const CHAT_TYPING_STOP_BROADCAST_EVENT = 'chat:typing_stop' as const;
 // Join request status change event
 export const JOIN_REQUEST_STATUS_CHANGED_EVENT = 'join-request:status-changed' as const;
 
+export type SocketMessageReadReceipt = {
+  userId: string;
+  readAt: string;
+};
+
 export type SocketMessagePayload = {
   id: string;
   joinRequestId: string;
   senderId: string;
   content: string;
   createdAt: string;
+  readBy: SocketMessageReadReceipt[];
+};
+
+export type SocketReadReceiptEventPayload = {
+  joinRequestId: string;
+  readerId: string;
+  receipts: Array<{
+    messageId: string;
+    readAt: string;
+  }>;
 };
 
 export type SocketTypingPayload = {

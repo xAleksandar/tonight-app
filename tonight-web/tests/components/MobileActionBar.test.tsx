@@ -25,6 +25,7 @@ const ensureDomGlobals = () => {
     document: { configurable: true, value: window.document, writable: true },
     navigator: { configurable: true, value: window.navigator, writable: true },
     HTMLElement: { configurable: true, value: window.HTMLElement, writable: true },
+    self: { configurable: true, value: window, writable: true },
   });
 };
 
@@ -37,6 +38,27 @@ beforeAll(async () => {
   screen = testingLibrary.screen;
   fireEvent = testingLibrary.fireEvent;
   cleanup = testingLibrary.cleanup;
+  it('mirrors the drafts waiting shortcut on mobile', () => {
+    const onJumpDrafts = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        draftsWaitingCount={3}
+        onJumpToDrafts={onJumpDrafts}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /drafts waiting/i });
+    fireEvent.click(button);
+    expect(onJumpDrafts).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/3 drafts waiting/i)).toBeInTheDocument();
+  });
 });
 
 afterAll(() => {
@@ -48,6 +70,7 @@ afterAll(() => {
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).self;
 });
 
 describe('MobileActionBar', () => {
@@ -112,4 +135,428 @@ describe('MobileActionBar', () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onOpenProfile).toHaveBeenCalledTimes(1);
   });
+
+  it('renders chat action details when provided', () => {
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          helperText: 'Latest note from the host',
+          badgeLabel: '2 unread',
+          badgeTone: 'highlight',
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: /open chat/i })).toHaveAttribute('href', '/chat/abc');
+    expect(screen.getByText('2 unread')).toBeInTheDocument();
+    expect(screen.getByText('Latest note from the host')).toBeInTheDocument();
+  });
+
+  it('shows the attention indicator when a new chat ping arrives', () => {
+    const onInteract = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          helperText: 'Latest note from the host',
+          badgeLabel: '2 unread',
+          badgeTone: 'highlight',
+          attentionActive: true,
+          attentionLabel: 'New chat ping',
+          onInteract,
+        }}
+      />
+    );
+
+    expect(screen.getByText('New chat ping')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: /open chat/i }));
+    expect(onInteract).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears queued chat attention entries via the bulk action control', () => {
+    const onClearAll = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mia',
+        snippet: 'Can I bring a friend?',
+        href: '/chat/mia',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-3',
+        authorName: 'Liam',
+        snippet: 'Is there parking?',
+        href: '/chat/liam',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-4',
+        authorName: 'Ava',
+        snippet: 'Running 5 min late',
+        href: '/chat/ava',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          badgeLabel: 'Queue',
+          badgeTone: 'highlight',
+          attentionActive: true,
+          attentionLabel: 'New chat ping',
+        }}
+        chatAttentionQueue={queue}
+        onChatAttentionClearAll={onClearAll}
+      />
+    );
+
+    const markAllButton = screen.getByRole('button', { name: /mark all chat attention entries as handled/i });
+    fireEvent.click(markAllButton);
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes chat attention chips clickable and exposes the queued guest list', () => {
+    const onInteract = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mia',
+        snippet: 'Can I bring a friend?',
+        href: '/chat/mia',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{
+          href: '/chat/abc',
+          label: 'Open chat',
+          badgeLabel: "You're caught up",
+          badgeTone: 'success',
+          onInteract,
+        }}
+        chatAttentionQueue={queue}
+      />
+    );
+
+    const leadChip = screen.getByRole('link', { name: /open chat with jess/i });
+    fireEvent.click(leadChip);
+    expect(onInteract).toHaveBeenCalledTimes(1);
+
+    const toggle = screen.getByRole('button', { name: /view queued guests/i });
+    fireEvent.click(toggle);
+    const miaLink = screen.getByRole('link', { name: /open chat with mia/i });
+    expect(miaLink).toBeInTheDocument();
+    fireEvent.click(miaLink);
+    expect(onInteract).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows draft quick picker chips with links to each chat', () => {
+    const onClearDraft = vi.fn();
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        draftsWaitingCount={4}
+        onJumpToDrafts={noop}
+        draftQuickPickEntries={[
+          {
+            conversationId: 'jr_1',
+            participantName: 'Nina',
+            href: '/chat/jr_1',
+            updatedAtISO: new Date().toISOString(),
+            snippet: 'Working on a reply right now.',
+          },
+          {
+            conversationId: 'jr_2',
+            participantName: 'Carlos',
+            href: '/chat/jr_2',
+            updatedAtISO: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+            snippet: 'Need to confirm timing.',
+          },
+        ]}
+        onClearDraft={onClearDraft}
+      />
+    );
+
+    expect(screen.getByText(/draft quick picker/i)).toBeInTheDocument();
+    const ninaLink = screen.getByRole('link', { name: /open drafted chat with nina/i });
+    expect(ninaLink).toHaveAttribute('href', '/chat/jr_1');
+
+    const clearButton = screen.getByRole('button', { name: /clear draft for nina/i });
+    fireEvent.click(clearButton);
+    expect(onClearDraft).toHaveBeenCalledWith('jr_1');
+  });
+
+  it('lets hosts clear drafts from the expanded quick picker list', () => {
+    const onClearDraft = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        draftsWaitingCount={5}
+        onJumpToDrafts={noop}
+        draftQuickPickEntries={[
+          {
+            conversationId: 'jr_1',
+            participantName: 'Nina',
+            href: '/chat/jr_1',
+            updatedAtISO: new Date().toISOString(),
+            snippet: 'Working on a reply right now.',
+          },
+          {
+            conversationId: 'jr_2',
+            participantName: 'Carlos',
+            href: '/chat/jr_2',
+            updatedAtISO: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+            snippet: 'Need to confirm timing.',
+          },
+          {
+            conversationId: 'jr_3',
+            participantName: 'Leo',
+            href: '/chat/jr_3',
+            updatedAtISO: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+            snippet: 'Lining up rides.',
+          },
+          {
+            conversationId: 'jr_4',
+            participantName: 'Priya',
+            href: '/chat/jr_4',
+            updatedAtISO: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+            snippet: 'Saving a spot in line.',
+          },
+        ]}
+        onClearDraft={onClearDraft}
+      />
+    );
+
+    const viewMore = screen.getByRole('button', { name: /view remaining drafts \(\+1\)/i });
+    fireEvent.click(viewMore);
+
+    const clearExpanded = screen.getByRole('button', { name: /clear draft for priya/i });
+    fireEvent.click(clearExpanded);
+    expect(onClearDraft).toHaveBeenCalledWith('jr_4');
+  });
+
+  it('lets people snooze and resume chat attention alerts on mobile', () => {
+    const onSnooze = vi.fn();
+    const onResume = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+    const futureISO = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { rerender } = render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{ href: '/chat/abc', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /snooze chat attention alerts for 5 minutes/i }));
+    expect(onSnooze).toHaveBeenCalledWith(5);
+    expect(onSnooze).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{ href: '/chat/abc', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        chatAttentionSnoozedUntil={futureISO}
+        onChatAttentionSnooze={onSnooze}
+        onChatAttentionResume={onResume}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /resume chat attention alerts/i }));
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a one-tap quick snooze shortcut that uses the preferred duration', () => {
+    const onSnooze = vi.fn();
+    const queue = [
+      {
+        id: 'entry-quick',
+        authorName: 'Maya',
+        snippet: 'Need a parking code',
+        href: '/chat/maya',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="discover"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        chatAction={{ href: '/chat/abc', label: 'Open chat', badgeTone: 'highlight', badgeLabel: '1 unread' }}
+        chatAttentionQueue={queue}
+        chatAttentionPreferredSnoozeMinutes={20}
+        onChatAttentionSnooze={onSnooze}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /quick snooze chat attention alerts.*20 min/i }));
+    expect(onSnooze).toHaveBeenCalledWith(20);
+  });
+
+  it('surfaces the jump to waiting guests action when provided', () => {
+    const onJump = vi.fn();
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        canJumpToWaitingGuests
+        onJumpToWaitingGuests={onJump}
+      />
+    );
+
+    const jumpButton = screen.getByRole('button', { name: /jump to the guests waiting for a reply/i });
+    fireEvent.click(jumpButton);
+    expect(onJump).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a quick picker and queue details under the jump action', () => {
+    const onHandle = vi.fn();
+    const queue = [
+      {
+        id: 'entry-1',
+        authorName: 'Jess',
+        snippet: 'Need a quick update',
+        href: '/chat/jess',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-2',
+        authorName: 'Mia',
+        snippet: 'Can I bring a friend?',
+        href: '/chat/mia',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-3',
+        authorName: 'Liam',
+        snippet: 'Is there parking?',
+        href: '/chat/liam',
+        timestampISO: new Date().toISOString(),
+      },
+      {
+        id: 'entry-4',
+        authorName: 'Ava',
+        snippet: 'Running 5 min late',
+        href: '/chat/ava',
+        timestampISO: new Date().toISOString(),
+      },
+    ];
+
+    render(
+      <MobileActionBar
+        active="messages"
+        onNavigateDiscover={noop}
+        onNavigatePeople={noop}
+        onNavigateMessages={noop}
+        onCreate={noop}
+        onOpenProfile={noop}
+        canJumpToWaitingGuests
+        onJumpToWaitingGuests={noop}
+        chatAttentionQueue={queue}
+        onChatAttentionEntryHandled={onHandle}
+      />
+    );
+
+    expect(screen.getAllByText(/4 queued/i)).toHaveLength(2);
+    expect(screen.getByText(/quick picker/i)).toBeInTheDocument();
+    const leadLink = screen.getByRole('link', { name: /open chat with jess/i });
+    expect(leadLink).toHaveAttribute('href', '/chat/jess');
+
+    const markButton = screen.getByRole('button', { name: /mark handled for jess/i });
+    fireEvent.click(markButton);
+    expect(onHandle).toHaveBeenCalledWith('entry-1');
+
+    const viewRemaining = screen.getByRole('button', { name: /view remaining guests \(\+1\)/i });
+    fireEvent.click(viewRemaining);
+    expect(screen.getByRole('link', { name: /open chat with ava/i })).toBeInTheDocument();
+  });
+
 });
