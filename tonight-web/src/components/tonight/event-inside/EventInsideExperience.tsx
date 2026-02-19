@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
-import { CheckCircle2, ChevronDown, Clock3, Copy, MapPin, MessageCircle, Share2, Shield, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock3, Copy, MapPin, MessageCircle, Send, Share2, Shield, Sparkles, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const EventMapView = dynamic(() => import("@/components/EventMapView"), { ssr: false });
 
 import UserAvatar from "@/components/UserAvatar";
+import MessageList, { type ChatMessage, type MessageListStatus } from "@/components/chat/MessageList";
 import { useSocket } from "@/hooks/useSocket";
 import { useSnoozeCountdown } from "@/hooks/useSnoozeCountdown";
 import { classNames } from "@/lib/classNames";
@@ -69,6 +70,13 @@ type EventChatPreview = {
   hostActivityLastSeenAt?: string | null;
 };
 
+type ViewerUserProfile = {
+  id: string;
+  displayName: string | null;
+  email: string;
+  photoUrl: string | null;
+};
+
 export type EventChatAttentionPayload = {
   id: string;
   snippet: string;
@@ -125,6 +133,7 @@ export type EventInsideExperienceProps = {
     nextInviteAvailableAtISO?: string | null;
     currentEventInviteAtISO?: string | null;
   }>;
+  viewerUser?: ViewerUserProfile | null;
   hostChatParticipants?: Array<{
     joinRequestId: string;
     userId: string;
@@ -289,6 +298,7 @@ export function EventInsideExperience({
   chatPreview: initialChatPreview,
   hostFriendInvites,
   hostChatParticipants: hostChatParticipantsProp,
+  viewerUser,
   socketToken,
   pendingJoinRequestId,
   onChatPreviewRefresh,
@@ -2143,8 +2153,8 @@ export function EventInsideExperience({
 
   return (
     <section className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="space-y-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="min-w-0 flex-[3] space-y-6">
           <Card>
             <SectionHeading icon={Sparkles} title="Tonight's plan" subtitle="Everything guests need once they're inside" />
 
@@ -2172,7 +2182,7 @@ export function EventInsideExperience({
             {event.location && (
               <div className="mt-6 relative">
                 {/* Map style toggle button */}
-                <div className="absolute top-3 right-3 z-10 flex items-center gap-2 rounded-lg bg-black/80 backdrop-blur-sm border border-white/20 px-3 py-1.5 shadow-lg">
+                <div className="absolute top-3 right-14 z-10 flex items-center gap-2 rounded-lg bg-black/80 backdrop-blur-sm border border-white/20 px-3 py-1.5 shadow-lg">
                   <button
                     type="button"
                     onClick={() => setMapStyle("light")}
@@ -2229,14 +2239,12 @@ export function EventInsideExperience({
           <Card>
             <SectionHeading icon={Users} title="Attendees" subtitle="Confirmed + pending guests" />
             <div className="mt-4 grid gap-6 lg:grid-cols-2">
-              {(["confirmed", "pending", "waitlist"] as const).map((bucket) => {
-                const bucketLabel = bucket === "confirmed" ? "Confirmed" : bucket === "pending" ? "Awaiting reply" : "Waitlist";
+              {(["confirmed", "waitlist"] as const).map((bucket) => {
+                const bucketLabel = bucket === "confirmed" ? "Confirmed" : "Waitlist";
                 const bucketColor =
                   bucket === "confirmed"
                     ? "text-emerald-300"
-                    : bucket === "pending"
-                      ? "text-sky-300"
-                      : "text-zinc-300";
+                    : "text-zinc-300";
                 const people = groupedAttendees[bucket];
                 return (
                   <div key={bucket} className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -2265,74 +2273,78 @@ export function EventInsideExperience({
           </Card>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <SectionHeading icon={CheckCircle2} title="Join requests" subtitle="Hosts see who's waiting" />
-            {pendingRequests.length === 0 ? (
-              <p className="mt-4 text-sm text-white/60">No new requests right now.</p>
-            ) : (
-              <ul className="mt-4 space-y-3">
-                {pendingRequests.map((request) => {
-                  const actionState = requestActionState[request.id];
-                  const isApproving = actionState === "approving";
-                  const isRejecting = actionState === "rejecting";
-                  const busy = Boolean(actionState);
-                  return (
-                    <li key={request.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      <div className="flex items-start gap-3">
-                        <UserAvatar displayName={request.displayName} size="sm" />
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-white">{request.displayName}</p>
-                          <p className="text-xs text-white/60">
-                            Sent {formatRelativeTime(request.submittedAtISO)}
-                            {typeof request.mutualFriends === "number" && request.mutualFriends > 0
-                              ? ` · ${request.mutualFriends} mutual`
-                              : ""}
-                          </p>
-                          {request.intro ? <p className="mt-2 text-sm text-white/80">“{request.intro}”</p> : null}
+        <div className="min-w-0 flex-[2] space-y-6">
+          {isHostViewer ? (
+            <Card>
+              <SectionHeading icon={CheckCircle2} title="Join requests" subtitle="Hosts see who's waiting" />
+              {pendingRequests.length === 0 ? (
+                <p className="mt-4 text-sm text-white/60">No new requests right now.</p>
+              ) : (
+                <ul className="mt-4 space-y-3">
+                  {pendingRequests.map((request) => {
+                    const actionState = requestActionState[request.id];
+                    const isApproving = actionState === "approving";
+                    const isRejecting = actionState === "rejecting";
+                    const busy = Boolean(actionState);
+                    return (
+                      <li key={request.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/[0.07]">
+                        <div className="flex items-start gap-3">
+                          <UserAvatar displayName={request.displayName} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white">{request.displayName}</p>
+                            <p className="mt-0.5 text-xs text-white/50">
+                              Sent {formatRelativeTime(request.submittedAtISO)}
+                              {typeof request.mutualFriends === "number" && request.mutualFriends > 0
+                                ? ` · ${request.mutualFriends} mutual`
+                                : ""}
+                            </p>
+                            {request.intro ? (
+                              <p className="mt-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs italic text-white/70">
+                                "{request.intro}"
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleJoinRequestDecision({
-                              requestId: request.id,
-                              userId: request.userId,
-                              displayName: request.displayName,
-                              nextStatus: "accepted",
-                            })
-                          }
-                          className="flex-1 rounded-xl bg-emerald-500/80 px-3 py-2 text-sm font-semibold text-emerald-950"
-                          disabled={busy}
-                        >
-                          {isApproving ? "Approving…" : "Approve"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleJoinRequestDecision({
-                              requestId: request.id,
-                              userId: request.userId,
-                              displayName: request.displayName,
-                              nextStatus: "rejected",
-                            })
-                          }
-                          className="flex-1 rounded-xl border border-white/20 px-3 py-2 text-sm font-semibold text-white/80"
-                          disabled={busy}
-                        >
-                          {isRejecting ? "Passing…" : "Pass"}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            <p className="mt-4 text-xs text-white/50">
-              Actions update the live join-requests API, so every tap stays in sync with the host tools page.
-            </p>
-            {isHostViewer ? (
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleJoinRequestDecision({
+                                requestId: request.id,
+                                userId: request.userId,
+                                displayName: request.displayName,
+                                nextStatus: "accepted",
+                              })
+                            }
+                            className="flex-1 rounded-xl bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-60"
+                            disabled={busy}
+                          >
+                            {isApproving ? "Approving…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleJoinRequestDecision({
+                                requestId: request.id,
+                                userId: request.userId,
+                                displayName: request.displayName,
+                                nextStatus: "rejected",
+                              })
+                            }
+                            className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm font-semibold text-white/70 transition hover:border-white/30 hover:text-white disabled:opacity-60"
+                            disabled={busy}
+                          >
+                            {isRejecting ? "Passing…" : "Pass"}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p className="mt-4 text-xs text-white/50">
+                Actions update the live join-requests API, so every tap stays in sync with the host tools page.
+              </p>
               <div className="mt-5 space-y-5">
                 <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">Share event invite</p>
@@ -2368,414 +2380,44 @@ export function EventInsideExperience({
 
                 {hostFriendInviteEntries.length ? (
                   <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Invite Tonight friends</p>
-                        <p className="mt-1 text-xs text-white/60">Pick a past guest and DM them without leaving this page.</p>
-                      </div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                        <div className="w-full sm:w-56">
-                          <label
-                            htmlFor={hostFriendSearchInputId}
-                            className="text-[11px] font-semibold uppercase tracking-wide text-white/60"
-                          >
-                            Search friends
-                          </label>
-                          <input
-                            id={hostFriendSearchInputId}
-                            type="search"
-                            value={hostFriendSearchValue}
-                            onChange={(event) => setHostFriendSearchValue(event.target.value)}
-                            placeholder="Search by name"
-                            className="mt-1 w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          />
-                        </div>
-                        {hostFriendTemplateOptionsAvailable ? (
-                          <div className="w-full sm:w-56">
-                            <label
-                              htmlFor={hostFriendTemplateSelectId}
-                              className="text-[11px] font-semibold uppercase tracking-wide text-white/60"
-                            >
-                              Invite template
-                            </label>
-                            <select
-                              id={hostFriendTemplateSelectId}
-                              value={hostFriendTemplateId}
-                              onChange={(event) => setHostFriendTemplateId(event.target.value as HostFriendInviteTemplateId)}
-                              className="mt-1 w-full rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs text-white focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                            >
-                              {hostFriendInviteTemplateOptions.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                    {hostFriendTemplateOptionsAvailable ? (
-                      <p className="mt-2 text-[11px] text-white/60">{hostFriendTemplateHelperCopy}</p>
-                    ) : null}
-                    {hostFriendSelectionActive ? (
-                      <div className="mt-4 rounded-2xl border border-primary/30 bg-primary/10 p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">Multi-send ready</p>
-                          <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                            {hostFriendSelectedCount}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs text-white/70">
-                          We’ll send the {activeHostFriendTemplate?.label ?? "default"} template to each friend with their name auto-filled.
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-white/70">
-                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-white/90">{hostFriendSelectionReadyLabel}</span>
-                          {hostFriendSelectionHasSkipped ? (
-                            <>
-                              <span className="rounded-full bg-amber-200/20 px-2 py-0.5 text-amber-100">{hostFriendSelectionSkippedLabel}</span>
-                              <button
-                                type="button"
-                                onClick={() => setHostFriendSelectionSkippedExpanded((prev) => !prev)}
-                                className="text-[11px] font-semibold text-primary/90 underline-offset-2 hover:underline"
-                                aria-expanded={hostFriendSelectionSkippedExpanded}
-                                disabled={hostFriendSelectionStatus === "sending"}
-                              >
-                                {hostFriendSelectionSkippedExpanded ? "Hide skipped" : "Review skipped"}
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
-                        {hostFriendSelectionHasSkipped ? (
-                          <div className="mt-3 rounded-xl border border-amber-200/30 bg-amber-100/5 p-3">
-                            <p className="text-xs text-amber-100">
-                              We’ll hold {hostFriendSelectionSkippedHelperLabel} until cooldowns clear or you override them.
-                            </p>
-                            {hostFriendSelectionSkippedExpanded ? (
-                              <ul className="mt-3 space-y-2">
-                                {hostFriendSelectionBlockedEntries.map((entry) => {
-                                  const friend = entry.friend;
-                                  const canOverride =
-                                    entry.type === "event" && entry.eventInviteOverrideAvailable && entry.currentEventInviteAtISO;
-                                  return (
-                                    <li key={friend.joinRequestId} className="rounded-lg border border-white/10 bg-black/30 p-3">
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div>
-                                          <p className="text-sm font-semibold text-white">{friend.displayName}</p>
-                                          <p className="text-xs text-white/70">{entry.reason}</p>
-                                        </div>
-                                        {canOverride ? (
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleHostFriendEventInviteOverride(friend.joinRequestId, entry.currentEventInviteAtISO)
-                                            }
-                                            className="rounded-full border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-white/40"
-                                          >
-                                            Re-enable + send
-                                          </button>
-                                        ) : null}
-                                      </div>
-                                      {entry.type === "cooldown" && entry.nextInviteAvailableAtISO ? (
-                                        <p className="mt-1 text-[11px] text-white/50">
-                                          Ready again {formatRelativeTime(entry.nextInviteAvailableAtISO)}.
-                                        </p>
-                                      ) : null}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            ) : null}
-                          </div>
-                        ) : null}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {hostFriendSelectedEntries.map((friend) => (
-                            <button
-                              key={friend.joinRequestId}
-                              type="button"
-                              onClick={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
-                              className="group inline-flex items-center gap-1 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/80 transition hover:border-white/40"
-                              disabled={hostFriendSelectionStatus === "sending"}
-                            >
-                              {friend.displayName}
-                              <span aria-hidden className="text-white/50 transition group-hover:text-white">×</span>
-                            </button>
-                          ))}
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleHostFriendSelectionSend}
-                            className="rounded-full bg-primary/80 px-4 py-1.5 text-xs font-semibold text-black transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={hostFriendSelectionStatus === "sending" || hostFriendSelectionEligibleCount === 0}
-                          >
-                            {hostFriendSelectionStatus === "sending" ? "Sending…" : hostFriendSelectionCtaLabel}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleHostFriendSelectionClear}
-                            className="text-[11px] font-semibold text-white/70 transition hover:text-white"
-                            disabled={hostFriendSelectionStatus === "sending"}
-                          >
-                            Clear selection
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                    {hostFriendSelectionSummary ? (
-                      <div className="mt-4 rounded-2xl border border-white/15 bg-black/30 p-3" data-testid="multi-send-summary">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Last multi-send summary</p>
-                            <p className="text-xs text-white/60">
-                              {hostFriendSelectionSummary.sentCount === 1
-                                ? "1 invite delivered"
-                                : `${hostFriendSelectionSummary.sentCount} invites delivered`}
-                              {hostFriendSelectionSummaryHasSkipped
-                                ? hostFriendSelectionSummary.skippedCount === 1
-                                  ? " · 1 skipped"
-                                  : ` · ${hostFriendSelectionSummary.skippedCount} skipped`
-                                : ""}
-                              {hostFriendSelectionSummaryHasFailures
-                                ? hostFriendSelectionSummary.failedCount === 1
-                                  ? " · 1 failed"
-                                  : ` · ${hostFriendSelectionSummary.failedCount} failed`
-                                : ""}
-                              {hostFriendSelectionSummaryRelativeTime ? ` · ${hostFriendSelectionSummaryRelativeTime}` : ""}
-                            </p>
-                          </div>
-                          {hostFriendSelectionSummaryHasSkipped ? (
-                            <button
-                              type="button"
-                              onClick={triggerHostFriendSkippedReselect}
-                              className="rounded-full border border-white/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-white/45 disabled:cursor-not-allowed disabled:opacity-60"
-                              disabled={hostFriendSelectionSkippedReselectableCount === 0 || hostFriendSelectionStatus === "sending"}
-                            >
-                              {hostFriendSelectionSkippedReselectableCount > 0 ? "Reselect skipped friends" : "Waiting for cooldowns"}
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
-                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-primary">
-                            {hostFriendSelectionSummary.sentCount === 1
-                              ? "1 invite sent"
-                              : `${hostFriendSelectionSummary.sentCount} invites sent`}
-                          </span>
-                          {hostFriendSelectionSummaryHasSkipped ? (
-                            <span className="rounded-full bg-amber-200/20 px-2 py-0.5 text-amber-50">
-                              {hostFriendSelectionSummary.skippedCount === 1
-                                ? "1 skipped"
-                                : `${hostFriendSelectionSummary.skippedCount} skipped`}
-                            </span>
-                          ) : null}
-                          {hostFriendSelectionSummaryHasFailures ? (
-                            <span className="rounded-full bg-rose-200/25 px-2 py-0.5 text-rose-50">
-                              {hostFriendSelectionSummary.failedCount === 1
-                                ? "1 failed"
-                                : `${hostFriendSelectionSummary.failedCount} failed`}
-                            </span>
-                          ) : null}
-                        </div>
-                        {hostFriendSelectionSummaryHasSkipped ? (
-                          <p className="mt-2 text-[11px] text-white/60">
-                            {hostFriendSelectionSkippedReselectableCount > 0
-                              ? "Tap reselect to drop cooled-down friends back into your selection."
-                              : "We’ll light up the reselect button once cooldowns lift."}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {hostFriendSelectionSkippedHistoryCount > 0 ? (
-                      <div className="mt-4 rounded-2xl border border-dashed border-white/15 bg-black/30 p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Skipped friends</p>
-                          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80">
-                            {hostFriendSelectionSkippedHistoryCount}
-                          </span>
-                          {hostFriendSelectionSkippedReselectableCount > 0 ? (
-                            <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                              {hostFriendSelectionSkippedReadyLabel}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-white/50">Waiting for cooldowns</span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-white/60">
-                          {hostFriendSelectionSkippedReselectableCount > 0
-                            ? "We’ll drop them back into your selection once you tap the button."
-                            : "We’ll re-enable the button once cooldowns lift."}
-                        </p>
-                        {hostFriendSelectionSkippedHistoryEntries.length ? (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {hostFriendSelectionSkippedHistoryEntries.map((friend) => (
-                              <span
-                                key={friend.joinRequestId}
-                                className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-semibold text-white/70"
-                              >
-                                {friend.displayName}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={handleHostFriendSelectionReselectSkipped}
-                          className="mt-3 rounded-full border border-white/30 px-4 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={hostFriendSelectionSkippedReselectableCount === 0 || hostFriendSelectionStatus === "sending"}
-                        >
-                          {hostFriendSelectionSkippedReselectableCount > 0
-                            ? `Reselect skipped ${hostFriendSelectionSkippedReselectableCount === 1 ? "friend" : "friends"}`
-                            : "Reselect skipped friends"}
-                        </button>
-                      </div>
-                    ) : null}
-                    {filteredHostFriendInvites.length === 0 ? (
-                      <p className="mt-4 text-xs text-white/60">{hostFriendInviteEmptyCopy}</p>
-                    ) : (
-                      <ul className="mt-4 space-y-3">
-                        {filteredHostFriendInvites.map((friend) => {
-                          const composerEntry = hostFriendComposerState[friend.joinRequestId];
-                          const composerValue = composerEntry?.value ?? "";
-                          const composerBusy = composerEntry?.status === "sending";
-                          const guardrail = getHostFriendGuardrailFor(friend.joinRequestId);
-                          const lastInviteAtISO = guardrail.lastInviteAtISO;
-                          const nextInviteAvailableAtISO = guardrail.nextInviteAvailableAtISO;
-                          const inviteGuardrailActive = isInviteGuardrailActive(nextInviteAvailableAtISO);
-                          const currentEventInviteAtISO =
-                            hostFriendEventInviteState[friend.joinRequestId] ?? friend.currentEventInviteAtISO ?? null;
-                          const eventInviteOverrideToken = hostFriendEventInviteOverrides[friend.joinRequestId] ?? null;
-                          const eventInviteOverrideActive =
-                            Boolean(currentEventInviteAtISO) && eventInviteOverrideToken === currentEventInviteAtISO;
-                          const eventInviteCooldownUntilISO = getEventInviteCooldownUntil(currentEventInviteAtISO);
-                          const eventInviteCoolingDown =
-                            Boolean(currentEventInviteAtISO) && isInviteGuardrailActive(eventInviteCooldownUntilISO);
-                          const eventInviteLocked = Boolean(currentEventInviteAtISO && !eventInviteOverrideActive);
-                          const eventInviteOverrideAvailable = eventInviteLocked && !eventInviteCoolingDown;
-                          const sendDisabled =
-                            composerBusy || composerValue.trim().length === 0 || inviteGuardrailActive || eventInviteLocked;
-                          const lastActiveLabel = friend.lastInteractionAtISO
-                            ? `Active ${formatRelativeTime(friend.lastInteractionAtISO)}`
-                            : "Recently active";
-                          const inviteHistoryLabel = lastInviteAtISO ? `Invited ${formatRelativeTime(lastInviteAtISO)}` : null;
-                          const inviteCooldownLabel =
-                            inviteGuardrailActive && nextInviteAvailableAtISO
-                              ? `Give them a moment — try again ${formatRelativeTime(nextInviteAvailableAtISO)}.`
-                              : null;
-                          const alreadyInvitedLabel = currentEventInviteAtISO
-                            ? `Already invited to ${event.title} · ${formatRelativeTime(currentEventInviteAtISO)}`
-                            : null;
-                          const eventInviteLockLabel = eventInviteLocked
-                            ? eventInviteCoolingDown && eventInviteCooldownUntilISO
-                              ? `Already pinged for this event — try again ${formatRelativeTime(eventInviteCooldownUntilISO)}.`
-                              : "Already invited to this event. Re-enable below if you truly need to re-invite."
-                            : null;
-                          const isSelected = Boolean(hostFriendSelectionState[friend.joinRequestId]);
-
-                          return (
-                            <li key={friend.joinRequestId} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                              <div className="flex flex-wrap items-start gap-3">
-                                <UserAvatar
-                                  displayName={friend.displayName}
-                                  photoUrl={friend.avatarUrl ?? undefined}
-                                  size="sm"
-                                />
-                                <div className="min-w-[160px] flex-1">
-                                  <p className="text-sm font-semibold text-white">{friend.displayName}</p>
-                                  {friend.lastEventTitle ? (
-                                    <p className="text-xs text-white/60">Last joined: {friend.lastEventTitle}</p>
-                                  ) : null}
-                                  <p className="text-[11px] text-white/50">{lastActiveLabel}</p>
-                                  {inviteHistoryLabel ? (
-                                    <p className="text-[11px] text-white/50">{inviteHistoryLabel}</p>
-                                  ) : null}
-                                  {alreadyInvitedLabel ? (
-                                    <p className="text-[11px] font-semibold text-primary/80">{alreadyInvitedLabel}</p>
-                                  ) : null}
-                                  {eventInviteLocked && alreadyInvitedLabel ? (
-                                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                                      {eventInviteLockLabel ? (
-                                        <p className="text-[11px] font-semibold text-amber-200">{eventInviteLockLabel}</p>
-                                      ) : null}
-                                      {eventInviteOverrideAvailable && currentEventInviteAtISO ? (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleHostFriendEventInviteOverride(friend.joinRequestId, currentEventInviteAtISO)
-                                          }
-                                          className="rounded-full border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80 transition hover:border-white/40"
-                                        >
-                                          Re-invite anyway
-                                        </button>
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-                                  {inviteCooldownLabel ? (
-                                    <p className="text-[11px] font-semibold text-amber-300">{inviteCooldownLabel}</p>
-                                  ) : null}
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleHostFriendUseTemplate(friend.joinRequestId, friend.displayName, hostFriendTemplateId)
-                                    }
-                                    className="text-[11px] font-semibold text-primary/80 transition hover:text-primary"
-                                    disabled={composerBusy || inviteGuardrailActive || eventInviteLocked}
-                                  >
-                                    Use template
-                                  </button>
-                                  <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/60">
-                                    <input
-                                      type="checkbox"
-                                      className="h-3.5 w-3.5 rounded border border-white/30 bg-black/40 text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-                                      checked={isSelected}
-                                      onChange={() => handleHostFriendSelectionToggle(friend.joinRequestId)}
-                                      aria-label={`Select ${friend.displayName}`}
-                                      disabled={hostFriendSelectionStatus === "sending" || inviteGuardrailActive || eventInviteLocked}
-                                    />
-                                    <span>{isSelected ? "Selected" : "Select"}</span>
-                                  </label>
-                                </div>
-                              </div>
-                              <textarea
-                                rows={2}
-                                value={composerValue}
-                                onChange={(event) => handleHostFriendComposerChange(friend.joinRequestId, event.target.value)}
-                                placeholder={`Tell ${friend.displayName.split(' ')[0] ?? friend.displayName} why this night fits them`}
-                                className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                disabled={composerBusy || inviteGuardrailActive || eventInviteLocked}
-                              />
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleHostFriendInviteSend(friend.joinRequestId)}
-                                  className="rounded-xl bg-primary/80 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                                  disabled={sendDisabled}
-                                >
-                                  {composerBusy ? "Sending…" : "Send DM"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleHostFriendComposerClear(friend.joinRequestId)}
-                                  className="text-[11px] font-semibold text-white/60 transition hover:text-white"
-                                  disabled={composerBusy || composerValue.length === 0 || eventInviteLocked}
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                    <p className="text-sm font-semibold text-white">Invite a friend</p>
+                    <input
+                      id={hostFriendSearchInputId}
+                      type="search"
+                      value={hostFriendSearchValue}
+                      onChange={(event) => setHostFriendSearchValue(event.target.value)}
+                      placeholder="Search past guests by name…"
+                      className="mt-3 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    />
+                    <button
+                      type="button"
+                      disabled={!hostFriendSearchValue.trim() || filteredHostFriendInvites.length === 0}
+                      className="mt-3 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Send invite
+                    </button>
                   </div>
                 ) : null}
               </div>
-            ) : null}
-          </Card>
+            </Card>
+          ) : null}
 
           <Card>
             <SectionHeading icon={MessageCircle} title="Event chat" subtitle="Hosts + guests coordinate here" />
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+            {viewerRole === "guest" && guestJoinRequestId && viewerUser ? (
+              <MiniEventChat
+                joinRequestId={guestJoinRequestId}
+                currentUser={viewerUser}
+                counterpart={{
+                  id: host.id,
+                  displayName: host.displayName,
+                  email: host.email ?? `${host.displayName ?? "host"}@tonight.app`,
+                  photoUrl: host.avatarUrl ?? null,
+                }}
+                socketToken={socketToken}
+              />
+            ) : (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-center gap-3">
                 <div className="rounded-full bg-primary/20 p-3 text-primary">
                   <MessageCircle className="h-5 w-5" />
@@ -2873,6 +2515,7 @@ export function EventInsideExperience({
                 <p className="mt-2 text-xs text-white/60">{chatCtaDisabledReason}</p>
               ) : null}
             </div>
+            )}
             {isHostViewer ? (
               <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Broadcast to guests</p>
@@ -2909,50 +2552,6 @@ export function EventInsideExperience({
                     {hostAnnouncementValue.length}/{HOST_ANNOUNCEMENT_MAX_LENGTH}
                   </span>
                 </div>
-              </div>
-            ) : null}
-            {viewerRole === "guest" && guestComposerConfig ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Message the host</p>
-                <p className="mt-1 text-xs text-white/60">Send a quick update without leaving this screen.</p>
-                <textarea
-                  rows={3}
-                  value={guestComposerValue}
-                  onChange={(event) => setGuestComposerValue(event.target.value)}
-                  placeholder="Share an update or ask a quick question"
-                  className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                  disabled={
-                    guestComposerStatus === "sending" ||
-                    Boolean(guestComposerConfig.disabledReason) ||
-                    !guestComposerConfig.joinRequestId
-                  }
-                />
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGuestComposerSend}
-                    className="rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={
-                      guestComposerStatus === "sending" ||
-                      Boolean(guestComposerConfig.disabledReason) ||
-                      !guestComposerConfig.joinRequestId ||
-                      guestComposerValue.trim().length === 0
-                    }
-                  >
-                    {guestComposerStatus === "sending" ? "Sending…" : "Send message"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGuestComposerValue("")}
-                    className="text-xs font-semibold text-white/60 transition hover:text-white"
-                    disabled={guestComposerStatus === "sending" || guestComposerValue.length === 0}
-                  >
-                    Clear
-                  </button>
-                </div>
-                {guestComposerConfig.disabledReason ? (
-                  <p className="mt-2 text-xs text-white/60">{guestComposerConfig.disabledReason}</p>
-                ) : null}
               </div>
             ) : null}
             {hostUnreadThreads.length > 0 ? (
@@ -3250,6 +2849,160 @@ const parseIsoTimestamp = (value?: string | null): number | null => {
   const date = new Date(value);
   const timestamp = date.getTime();
   return Number.isNaN(timestamp) ? null : timestamp;
+};
+
+type MiniEventChatProps = {
+  joinRequestId: string;
+  currentUser: ViewerUserProfile;
+  counterpart: ViewerUserProfile;
+  socketToken?: string | null;
+};
+
+const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socketToken }: MiniEventChatProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messagesStatus, setMessagesStatus] = useState<MessageListStatus>("loading");
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [composer, setComposer] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const appendMessage = useCallback((message: ChatMessage) => {
+    setMessages((prev) => {
+      if (prev.some((entry) => entry.id === message.id)) {
+        return prev;
+      }
+      const next = [...prev, message].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      return next;
+    });
+  }, []);
+
+  const fetchMessages = useCallback(async () => {
+    setMessagesStatus("loading");
+    setMessagesError(null);
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Unable to load messages.");
+      }
+      const payload = (await response.json()) as { messages?: ChatMessage[] };
+      setMessages((prev) => {
+        const optimistic = prev.filter((m) => m.deliveryStatus);
+        const next = [...(payload.messages ?? []), ...optimistic].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+        return next;
+      });
+      setMessagesStatus("ready");
+    } catch (error) {
+      console.error("Failed to load chat messages", error);
+      setMessagesStatus("error");
+      setMessagesError((error as Error)?.message ?? "Unable to load messages.");
+    }
+  }, [joinRequestId]);
+
+  useEffect(() => {
+    fetchMessages().catch(() => {});
+  }, [fetchMessages]);
+
+  const { isConnected, joinRoom } = useSocket({
+    token: socketToken ?? undefined,
+    autoConnect: Boolean(socketToken),
+    readinessEndpoint: "/api/socket/io",
+    onMessage: (payload) => {
+      if (payload.joinRequestId === joinRequestId) {
+        appendMessage(payload as ChatMessage);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (isConnected) {
+      joinRoom(joinRequestId);
+    }
+  }, [isConnected, joinRequestId, joinRoom]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+    fetch(`/api/chat/${joinRequestId}/mark-read`, { method: "POST" }).catch(() => {});
+  }, [isConnected, joinRequestId]);
+
+  const handleSend = useCallback(async () => {
+    const trimmed = composer.trim();
+    if (!trimmed || sending) {
+      return;
+    }
+    setSending(true);
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: trimmed }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Unable to send message.");
+      }
+      const payload = (await response.json()) as { message: ChatMessage };
+      appendMessage(payload.message);
+      setComposer("");
+    } catch (error) {
+      const message = (error as Error)?.message ?? "Unable to send message.";
+      showErrorToast("Message not sent", message);
+    } finally {
+      setSending(false);
+    }
+  }, [appendMessage, composer, joinRequestId, sending]);
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-white/10 bg-black/25 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-white">Event chat</p>
+          <p className="text-xs text-white/60">Chat with {counterpart.displayName ?? counterpart.email}</p>
+        </div>
+        <Link
+          href={`/chat/${joinRequestId}`}
+          className="rounded-full bg-primary/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          Open full chat
+        </Link>
+      </div>
+
+      <div className="h-80 rounded-2xl border border-white/10 bg-black/30">
+        <MessageList
+          status={messagesStatus}
+          error={messagesError}
+          messages={messages}
+          currentUserId={currentUser.id}
+          counterpartId={counterpart.id}
+          onRetry={() => fetchMessages().catch(() => {})}
+          className="!h-full"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-end gap-3">
+          <textarea
+            rows={1}
+            value={composer}
+            onChange={(event) => setComposer(event.target.value)}
+            placeholder={sending ? "Sending…" : "Type a message"}
+            className="max-h-48 min-h-[52px] w-full flex-1 resize-none rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed"
+            disabled={sending}
+          />
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sending || composer.trim().length === 0}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 async function copyTextToClipboard(value: string) {
