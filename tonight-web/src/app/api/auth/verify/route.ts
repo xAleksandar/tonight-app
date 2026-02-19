@@ -44,7 +44,23 @@ export async function GET(request: NextRequest) {
     });
 
     const jwt = await generateJWT(user.id);
-    const response = NextResponse.redirect(new URL('/', request.url));
+    const baseUrl = (() => {
+      const envBase = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL;
+      if (envBase) {
+        return new URL(envBase);
+      }
+      const url = new URL(request.url);
+      const forwardedHost = request.headers.get('x-forwarded-host');
+      const forwardedProto = request.headers.get('x-forwarded-proto');
+      if (forwardedHost) {
+        url.host = forwardedHost;
+      }
+      if (forwardedProto) {
+        url.protocol = `${forwardedProto}:`;
+      }
+      return url;
+    })();
+    const response = NextResponse.redirect(new URL('/', baseUrl));
     response.cookies.set({
       name: getAuthCookieName(),
       value: jwt,
