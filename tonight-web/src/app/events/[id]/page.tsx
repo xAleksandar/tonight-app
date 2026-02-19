@@ -807,14 +807,15 @@ export default async function EventInsidePage({ params }: PageParams) {
     hostChatParticipants,
     socketToken: authenticatedUser?.token,
     pendingJoinRequestId: viewerRole === "pending" && viewerJoinRequest ? viewerJoinRequest.id : null,
-    viewerUser: authenticatedUser
-      ? {
-          id: authenticatedUser.userId,
-          displayName: currentUserProfile?.displayName ?? null,
-          email: currentUserProfile?.email ?? authenticatedUser.email,
-          photoUrl: currentUserProfile?.photoUrl ?? null,
-        }
-      : null,
+    viewerUser:
+      authenticatedUser && currentUserProfile
+        ? {
+            id: authenticatedUser.userId,
+            displayName: currentUserProfile.displayName ?? null,
+            email: currentUserProfile.email,
+            photoUrl: currentUserProfile.photoUrl ?? null,
+          }
+        : null,
   };
 
   if (authenticatedUser && currentUserProfile) {

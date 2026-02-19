@@ -1,15 +1,17 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/middleware/auth";
 
-export async function POST(request: Request, { params }: { params: { id?: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await getCurrentUser();
   if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const eventId = params?.id?.trim();
+  const { id: rawEventId } = await context.params;
+  const eventId = rawEventId?.trim();
   if (!eventId) {
     return NextResponse.json({ error: "Missing event id" }, { status: 400 });
   }

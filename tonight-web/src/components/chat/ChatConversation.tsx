@@ -881,7 +881,7 @@ export default function ChatConversation({
   const showChatAttentionToast = isHostViewer && chatAttentionHasEntries && !chatAttentionToastDismissed;
 
   const applyChatAttentionQueueUpdate = useCallback(
-    (updater: (prev: EventChatAttentionPayload[]) => EventChatAttentionPayload[]) => {
+    (updater: (prev: EventChatAttentionPayload[]) => EventChatAttentionPayload[]): EventChatAttentionPayload[] | null => {
       if (!isHostViewer) {
         return null;
       }
