@@ -23,6 +23,7 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
   const [message, setMessage] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string>("");
   const [magicLinkUrl, setMagicLinkUrl] = useState<string | null>(null);
+  const showDevDirectLogin = process.env.NEXT_PUBLIC_DEV_DIRECT_LOGIN === "true";
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -143,7 +144,7 @@ export function WelcomeScreen({ defaultEmail = "", redirectMessage }: WelcomeScr
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">Open the link on this device to jump into Tonight.</p>
-              {magicLinkUrl ? (
+              {magicLinkUrl && showDevDirectLogin ? (
                 <a
                   href={magicLinkUrl}
                   className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
