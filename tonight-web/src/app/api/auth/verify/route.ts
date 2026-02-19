@@ -61,12 +61,14 @@ export async function GET(request: NextRequest) {
       return url;
     })();
     const response = NextResponse.redirect(new URL('/', baseUrl));
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const isHttps = forwardedProto ? forwardedProto === "https" : request.nextUrl.protocol === "https:";
     response.cookies.set({
       name: getAuthCookieName(),
       value: jwt,
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production' && isHttps,
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
