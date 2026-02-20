@@ -60,7 +60,14 @@ export async function GET(request: NextRequest) {
       }
       return url;
     })();
-    const response = NextResponse.redirect(new URL('/', baseUrl));
+    const wantsJson = (() => {
+      const accept = request.headers.get("accept") ?? "";
+      return accept.includes("application/json") || request.headers.get("x-auth-verify-client") === "1";
+    })();
+
+    const response = wantsJson
+      ? NextResponse.json({ ok: true, redirectTo: "/" })
+      : NextResponse.redirect(new URL('/', baseUrl));
     const forwardedProto = request.headers.get("x-forwarded-proto");
     const isHttps = forwardedProto ? forwardedProto === "https" : request.nextUrl.protocol === "https:";
     response.cookies.set({
