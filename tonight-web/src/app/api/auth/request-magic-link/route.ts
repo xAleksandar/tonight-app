@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     // In development, return the magic link URL for direct login
     if (process.env.NODE_ENV === 'development') {
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-      const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${encodeURIComponent(token)}`;
+      const magicLinkUrl = `${baseUrl}/auth/verify?token=${encodeURIComponent(token)}`;
       return NextResponse.json({ ok: true, magicLinkUrl });
     }
 

@@ -66,7 +66,7 @@ const getResendClient = (): ResendLike | null => {
 
 const buildVerificationUrl = (token: string, baseUrl: string): string => {
   const encodedToken = encodeURIComponent(token);
-  return `${baseUrl}/api/auth/verify?token=${encodedToken}`;
+  return `${baseUrl}/auth/verify?token=${encodedToken}`;
 };
 
 const buildEmailBody = (verificationUrl: string, expiresAt: Date) => {

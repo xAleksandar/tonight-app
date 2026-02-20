@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "error";
 
@@ -84,6 +86,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       abortRef.current?.abort();
     };
   }, [fetchUser]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    const removeListener = App.addListener("appUrlOpen", (data) => {
+      const url = data?.url;
+      if (!url) {
+        return;
+      }
+      if (url.includes("/auth/verify")) {
+        window.location.href = url;
+      }
+    });
+
+    return () => {
+      removeListener.then((handler) => handler.remove()).catch(() => undefined);
+    };
+  }, []);
 
   const logout = useCallback(async () => {
     try {

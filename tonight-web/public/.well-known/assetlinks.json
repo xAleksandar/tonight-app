@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fun.nightwithme.app",
+      "sha256_cert_fingerprints": [
+        "E7:47:3F:7D:A9:46:C6:09:9A:2C:D1:A0:0A:53:68:47:C6:C1:03:FC:74:0D:37:18:E3:1C:C3:F4:C4:64:8E:B8"
+      ]
+    }
+  }
+]
