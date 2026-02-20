@@ -9,8 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { App } from "@capacitor/app";
-import { Capacitor } from "@capacitor/core";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "error";
 
@@ -88,11 +86,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUser]);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
+    let cleanup: (() => void) | undefined;
+
+    const capacitor = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean; Plugins?: Record<string, any> } }).Capacitor;
+    if (!capacitor?.isNativePlatform?.()) {
       return;
     }
 
-    const removeListener = App.addListener("appUrlOpen", (data) => {
+    const appPlugin = capacitor.Plugins?.App;
+    if (!appPlugin?.addListener) {
+      return;
+    }
+
+    const removeListener = appPlugin.addListener("appUrlOpen", (data: { url?: string }) => {
       const url = data?.url;
       if (!url) {
         return;
@@ -102,8 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    cleanup = () => {
+      removeListener?.then?.((handler: { remove: () => void }) => handler.remove()).catch?.(() => undefined);
+    };
+
     return () => {
-      removeListener.then((handler) => handler.remove()).catch(() => undefined);
+      cleanup?.();
     };
   }, []);
 
