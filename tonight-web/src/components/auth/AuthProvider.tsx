@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "error";
 
@@ -86,34 +88,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUser]);
 
   useEffect(() => {
-    let cleanup: (() => void) | undefined;
-
-    const capacitor = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean; Plugins?: Record<string, any> } }).Capacitor;
-    if (!capacitor?.isNativePlatform?.()) {
+    if (!Capacitor.isNativePlatform()) {
       return;
     }
 
-    const appPlugin = capacitor.Plugins?.App;
-    if (!appPlugin?.addListener) {
-      return;
-    }
-
-    const removeListener = appPlugin.addListener("appUrlOpen", (data: { url?: string }) => {
-      const url = data?.url;
+    const handleUrl = (url?: string | null) => {
       if (!url) {
         return;
       }
       if (url.includes("/auth/verify")) {
         window.location.href = url;
       }
-    });
-
-    cleanup = () => {
-      removeListener?.then?.((handler: { remove: () => void }) => handler.remove()).catch?.(() => undefined);
     };
 
+    App.getLaunchUrl()
+      .then((result) => handleUrl(result?.url))
+      .catch(() => undefined);
+
+    const removeListener = App.addListener("appUrlOpen", (data) => {
+      handleUrl(data?.url);
+    });
+
     return () => {
-      cleanup?.();
+      removeListener.then((handler) => handler.remove()).catch(() => undefined);
     };
   }, []);
 
