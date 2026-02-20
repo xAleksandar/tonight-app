@@ -9,7 +9,7 @@ export default function VerifyPage() {
   const [status, setStatus] = useState<"idle" | "verifying" | "error">("idle");
 
   useEffect(() => {
-    const token = searchParams.get("token")?.trim();
+    const token = searchParams?.get("token")?.trim() ?? "";
     if (!token) {
       router.replace("/login?error=missing_token");
       return;
