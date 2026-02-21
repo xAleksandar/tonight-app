@@ -308,6 +308,15 @@ describe('Authenticated home/discovery experience', () => {
     expect(screen.getByText(/1 spot left/i)).toBeInTheDocument();
   });
 
+  it('keeps the compact category rail padded to match the Discover heading', async () => {
+    render(<HomePage />);
+    await screen.findByText('Sunset Cinema on the Roof');
+
+    const mobileRail = screen.getByTestId('mobile-category-scroll');
+    expect(mobileRail).toHaveClass('pl-4');
+    expect(mobileRail).toHaveClass('pr-4');
+  });
+
   it('filters events by category selection so only matching cards remain', async () => {
     render(<HomePage />);
     await screen.findByText('Downtown Coffee Crawl');

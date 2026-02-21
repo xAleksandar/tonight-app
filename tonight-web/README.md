@@ -18,6 +18,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Local auth bypass (developer only)
+
+Nightly builds redirect unauthenticated visitors immediately, which makes quick visual checks difficult without staging credentials. For local development you can opt into a mock session by adding the following to `.env.local`:
+
+```
+NEXT_PUBLIC_DEV_AUTH_BYPASS=1
+NEXT_PUBLIC_DEV_AUTH_BYPASS_EMAIL=dev@tonight.test        # optional override
+NEXT_PUBLIC_DEV_AUTH_BYPASS_NAME=Tonight Dev              # optional override
+```
+
+You can also set `NEXT_PUBLIC_DEV_AUTH_BYPASS_ID`, `NEXT_PUBLIC_DEV_AUTH_BYPASS_PHOTO`, or `NEXT_PUBLIC_DEV_AUTH_BYPASS_CREATED_AT` if you need more control over the mock profile.
+
+The bypass only works when `NODE_ENV !== "production"` and never ships with production builds. When enabled, the UI behaves as if a lightweight user is signed in so you can inspect authenticated screens without waiting for an invite link.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

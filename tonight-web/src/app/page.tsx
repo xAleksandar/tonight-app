@@ -1216,9 +1216,10 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false, show
         </div>
       )}
       <div
+        data-testid={compact ? "mobile-category-scroll" : undefined}
         className={classNames(
           "flex gap-2",
-          compact ? "overflow-x-auto pb-1 pr-4" : "flex-wrap"
+          compact ? "overflow-x-auto pb-1 pr-4 pl-4" : "flex-wrap"
         )}
         style={
           compact
