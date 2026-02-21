@@ -31,6 +31,18 @@ type AuthContextValue = {
   logout: () => Promise<void>;
 };
 
+const DEV_AUTH_BYPASS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "1";
+
+const DEV_AUTH_USER: AuthUser = {
+  id: process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS_ID ?? "tonight-dev-user",
+  email: process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS_EMAIL ?? "dev@tonight.test",
+  displayName: process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS_NAME ?? "Tonight Dev",
+  photoUrl: process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS_PHOTO ?? null,
+  createdAt: process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS_CREATED_AT ?? "1970-01-01T00:00:00.000Z",
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -40,6 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchUser = useCallback(async () => {
+    if (DEV_AUTH_BYPASS) {
+      setError(null);
+      setStatus("authenticated");
+      setUser(DEV_AUTH_USER);
+      return;
+    }
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -115,6 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (DEV_AUTH_BYPASS) {
+      setUser(DEV_AUTH_USER);
+      setStatus("authenticated");
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", {
         method: "POST",
