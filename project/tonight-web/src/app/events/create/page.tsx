@@ -277,7 +277,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
         <div className="flex flex-1 flex-col">
           <DesktopHeader
             title="Create"
-            subtitle="Share what you're planning tonight"
+            subtitle="Share what you’re planning tonight"
             onNavigateProfile={() => router.push('/profile')}
             onNavigateMessages={() => router.push('/messages')}
             userDisplayName={currentUser?.displayName ?? null}
@@ -516,7 +516,7 @@ function MobileCreateHero() {
     <div className="rounded-3xl border border-border/70 bg-card/50 px-5 py-4 text-foreground shadow-xl shadow-black/20 md:hidden">
       <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
       <h1 className="mt-1 text-2xl font-serif font-semibold leading-tight">Create event</h1>
-      <p className="text-xs text-muted-foreground">Share what you're up to tonight</p>
+      <p className="text-xs text-muted-foreground">Share what you’re up to tonight</p>
     </div>
   );
 }
