@@ -47,6 +47,7 @@ export function MiniMap({
         height,
       }}
     >
+      <div className="absolute inset-0 bg-secondary/50" />
       {tileUrl && (
         <div
           className="absolute inset-0"
@@ -54,12 +55,12 @@ export function MiniMap({
             backgroundImage: `url(${tileUrl})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: "saturate(1.05) brightness(1.1)",
+            filter: "saturate(0.35) brightness(0.45)",
           }}
         />
       )}
 
-      <div className="absolute inset-0 bg-white/15" aria-hidden />
+      <div className="absolute inset-0 bg-background/20" />
 
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full">
         <div className="flex flex-col items-center">

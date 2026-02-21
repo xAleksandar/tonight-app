@@ -46,3 +46,7 @@ prisma/migrations/
 
 # Copied reference app (not part of Tonight project)
 bitcoinstandard.app/
+
+library/
+TASKS/
+tonight-app

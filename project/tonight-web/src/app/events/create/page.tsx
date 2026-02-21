@@ -10,7 +10,6 @@ import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLo
 import { DesktopHeader } from '@/components/tonight/DesktopHeader';
 import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
 import { MobileActionBar } from '@/components/tonight/MobileActionBar';
-import { MobileBottomDrawer } from '@/components/tonight/MobileBottomDrawer';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import type { AuthUser } from '@/components/auth/AuthProvider';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -94,7 +93,6 @@ export default function CreateEventPage() {
 function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [datetimeInput, setDatetimeInput] = useState(getInitialDateValue);
@@ -109,10 +107,6 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
   const [geolocating, setGeolocating] = useState(false);
 
   const friendlyDatetime = useMemo(() => formatReadableDatetime(datetimeInput), [datetimeInput]);
-  const categories = useMemo(() => Object.values(CATEGORY_DEFINITIONS), []);
-  const selectedCategoryDefinition = selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory] : null;
-  const categoryTriggerLabel = selectedCategoryDefinition ? selectedCategoryDefinition.label : 'Choose a category';
-  const CategoryTriggerIcon = selectedCategoryDefinition?.icon ?? Sparkles;
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -292,22 +286,19 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
           />
 
           <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
-            <div className="mx-auto w-full max-w-4xl space-y-5 md:space-y-6">
+            <div className="mx-auto w-full max-w-4xl space-y-6">
               <MobileCreateHero />
 
               {statusMessage && (
                 <StatusBanner intent={statusIntent} message={statusMessage} />
               )}
 
-              <form onSubmit={onSubmit} className="space-y-5 md:space-y-6">
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
-                  <header className="flex flex-wrap items-start justify-between gap-3">
+              <form onSubmit={onSubmit} className="space-y-6">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <header className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
                       <p className="text-xs text-muted-foreground/80">Optional: highlight the vibe.</p>
-                      {selectedCategoryDefinition && (
-                        <p className="mt-1 text-sm font-semibold text-foreground">{selectedCategoryDefinition.label}</p>
-                      )}
                     </div>
                     {selectedCategory && (
                       <button
@@ -319,8 +310,8 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                       </button>
                     )}
                   </header>
-                  <div className="mt-4 hidden gap-3 md:grid md:grid-cols-3">
-                    {categories.map((category) => (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {Object.values(CATEGORY_DEFINITIONS).map((category) => (
                       <button
                         key={category.id}
                         type="button"
@@ -337,23 +328,10 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                       </button>
                     ))}
                   </div>
-                  <div className="mt-3 md:hidden">
-                    <button
-                      type="button"
-                      onClick={() => setCategoryDrawerOpen(true)}
-                      className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-background/40 px-4 py-3 text-left text-sm font-semibold text-foreground shadow-inner shadow-black/10"
-                    >
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Selected vibe</p>
-                        <p className="text-base font-semibold text-foreground">{categoryTriggerLabel}</p>
-                      </div>
-                      <CategoryTriggerIcon className="h-5 w-5 text-primary" aria-hidden="true" />
-                    </button>
-                  </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
-                  <div className="space-y-4">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <div className="space-y-5">
                     <FormField label="Title" icon={Type}>
                       <input
                         id="event-title"
@@ -388,8 +366,8 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
-                  <div className="grid gap-4 md:grid-cols-2">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <div className="grid gap-5 md:grid-cols-2">
                     <FormField label="Date & time" icon={Clock}>
                       <input
                         id="event-datetime"
@@ -436,7 +414,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
@@ -517,46 +495,6 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </div>
               </form>
-
-              <MobileBottomDrawer
-                open={categoryDrawerOpen}
-                onClose={() => setCategoryDrawerOpen(false)}
-                title="Pick a category"
-                footer={
-                  selectedCategory ? (
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-primary"
-                      onClick={() => setSelectedCategory(null)}
-                    >
-                      Clear selection
-                    </button>
-                  ) : null
-                }
-              >
-                <p className="text-xs text-muted-foreground">Tap to switch the vibe for your meetup.</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {categories.map((category) => (
-                    <button
-                      key={category.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCategory(category.id);
-                        setCategoryDrawerOpen(false);
-                      }}
-                      className={classNames(
-                        'flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 text-xs font-semibold transition',
-                        selectedCategory === category.id
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
-                      )}
-                    >
-                      <category.icon className="h-5 w-5" />
-                      {category.label}
-                    </button>
-                  ))}
-                </div>
-              </MobileBottomDrawer>
             </div>
           </main>
         </div>
