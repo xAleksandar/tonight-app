@@ -61,6 +61,19 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   padding-top: env(safe-area-inset-top, 0px);
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: hsl(var(--card) / 0.6);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .text-balance {
