@@ -77,7 +77,7 @@ body::before {
 }
 
 body[data-safe-area="discover"]::before {
-  background-color: hsl(var(--background));
+  height: 0;
 }
 
 .text-balance {
