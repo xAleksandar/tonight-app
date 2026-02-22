@@ -766,7 +766,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
 
   return (
     <>
-      <div className="flex h-dvh flex-col overflow-hidden text-foreground md:flex-row md:h-auto md:min-h-dvh">
+      <div className="flex min-h-dvh flex-col text-foreground md:h-auto md:min-h-dvh md:flex-row md:overflow-hidden">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -777,7 +777,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           activePrimaryNav={desktopPrimarySection}
         />
 
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col md:min-h-0">
           <DesktopHeader
             title="Discover"
             subtitle="Events near you"
@@ -800,7 +800,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             onCategoryChange={setSelectedCategory}
           />
 
-          <main className="flex-1 overflow-y-auto pb-20 pt-0 md:px-10 md:pb-12 md:pt-8">
+          <main className="flex-1 pb-20 pt-0 md:min-h-0 md:overflow-y-auto md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
               <section className="mt-4 flex flex-col gap-4">
                 {locationStatus === "denied" || locationStatus === "unsupported" ? (
