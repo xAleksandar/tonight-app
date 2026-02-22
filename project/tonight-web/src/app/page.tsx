@@ -1045,57 +1045,82 @@ function MobileHero({
   selectedCategory,
   onCategoryChange,
 }: MobileHeroProps) {
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  useEffect(() => {
+    const element = headerRef.current;
+    if (!element) return;
+
+    const updateHeight = () => {
+      setHeaderHeight(Math.ceil(element.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateHeight) : null;
+    observer?.observe(element);
+
+    return () => {
+      observer?.disconnect();
+    };
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 pb-3 pt-[calc(env(safe-area-inset-top)+16px)] text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden">
-      <div className="mb-3 flex items-center justify-between gap-2 px-4">
-        <div>
-          <h1 className="text-2xl font-serif font-semibold leading-tight">Discover</h1>
-          <p className="text-xs text-muted-foreground">Events near you</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-border bg-card/60 p-1">
+    <>
+      <header
+        ref={headerRef}
+        className="fixed inset-x-0 z-40 border-b border-border bg-background/95 pb-3 pt-4 text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden"
+        style={{ top: "var(--mobile-statusbar-height, env(safe-area-inset-top, 0px))" }}
+      >
+        <div className="mb-3 flex items-center justify-between gap-2 px-4">
+          <div>
+            <h1 className="text-2xl font-serif font-semibold leading-tight">Discover</h1>
+            <p className="text-xs text-muted-foreground">Events near you</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-border bg-card/60 p-1">
+              <button
+                type="button"
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+                onClick={() => onViewModeChange('list')}
+                className={classNames(
+                  'rounded-lg px-2 py-1.5 transition-colors',
+                  viewMode === 'list'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <ListIcon className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Map view"
+                aria-pressed={viewMode === 'map'}
+                onClick={() => onViewModeChange('map')}
+                className={classNames(
+                  'rounded-lg px-2 py-1.5 transition-colors',
+                  viewMode === 'map'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <MapIcon className="h-4 w-4" />
+              </button>
+            </div>
             <button
               type="button"
-              aria-label="List view"
-              aria-pressed={viewMode === 'list'}
-              onClick={() => onViewModeChange('list')}
-              className={classNames(
-                'rounded-lg px-2 py-1.5 transition-colors',
-                viewMode === 'list'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
+              onClick={onOpenRange}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <ListIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              aria-label="Map view"
-              aria-pressed={viewMode === 'map'}
-              onClick={() => onViewModeChange('map')}
-              className={classNames(
-                'rounded-lg px-2 py-1.5 transition-colors',
-                viewMode === 'map'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <MapIcon className="h-4 w-4" />
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              {Math.round(radiusKm)} km
             </button>
           </div>
-          <button
-            type="button"
-            onClick={onOpenRange}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            {Math.round(radiusKm)} km
-          </button>
         </div>
-      </div>
 
-      <div className="-mx-4 overflow-hidden">
-        <div className="px-4 pb-1">
+        <div className="pb-1">
           <CategoryRow
             selectedCategory={selectedCategory}
             onCategoryChange={onCategoryChange}
@@ -1103,8 +1128,9 @@ function MobileHero({
             showLabel={false}
           />
         </div>
-      </div>
-    </header>
+      </header>
+      <div aria-hidden="true" className="md:hidden" style={{ height: headerHeight }} />
+    </>
   );
 }
 
@@ -1219,7 +1245,7 @@ function CategoryRow({ selectedCategory, onCategoryChange, compact = false, show
         data-testid={compact ? "mobile-category-scroll" : undefined}
         className={classNames(
           "flex gap-2",
-          compact ? "overflow-x-auto pb-1 pr-4 pl-4" : "flex-wrap"
+          compact ? "overflow-x-auto pb-1 px-4" : "flex-wrap"
         )}
         style={
           compact

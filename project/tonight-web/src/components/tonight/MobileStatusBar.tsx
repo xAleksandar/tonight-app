@@ -1,46 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { BatteryFull, Signal, Wifi } from "lucide-react";
-
+import { useEffect, useRef } from "react";
 import { useAuthContext } from "@/components/auth/AuthProvider";
-
-const getTimeLabel = () => {
-  const now = new Date();
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(now);
-  } catch {
-    return now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
-};
 
 export function MobileStatusBar() {
   const { isAuthenticated } = useAuthContext();
-  const [timeLabel, setTimeLabel] = useState<string>(() => getTimeLabel());
+  const barRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setTimeLabel(getTimeLabel());
-    }, 30_000);
+    if (!isAuthenticated) {
+      document.documentElement.style.setProperty(
+        "--mobile-statusbar-height",
+        "env(safe-area-inset-top, 0px)"
+      );
+      return;
+    }
+
+    const element = barRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateHeight = () => {
+      const height = element.getBoundingClientRect().height;
+      document.documentElement.style.setProperty("--mobile-statusbar-height", `${height}px`);
+    };
+
+    updateHeight();
+
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateHeight) : null;
+    observer?.observe(element);
 
     return () => {
-      window.clearInterval(interval);
+      observer?.disconnect();
+      document.documentElement.style.setProperty(
+        "--mobile-statusbar-height",
+        "env(safe-area-inset-top, 0px)"
+      );
     };
-  }, []);
-
-  const statusIcons = useMemo(
-    () => (
-      <div className="flex items-center gap-1 text-foreground/70">
-        <Signal className="h-3.5 w-3.5" aria-hidden="true" />
-        <Wifi className="h-3.5 w-3.5" aria-hidden="true" />
-        <BatteryFull className="h-4 w-4" aria-hidden="true" />
-      </div>
-    ),
-    []
-  );
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return null;
@@ -48,14 +46,12 @@ export function MobileStatusBar() {
 
   return (
     <div
+      ref={barRef}
       className="sticky top-0 z-50 flex w-full flex-col border-b border-border/40 bg-background/80 text-xs font-semibold uppercase tracking-wide text-foreground/80 backdrop-blur-md md:hidden"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       aria-label="Mobile status bar"
     >
-      <div className="flex items-center justify-between px-4 py-2">
-        <span suppressHydrationWarning>{timeLabel}</span>
-        {statusIcons}
-      </div>
+      <div className="px-4 py-2" aria-hidden="true" />
     </div>
   );
 }
