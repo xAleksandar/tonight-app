@@ -51,7 +51,7 @@ export function MobileStatusBar() {
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       aria-label="Mobile status bar"
     >
-      <div className="px-4 py-1" aria-hidden="true" />
+      <div className="px-4 py-[0.175rem]" aria-hidden="true" />
     </div>
   );
 }
