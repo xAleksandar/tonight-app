@@ -71,13 +71,13 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background-color: hsl(var(--card) / 0.25);
+  background-color: hsl(var(--card) / 0.4);
   pointer-events: none;
   z-index: 1;
 }
 
 body[data-safe-area="discover"]::before {
-  background-color: hsl(var(--background));
+  background-color: hsl(var(--background) / 0.95);
 }
 
 .text-balance {
