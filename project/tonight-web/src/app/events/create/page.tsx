@@ -3,7 +3,7 @@
 
 import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlignLeft, Clock, MapPin, Sparkles, Type, Users } from 'lucide-react';
+import { AlignLeft, ChevronRight, Clock, MapPin, Sparkles, Type, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLocationPicker';
@@ -14,6 +14,7 @@ import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import type { AuthUser } from '@/components/auth/AuthProvider';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { CATEGORY_DEFINITIONS, type CategoryId } from '@/lib/categories';
+import { Drawer } from "@/components/tonight/Drawer";
 import { classNames } from '@/lib/classNames';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
@@ -93,6 +94,7 @@ export default function CreateEventPage() {
 function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser | null }) {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+  const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [datetimeInput, setDatetimeInput] = useState(getInitialDateValue);
@@ -260,6 +262,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
   };
 
   const errorBorderClass = 'border-rose-400/80 focus:border-rose-400 focus:ring-rose-400/30';
+  const categories = Object.values(CATEGORY_DEFINITIONS);
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] text-foreground">
@@ -285,16 +288,16 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
             userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
-          <main className="flex-1 px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
-            <div className="mx-auto w-full max-w-4xl space-y-6">
+          <main className="flex-1 px-4 pb-24 pt-4 md:px-10 md:pb-12 md:pt-8">
+            <div className="mx-auto w-full max-w-4xl space-y-4 md:space-y-6">
               <MobileCreateHero />
 
               {statusMessage && (
                 <StatusBanner intent={statusIntent} message={statusMessage} />
               )}
 
-              <form onSubmit={onSubmit} className="space-y-6">
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+              <form onSubmit={onSubmit} className="space-y-5 md:space-y-6">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
                   <header className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
@@ -310,27 +313,42 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                       </button>
                     )}
                   </header>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    {Object.values(CATEGORY_DEFINITIONS).map((category) => (
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className="md:hidden">
                       <button
-                        key={category.id}
                         type="button"
-                        onClick={() => setSelectedCategory(category.id)}
-                        className={classNames(
-                          'flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 text-xs font-semibold transition',
-                          selectedCategory === category.id
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
-                        )}
+                        onClick={() => setCategoryDrawerOpen(true)}
+                        className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/60"
                       >
-                        <category.icon className="h-5 w-5" />
-                        {category.label}
+                        <span>
+                          {selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory].label : "Pick a category"}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </button>
-                    ))}
+                    </div>
+
+                    <div className="hidden gap-3 md:grid md:grid-cols-3">
+                      {categories.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={classNames(
+                            'flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 text-xs font-semibold transition',
+                            selectedCategory === category.id
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          <category.icon className="h-5 w-5" />
+                          {category.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
                   <div className="space-y-5">
                     <FormField label="Title" icon={Type}>
                       <input
@@ -355,7 +373,11 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
                         placeholder="Tell people what you're planning..."
-                        className={classNames(INPUT_BASE_CLASS, 'min-h-[140px] resize-none py-3', fieldErrors.description && errorBorderClass)}
+                        className={classNames(
+                          INPUT_BASE_CLASS,
+                          'min-h-[120px] resize-none py-3 md:min-h-[140px]',
+                          fieldErrors.description && errorBorderClass
+                        )}
                         maxLength={DESCRIPTION_LIMITS.max}
                       />
                       <FieldMeta>
@@ -366,7 +388,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
                   <div className="grid gap-5 md:grid-cols-2">
                     <FormField label="Date & time" icon={Clock}>
                       <input
@@ -414,7 +436,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
@@ -499,6 +521,35 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
           </main>
         </div>
       </div>
+
+      <Drawer
+        isOpen={categoryDrawerOpen}
+        onClose={() => setCategoryDrawerOpen(false)}
+        title="Choose a category"
+        className="md:hidden"
+      >
+        <div className="grid grid-cols-2 gap-3">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => {
+                setSelectedCategory(category.id);
+                setCategoryDrawerOpen(false);
+              }}
+              className={classNames(
+                "flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-xs font-semibold transition",
+                selectedCategory === category.id
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border/60 bg-background/40 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <category.icon className="h-5 w-5" />
+              {category.label}
+            </button>
+          ))}
+        </div>
+      </Drawer>
 
       <MobileActionBar
         active="create"

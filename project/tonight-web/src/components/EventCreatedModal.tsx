@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { classNames } from "@/lib/classNames";
 import { buildEventInviteShareText, buildEventShareUrl, formatEventShareMoment } from "@/lib/eventShare";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { Drawer } from "@/components/tonight/Drawer";
 
 export type EventCreatedSummary = {
   id: string;
@@ -89,7 +90,7 @@ export function EventCreatedModal({ event, isOpen, onClose, onViewEvent, onCreat
   const friendlyMoment = useMemo(() => formatDateTime(event?.datetimeISO), [event?.datetimeISO]);
   const momentLabel = useMemo(() => formatEventShareMoment(event?.datetimeISO), [event?.datetimeISO]);
 
-  if (!mounted || !isOpen || !event) {
+  if (!mounted || !event) {
     return null;
   }
 
@@ -144,23 +145,85 @@ export function EventCreatedModal({ event, isOpen, onClose, onViewEvent, onCreat
     }
   };
 
-  const modalContent = (
+  const mobileContent = (
+    <Drawer isOpen={isOpen} onClose={onClose} title="Event created" className="md:hidden">
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Now live</p>
+          <p className="mt-1 text-base font-semibold text-zinc-900">{event.title}</p>
+          <p className="mt-1 text-xs text-zinc-500">{friendlyMoment ?? "Time to be announced"}</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {event.locationName ?? "Location shared after guests are accepted"}
+          </p>
+        </div>
+
+        <div className="grid gap-3">
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={shareState === "sharing"}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Share2 className="h-4 w-4" />
+            {shareSupported ? (shareState === "sharing" ? "Opening share sheet…" : "Share invite") : "Share invite copy"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            disabled={copyState === "copying"}
+            className={classNames(
+              "inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300",
+              copyState === "copied" ? "bg-emerald-50 text-emerald-700" : "bg-white"
+            )}
+          >
+            <Copy className="h-4 w-4" />
+            {copyState === "copying" ? "Copying…" : copyState === "copied" ? "Link copied" : "Copy invite link"}
+          </button>
+        </div>
+
+        <div className="grid gap-2">
+          {onViewEvent && (
+            <button
+              type="button"
+              onClick={onViewEvent}
+              className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-300"
+            >
+              Open event page
+            </button>
+          )}
+          {onCreateAnother && (
+            <button
+              type="button"
+              onClick={onCreateAnother}
+              className="inline-flex items-center justify-center rounded-2xl border border-transparent bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            >
+              Create another
+            </button>
+          )}
+        </div>
+      </div>
+    </Drawer>
+  );
+
+  const desktopContent = (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-3 py-4 sm:items-center sm:px-6 sm:py-10"
+      className={classNames(
+        "fixed inset-0 z-50 items-end justify-center bg-black/60 px-3 py-4 sm:items-center sm:px-6 sm:py-10 md:flex",
+        isOpen ? "flex" : "hidden"
+      )}
       onClick={(event) => handleOverlayClick(event.target)}
       role="dialog"
       aria-modal="true"
       aria-labelledby="event-created-title"
     >
-      <div className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-t-[32px] bg-white text-zinc-900 shadow-2xl sm:max-h-[90vh] sm:flex-row sm:rounded-[32px]">
-        <div className="absolute left-1/2 top-3 h-1.5 w-16 -translate-x-1/2 rounded-full bg-white/60 sm:hidden" aria-hidden="true" />
-
+      <div className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white text-zinc-900 shadow-2xl sm:max-h-[90vh] sm:flex-row">
         <button
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/90 text-sm text-zinc-600 shadow-sm backdrop-blur transition hover:bg-white hover:text-zinc-800 sm:border-zinc-200"
+          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white/90 text-sm text-zinc-600 shadow-sm backdrop-blur transition hover:bg-white hover:text-zinc-800"
         >
           <X className="h-4 w-4" />
         </button>
@@ -233,7 +296,12 @@ export function EventCreatedModal({ event, isOpen, onClose, onViewEvent, onCreat
     </div>
   );
 
-  return createPortal(modalContent, document.body);
+  return (
+    <>
+      {mobileContent}
+      {createPortal(desktopContent, document.body)}
+    </>
+  );
 }
 
 type DetailSlotProps = {
