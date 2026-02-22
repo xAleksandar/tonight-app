@@ -1070,7 +1070,7 @@ function MobileHero({
     <>
       <header
         ref={headerRef}
-        className="fixed inset-x-0 z-40 border-b border-border bg-background/95 pb-3 pt-4 text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden"
+        className="fixed inset-x-0 z-40 border-b border-border bg-background pb-3 pt-4 text-foreground shadow-[0_12px_32px_rgba(2,6,23,0.65)] backdrop-blur-lg md:hidden"
         style={{ top: "var(--mobile-statusbar-height, env(safe-area-inset-top, 0px))" }}
       >
         <div className="mb-3 flex items-center justify-between gap-2 px-4">
