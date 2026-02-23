@@ -16,7 +16,8 @@ export function ToastPresenter() {
           background: "transparent",
           boxShadow: "none",
           padding: 0,
-          maxWidth: "100%",
+          maxWidth: "90vw",
+          width: "90vw",
         },
       }}
     />

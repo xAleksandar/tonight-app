@@ -681,14 +681,16 @@ function PeopleQuickInvitePanel({ className }: PeopleQuickInvitePanelProps) {
   const handleCopy = useCallback(async () => {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        const savedScrollY = typeof window !== "undefined" ? window.scrollY : 0;
         await navigator.clipboard.writeText(inviteLink);
+        if (typeof window !== "undefined") window.scrollTo(0, savedScrollY);
       } else if (typeof document !== "undefined") {
         const textarea = document.createElement("textarea");
         textarea.value = inviteLink;
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
         document.body.appendChild(textarea);
-        textarea.focus();
+        textarea.focus({ preventScroll: true });
         textarea.select();
         document.execCommand("copy");
         document.body.removeChild(textarea);

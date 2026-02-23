@@ -335,7 +335,9 @@ const DetailSlot = ({ label, value, icon, tone = "light" }: DetailSlotProps) => 
 
 async function copyTextToClipboard(value: string) {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    const savedScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
     await navigator.clipboard.writeText(value);
+    if (typeof window !== 'undefined') window.scrollTo(0, savedScrollY);
     return;
   }
 
@@ -349,7 +351,7 @@ async function copyTextToClipboard(value: string) {
   textarea.style.opacity = '0';
   textarea.style.top = '-1000px';
   document.body.appendChild(textarea);
-  textarea.focus();
+  textarea.focus({ preventScroll: true });
   textarea.select();
   const successful = document.execCommand('copy');
   document.body.removeChild(textarea);
