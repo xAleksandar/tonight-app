@@ -71,7 +71,9 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  background-color: hsl(var(--card) / 0.55);
+  background-color: hsl(var(--card) / 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   pointer-events: none;
   z-index: 1;
 }

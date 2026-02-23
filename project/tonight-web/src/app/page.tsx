@@ -1108,14 +1108,14 @@ function MobileHero({
                 <MapIcon className="h-4 w-4" />
               </button>
             </div>
-            <button
-              type="button"
-              onClick={onOpenRange}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              {Math.round(radiusKm)} km
-            </button>
+          <button
+            type="button"
+            onClick={onOpenRange}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            {Math.round(radiusKm)} km
+          </button>
           </div>
         </div>
 
