@@ -324,8 +324,14 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
+  const [geoAvailable, setGeoAvailable] = useState<boolean | null>(null);
+  const [secureContext, setSecureContext] = useState<boolean | null>(null);
+  const [permissionState, setPermissionState] = useState<PermissionState | "unsupported" | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [locationErrorDetails, setLocationErrorDetails] = useState<string | null>(null);
   const hostUpdatesQueryValueRef = useRef(searchParams?.get(HOST_UPDATES_FILTER_QUERY_KEY) ?? null);
   const hostUpdatesPrefInitializedRef = useRef(false);
+  const debugLocation = searchParams?.get("debugLocation") === "1";
   const hostUpdatesShareUrl = useMemo(() => {
     if (typeof window === 'undefined' || !pathname) {
       return null;
@@ -541,6 +547,34 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    setSecureContext(window.isSecureContext ?? null);
+    setGeoAvailable("geolocation" in navigator);
+    let mounted = true;
+    const run = async () => {
+      if (!navigator.permissions?.query) {
+        if (mounted) setPermissionState("unsupported");
+        return;
+      }
+      try {
+        const result = await navigator.permissions.query({ name: "geolocation" });
+        if (mounted) setPermissionState(result.state);
+      } catch (error) {
+        if (mounted) {
+          setPermissionState("unsupported");
+          setPermissionError((error as Error).message ?? "Permission query failed");
+        }
+      }
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const describeLocation = useMemo(() => {
     switch (locationStatus) {
       case "locating":
@@ -577,27 +611,49 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     if (typeof window === "undefined" || !("geolocation" in navigator)) {
       setLocationStatus("unsupported");
       setLocationError("Geolocation is not available in this browser.");
+      setLocationErrorDetails(null);
       return;
     }
 
     setLocationStatus("locating");
     setLocationError(null);
+    setLocationErrorDetails(null);
+
+    const handleSuccess = (position: GeolocationPosition) => {
+      setUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      setLocationStatus("ready");
+      setLocationError(null);
+      setLocationErrorDetails(null);
+    };
+
+    const handleFailure = (error: GeolocationPositionError, allowRetry: boolean) => {
+      setLocationErrorDetails(`${error.code} ${error.message}`.trim());
+      if (error.code === error.PERMISSION_DENIED) {
+        setLocationStatus("denied");
+        setLocationError(
+          "Location access is blocked in your browser. Check site permissions, then retry."
+        );
+        return;
+      }
+      if (allowRetry && (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT)) {
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          (retryError) => {
+            setLocationErrorDetails(`${retryError.code} ${retryError.message}`.trim());
+            setLocationStatus("error");
+            setLocationError("Unable to determine your location. Try again in a moment.");
+          },
+          { enableHighAccuracy: false, timeout: 15_000, maximumAge: 300_000 }
+        );
+        return;
+      }
+      setLocationStatus("error");
+      setLocationError("Unable to determine your location. Try again in a moment.");
+    };
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-        setLocationStatus("ready");
-        setLocationError(null);
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationStatus("denied");
-          setLocationError("We need your permission to find events nearby.");
-        } else {
-          setLocationStatus("error");
-          setLocationError("Unable to determine your location. Try again in a moment.");
-        }
-      },
+      handleSuccess,
+      (error) => handleFailure(error, true),
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 }
     );
   }, []);
@@ -796,6 +852,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             onViewModeChange={handleViewModeChange}
             radiusKm={radiusKm}
             onOpenRange={openRangeSheet}
+            locationReady={locationReady}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
           />
@@ -803,7 +860,14 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           <main className="flex-1 pb-20 pt-0 md:min-h-0 md:overflow-y-auto md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
               <section className="mt-4 flex flex-col gap-4">
-                {locationStatus === "denied" || locationStatus === "unsupported" ? (
+                {locationStatus === "denied" && permissionState === "denied" ? (
+                  <AlertPanel
+                    title="Location access blocked"
+                    description="You've denied location access for this site. To fix it, update your browser's site permissions to allow location, then tap Retry."
+                    actionLabel="Retry"
+                    onAction={attemptLocationDetection}
+                  />
+                ) : locationStatus === "denied" || locationStatus === "unsupported" ? (
                   <AlertPanel
                     title="Turn on location services"
                     description={
@@ -829,7 +893,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                   />
                 ) : null}
 
-                {locationStatus !== "ready" && locationStatus !== "locating" && (
+                {locationStatus === "idle" && (
                   <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 shadow-lg shadow-primary/10">
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary">
@@ -838,7 +902,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                       <div className="flex-1 space-y-2">
                         <p className="text-sm font-semibold text-foreground">Enable location access</p>
                         <p className="text-xs text-muted-foreground">
-                          We need your location to show events happening near you.
+                          We need your location to show events happening near you. If you already granted
+                          system access, make sure your browser allows location for this site.
                         </p>
                         <button
                           type="button"
@@ -849,6 +914,19 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                         </button>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {debugLocation && (
+                  <div className="rounded-2xl border border-border/70 bg-card/40 p-4 text-xs text-muted-foreground">
+                    <p className="font-semibold text-foreground">Location debug</p>
+                    <p>status: {locationStatus}</p>
+                    <p>secureContext: {secureContext === null ? "unknown" : String(secureContext)}</p>
+                    <p>geolocation: {geoAvailable === null ? "unknown" : geoAvailable ? "available" : "missing"}</p>
+                    <p>permission: {permissionState ?? "unknown"}</p>
+                    {permissionError && <p>permissionError: {permissionError}</p>}
+                    {locationError && <p>locationError: {locationError}</p>}
+                    {locationErrorDetails && <p>locationErrorDetails: {locationErrorDetails}</p>}
                   </div>
                 )}
 
@@ -863,7 +941,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                   />
                 )}
 
-                {!isLoading && viewMode === "map" && (
+                {!isLoading && locationReady && viewMode === "map" && (
                   <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
                     <div className="border-b border-border/60 bg-card/40 p-4">
                       <div className="flex items-center justify-between gap-3">
@@ -914,7 +992,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                   </div>
                 )}
 
-                {!isLoading && viewMode === "list" && (
+                {!isLoading && locationReady && viewMode === "list" && (
                   <DiscoveryList
                     events={visibleEvents}
                     selectedEventId={selectedEventId}
@@ -1033,6 +1111,7 @@ type MobileHeroProps = {
   onViewModeChange: (mode: ViewMode) => void;
   radiusKm: number;
   onOpenRange: () => void;
+  locationReady: boolean;
   selectedCategory: CategoryId | null;
   onCategoryChange: (category: CategoryId | null) => void;
 };
@@ -1042,6 +1121,7 @@ function MobileHero({
   onViewModeChange,
   radiusKm,
   onOpenRange,
+  locationReady,
   selectedCategory,
   onCategoryChange,
 }: MobileHeroProps) {
@@ -1111,7 +1191,8 @@ function MobileHero({
           <button
             type="button"
             onClick={onOpenRange}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            disabled={!locationReady}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             {Math.round(radiusKm)} km
