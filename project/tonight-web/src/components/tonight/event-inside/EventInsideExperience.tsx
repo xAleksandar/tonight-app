@@ -3009,30 +3009,50 @@ const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socketToken }:
 };
 
 async function copyTextToClipboard(value: string) {
+  const captureScrollPositions = () => {
+    if (typeof document === 'undefined') {
+      return null;
+    }
+    const elements: Array<{ el: HTMLElement; top: number; left: number }> = [];
+    const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
+    const consider = (el: HTMLElement) => {
+      if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) {
+        if (el.scrollTop !== 0 || el.scrollLeft !== 0) {
+          elements.push({ el, top: el.scrollTop, left: el.scrollLeft });
+        }
+      }
+    };
+    const scrollingElement = document.scrollingElement as HTMLElement | null;
+    if (scrollingElement) {
+      consider(scrollingElement);
+    }
+    all.forEach(consider);
+    if (elements.length === 0) {
+      return null;
+    }
+    return {
+      restore: () => {
+        elements.forEach(({ el, top, left }) => {
+          el.scrollTop = top;
+          el.scrollLeft = left;
+        });
+      },
+      hasChanged: () =>
+        elements.some(({ el, top, left }) => el.scrollTop !== top || el.scrollLeft !== left),
+    };
+  };
+
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    const savedScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+    const snapshot = captureScrollPositions();
     await navigator.clipboard.writeText(value);
-    if (typeof window !== 'undefined') window.scrollTo(0, savedScrollY);
+    if (snapshot?.hasChanged()) {
+      snapshot.restore();
+      requestAnimationFrame(snapshot.restore);
+    }
     return;
   }
 
-  if (typeof document === 'undefined') {
-    throw new Error('Clipboard is unavailable in this environment.');
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  textarea.style.top = '-1000px';
-  document.body.appendChild(textarea);
-  textarea.focus({ preventScroll: true });
-  textarea.select();
-  const successful = document.execCommand('copy');
-  document.body.removeChild(textarea);
-  if (!successful) {
-    throw new Error('Unable to copy to clipboard.');
-  }
+  throw new Error('Clipboard is unavailable in this browser. Copy the link from the page instead.');
 }
 
 const readErrorPayload = async (response: Response, fallback: string) => {
