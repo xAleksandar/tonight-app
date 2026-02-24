@@ -1458,6 +1458,7 @@ export default function ChatConversation({
             messages={messages}
             currentUserId={currentUserId}
             counterpartId={counterpartId}
+            counterpartName={counterpart.displayName ?? counterpart.email}
             onRetry={() => fetchMessages().catch(() => {})}
             className="!px-0"
           />

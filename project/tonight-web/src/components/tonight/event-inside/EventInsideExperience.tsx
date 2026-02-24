@@ -2462,24 +2462,28 @@ export function EventInsideExperience({
             <Card>
               <SectionHeading icon={MessageCircle} title="Event chat" subtitle="Hosts + guests coordinate here" />
             {viewerRole === "guest" && guestJoinRequestId && viewerUser ? (
-              <MiniEventChat
-                joinRequestId={guestJoinRequestId}
-                currentUser={viewerUser}
-                counterpart={{
-                  id: host.id,
-                  displayName: host.displayName,
-                  email: host.email ?? `${host.displayName ?? "host"}@tonight.app`,
-                  photoUrl: host.avatarUrl ?? null,
-                }}
-                socket={socket}
-              />
+              <div className="mt-4">
+                <MiniEventChat
+                  joinRequestId={guestJoinRequestId}
+                  currentUser={viewerUser}
+                  counterpart={{
+                    id: host.id,
+                    displayName: host.displayName,
+                    email: host.email ?? `${host.displayName ?? "host"}@tonight.app`,
+                    photoUrl: host.avatarUrl ?? null,
+                  }}
+                  socket={socket}
+                />
+              </div>
             ) : isHostViewer && hostActiveChatJoinRequestId && hostActiveChatCounterpart && viewerUser ? (
-              <MiniEventChat
-                joinRequestId={hostActiveChatJoinRequestId}
-                currentUser={viewerUser}
-                counterpart={hostActiveChatCounterpart}
-                socket={socket}
-              />
+              <div className="mt-4">
+                <MiniEventChat
+                  joinRequestId={hostActiveChatJoinRequestId}
+                  currentUser={viewerUser}
+                  counterpart={hostActiveChatCounterpart}
+                  socket={socket}
+                />
+              </div>
             ) : isHostViewer ? (
               <p className="mt-4 text-sm text-white/60">No guest chats yet. Approve a guest to get started.</p>
             ) : (
@@ -2938,6 +2942,7 @@ const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socket }: Mini
           messages={messages}
           currentUserId={currentUser.id}
           counterpartId={counterpart.id}
+          counterpartName={counterpart.displayName ?? counterpart.email}
           onRetry={() => fetchMessages().catch(() => {})}
           className="!h-full"
         />
