@@ -121,6 +121,8 @@ export type EventInsideExperienceProps = {
     mutualFriends?: number | null;
   }>;
   viewerRole: "host" | "guest" | "pending" | "public";
+  /** Counts only — shown to pending/public viewers instead of full attendee list */
+  attendeeSummary?: { confirmed: number; pending: number };
   chatPreview?: EventChatPreview;
   hostFriendInvites?: Array<{
     joinRequestId: string;
@@ -293,6 +295,7 @@ export function EventInsideExperience({
   event,
   host,
   attendees,
+  attendeeSummary,
   joinRequests,
   viewerRole,
   chatPreview: initialChatPreview,
@@ -1005,6 +1008,20 @@ export function EventInsideExperience({
   const rawChatHref = chatPreview?.ctaHref ?? "";
   const chatCtaHref = rawChatHref.trim() ? rawChatHref.trim() : null;
   const chatCtaDisabledReason = chatPreview?.ctaDisabledReason;
+  const hostActiveChatJoinRequestId = isHostViewer && chatCtaHref
+    ? (chatCtaHref.split("/chat/")[1] ?? null)
+    : null;
+  const hostActiveChatCounterpart = useMemo(() => {
+    if (!hostActiveChatJoinRequestId) return null;
+    const participant = hostChatParticipantMap.get(hostActiveChatJoinRequestId);
+    if (!participant) return null;
+    return {
+      id: participant.userId,
+      displayName: participant.displayName,
+      email: `${participant.displayName ?? "guest"}@tonight.app`,
+      photoUrl: participant.avatarUrl ?? null,
+    };
+  }, [hostActiveChatJoinRequestId, hostChatParticipantMap]);
   const chatAttentionQueueEntries = useMemo(
     () => (chatAttentionQueue ?? []).filter((entry): entry is EventChatAttentionPayload => Boolean(entry && entry.id)),
     [chatAttentionQueue]
@@ -2239,36 +2256,54 @@ export function EventInsideExperience({
           <Card>
             <SectionHeading icon={Users} title="Attendees" subtitle="Confirmed + pending guests" />
             <div className="mt-4 grid gap-6 lg:grid-cols-2">
-              {(["confirmed", "waitlist"] as const).map((bucket) => {
-                const bucketLabel = bucket === "confirmed" ? "Confirmed" : "Waitlist";
-                const bucketColor =
-                  bucket === "confirmed"
-                    ? "text-emerald-300"
-                    : "text-zinc-300";
-                const people = groupedAttendees[bucket];
-                return (
-                  <div key={bucket} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className={classNames("text-xs font-semibold uppercase tracking-wide", bucketColor)}>
-                      {bucketLabel} · {people.length}
+              {isHostViewer || isGuestViewer ? (
+                (["confirmed", "waitlist"] as const).map((bucket) => {
+                  const bucketLabel = bucket === "confirmed" ? "Confirmed" : "Waitlist";
+                  const bucketColor =
+                    bucket === "confirmed"
+                      ? "text-emerald-300"
+                      : "text-zinc-300";
+                  const people =
+                    bucket === "waitlist"
+                      ? [...groupedAttendees.pending, ...groupedAttendees.waitlist]
+                      : groupedAttendees[bucket];
+                  return (
+                    <div key={bucket} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className={classNames("text-xs font-semibold uppercase tracking-wide", bucketColor)}>
+                        {bucketLabel} · {people.length}
+                      </p>
+                      <ul className="mt-3 space-y-2">
+                        {people.length === 0 ? (
+                          <li className="text-sm text-white/50">No one yet.</li>
+                        ) : (
+                          people.map((person) => (
+                            <li key={person.id} className="flex items-center gap-3 rounded-xl bg-black/20 px-3 py-2">
+                              <UserAvatar displayName={person.displayName} photoUrl={person.avatarUrl ?? undefined} size="sm" />
+                              <div>
+                                <p className="text-sm font-semibold text-white">{person.displayName}</p>
+                                {person.blurb ? <p className="text-xs text-white/60">{person.blurb}</p> : null}
+                              </div>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </div>
+                  );
+                })
+              ) : (
+                <>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                      Confirmed · {attendeeSummary?.confirmed ?? 0}
                     </p>
-                    <ul className="mt-3 space-y-2">
-                      {people.length === 0 ? (
-                        <li className="text-sm text-white/50">No one yet.</li>
-                      ) : (
-                        people.map((person) => (
-                          <li key={person.id} className="flex items-center gap-3 rounded-xl bg-black/20 px-3 py-2">
-                            <UserAvatar displayName={person.displayName} photoUrl={person.avatarUrl ?? undefined} size="sm" />
-                            <div>
-                              <p className="text-sm font-semibold text-white">{person.displayName}</p>
-                              {person.blurb ? <p className="text-xs text-white/60">{person.blurb}</p> : null}
-                            </div>
-                          </li>
-                        ))
-                      )}
-                    </ul>
                   </div>
-                );
-              })}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-300">
+                      Waitlist · {attendeeSummary?.pending ?? 0}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </Card>
         </div>
@@ -2365,7 +2400,12 @@ export function EventInsideExperience({
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => {
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
                         void handleCopyEventInvite();
                       }}
                       disabled={!eventShareUrl || eventShareCopyState === "copying"}
@@ -2402,8 +2442,24 @@ export function EventInsideExperience({
             </Card>
           ) : null}
 
-          <Card>
-            <SectionHeading icon={MessageCircle} title="Event chat" subtitle="Hosts + guests coordinate here" />
+          {isPublicViewer || isPendingViewer ? (
+            <button
+              type="button"
+              onClick={isPublicViewer ? handleJoinRequest : undefined}
+              disabled={!isPublicViewer || joinRequestStatus !== "idle"}
+              className="w-full rounded-xl bg-primary/80 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isPendingViewer
+                ? "Awaiting host approval…"
+                : joinRequestStatus === "submitting"
+                  ? "Sending request..."
+                  : joinRequestStatus === "submitted"
+                    ? "Request sent!"
+                    : "Request to join event"}
+            </button>
+          ) : (
+            <Card>
+              <SectionHeading icon={MessageCircle} title="Event chat" subtitle="Hosts + guests coordinate here" />
             {viewerRole === "guest" && guestJoinRequestId && viewerUser ? (
               <MiniEventChat
                 joinRequestId={guestJoinRequestId}
@@ -2416,6 +2472,15 @@ export function EventInsideExperience({
                 }}
                 socketToken={socketToken}
               />
+            ) : isHostViewer && hostActiveChatJoinRequestId && hostActiveChatCounterpart && viewerUser ? (
+              <MiniEventChat
+                joinRequestId={hostActiveChatJoinRequestId}
+                currentUser={viewerUser}
+                counterpart={hostActiveChatCounterpart}
+                socketToken={socketToken}
+              />
+            ) : isHostViewer ? (
+              <p className="mt-4 text-sm text-white/60">No guest chats yet. Approve a guest to get started.</p>
             ) : (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
               <div className="flex items-center gap-3">
@@ -2519,138 +2584,12 @@ export function EventInsideExperience({
               ) : null}
             </div>
             )}
-            {isHostViewer ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Broadcast to guests</p>
-                <p className="mt-1 text-xs text-white/60">
-                  Share schedule changes or arrival info. Accepted guests see these inside their Host updates feed.
-                </p>
-                <textarea
-                  rows={3}
-                  value={hostAnnouncementValue}
-                  onChange={(event) => setHostAnnouncementValue(event.target.value)}
-                  placeholder="Post an announcement (multi-line supported)"
-                  maxLength={HOST_ANNOUNCEMENT_MAX_LENGTH}
-                  className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                  disabled={hostAnnouncementStatus === "sending"}
-                />
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleHostAnnouncementSend}
-                    className="rounded-xl bg-primary/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={hostAnnouncementStatus === "sending" || hostAnnouncementValue.trim().length === 0}
-                  >
-                    {hostAnnouncementStatus === "sending" ? "Publishing…" : "Publish announcement"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHostAnnouncementValue("")}
-                    className="text-xs font-semibold text-white/60 transition hover:text-white"
-                    disabled={hostAnnouncementStatus === "sending" || hostAnnouncementValue.length === 0}
-                  >
-                    Clear
-                  </button>
-                  <span className="ml-auto text-[11px] text-white/50">
-                    {hostAnnouncementValue.length}/{HOST_ANNOUNCEMENT_MAX_LENGTH}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-            {hostUnreadThreads.length > 0 ? (
-              <div className="mt-4 rounded-2xl border border-primary/20 bg-black/30 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">Guests needing replies</p>
-                <ul className="mt-3 space-y-2">
-                  {hostUnreadThreads.map((thread) => {
-                    const composerEntry = inlineComposerState[thread.joinRequestId];
-                    const composerValue = composerEntry?.value ?? "";
-                    const composerSending = composerEntry?.status === "sending";
-                    const composerSendDisabled = composerSending || composerValue.trim().length === 0;
-                    const quickReplyBusy = quickReplyState[thread.joinRequestId] === "sending";
-
-                    return (
-                      <li key={thread.joinRequestId} className="space-y-2">
-                        <Link
-                          href={`/chat/${thread.joinRequestId}`}
-                          className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/5 p-3 text-left transition hover:border-primary/40"
-                        >
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-white">{thread.displayName}</p>
-                            <p className="text-xs text-white/70 line-clamp-2">{thread.lastMessageSnippet}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 text-[11px] text-white/60">
-                            <span>{formatRelativeTime(thread.lastMessageAtISO)}</span>
-                            {thread.unreadCount ? (
-                              <span className="rounded-full bg-primary/30 px-2 py-0.5 text-primary">{thread.unreadCount} new</span>
-                            ) : null}
-                          </div>
-                        </Link>
-                        <div className="rounded-xl bg-white/5 p-2 text-xs text-white/70 space-y-3">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Quick replies</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {quickReplyTemplates.map((template) => (
-                                <button
-                                  key={template.label}
-                                  type="button"
-                                  onClick={() => handleQuickReplySend(thread.joinRequestId, template.message)}
-                                  className="rounded-lg border border-primary/30 px-3 py-1 text-[11px] font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                                  disabled={quickReplyBusy}
-                                >
-                                  {quickReplyBusy ? "Sending…" : template.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Custom reply</p>
-                            <textarea
-                              rows={2}
-                              value={composerValue}
-                              onChange={(event) => handleInlineComposerChange(thread.joinRequestId, event.target.value)}
-                              placeholder="Type a custom reply"
-                              className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                              disabled={composerSending}
-                            />
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleInlineComposerSend(thread.joinRequestId)}
-                                className="rounded-lg bg-primary/80 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={composerSendDisabled}
-                              >
-                                {composerSending ? "Sending…" : "Send reply"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleInlineComposerClear(thread.joinRequestId)}
-                                className="text-[11px] font-semibold text-white/60 transition hover:text-white"
-                                disabled={composerSending || composerValue.length === 0}
-                              >
-                                Clear
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleMarkThreadAsRead(thread.joinRequestId)}
-                          className="w-full rounded-xl border border-primary/30 px-3 py-2 text-xs font-semibold text-primary/80 transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={markingThreadId === thread.joinRequestId}
-                        >
-                          {markingThreadId === thread.joinRequestId ? "Marking…" : "Mark as read"}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : null}
             <div className="mt-4 flex items-center gap-2 text-xs text-white/50">
               <Shield className="h-3.5 w-3.5" />
               <span>Hosts can remove disruptive guests. Reports escalate to the safety team.</span>
             </div>
           </Card>
+          )}
         </div>
       </div>
     </section>
@@ -3009,46 +2948,8 @@ const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socketToken }:
 };
 
 async function copyTextToClipboard(value: string) {
-  const captureScrollPositions = () => {
-    if (typeof document === 'undefined') {
-      return null;
-    }
-    const elements: Array<{ el: HTMLElement; top: number; left: number }> = [];
-    const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
-    const consider = (el: HTMLElement) => {
-      if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) {
-        if (el.scrollTop !== 0 || el.scrollLeft !== 0) {
-          elements.push({ el, top: el.scrollTop, left: el.scrollLeft });
-        }
-      }
-    };
-    const scrollingElement = document.scrollingElement as HTMLElement | null;
-    if (scrollingElement) {
-      consider(scrollingElement);
-    }
-    all.forEach(consider);
-    if (elements.length === 0) {
-      return null;
-    }
-    return {
-      restore: () => {
-        elements.forEach(({ el, top, left }) => {
-          el.scrollTop = top;
-          el.scrollLeft = left;
-        });
-      },
-      hasChanged: () =>
-        elements.some(({ el, top, left }) => el.scrollTop !== top || el.scrollLeft !== left),
-    };
-  };
-
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    const snapshot = captureScrollPositions();
     await navigator.clipboard.writeText(value);
-    if (snapshot?.hasChanged()) {
-      snapshot.restore();
-      requestAnimationFrame(snapshot.restore);
-    }
     return;
   }
 

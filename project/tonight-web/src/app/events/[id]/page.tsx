@@ -712,7 +712,61 @@ export default async function EventInsidePage({ params }: PageParams) {
     }
   }
 
-  const attendees = mapJoinRequestsToAttendees(joinRequests);
+  const isGuestViewer = !isHostViewer && viewerJoinRequest?.status === JoinRequestStatus.ACCEPTED;
+
+  // Accepted guests see the full attendee list too
+  let guestJoinRequests: SerializedJoinRequestWithUser[] = [];
+  if (isGuestViewer) {
+    const rawRequests = await prisma.joinRequest.findMany({
+      where: { eventId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        lastSeenHostActivityAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            photoUrl: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    guestJoinRequests = rawRequests.map((r) => ({
+      id: r.id,
+      eventId,
+      userId: r.user.id,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+      lastSeenHostActivityAt: r.lastSeenHostActivityAt?.toISOString() ?? null,
+      user: {
+        id: r.user.id,
+        email: r.user.email,
+        displayName: r.user.displayName,
+        photoUrl: r.user.photoUrl,
+        createdAt: r.user.createdAt.toISOString(),
+      },
+    }));
+  }
+
+  // Pending/public viewers only get counts — no names
+  let attendeeSummary: { confirmed: number; pending: number } | undefined;
+  if (!isHostViewer && !isGuestViewer) {
+    const [confirmedCount, pendingCount] = await Promise.all([
+      prisma.joinRequest.count({ where: { eventId, status: JoinRequestStatus.ACCEPTED } }),
+      prisma.joinRequest.count({ where: { eventId, status: JoinRequestStatus.PENDING } }),
+    ]);
+    attendeeSummary = { confirmed: confirmedCount, pending: pendingCount };
+  }
+
+  const allRequestsForAttendees = isHostViewer ? joinRequests : isGuestViewer ? guestJoinRequests : [];
+  const attendees = mapJoinRequestsToAttendees(allRequestsForAttendees);
   const pendingRequests = isHostViewer ? mapPendingJoinRequests(joinRequests) : [];
   const attendeeUserIds = attendees.map((attendee) => attendee.id);
 
@@ -800,6 +854,7 @@ export default async function EventInsidePage({ params }: PageParams) {
       avatarUrl: eventRecord.hostPhotoUrl,
     },
     attendees,
+    attendeeSummary,
     joinRequests: pendingRequests,
     viewerRole,
     chatPreview,

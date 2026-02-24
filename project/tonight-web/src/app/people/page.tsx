@@ -681,9 +681,18 @@ function PeopleQuickInvitePanel({ className }: PeopleQuickInvitePanelProps) {
   const handleCopy = useCallback(async () => {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        const savedScrollY = typeof window !== "undefined" ? window.scrollY : 0;
-        await navigator.clipboard.writeText(inviteLink);
-        if (typeof window !== "undefined") window.scrollTo(0, savedScrollY);
+        const scrollY = window.scrollY;
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+        try {
+          await navigator.clipboard.writeText(inviteLink);
+        } finally {
+          document.body.style.position = '';
+          document.body.style.top = '';
+          document.body.style.width = '';
+          window.scrollTo(0, scrollY);
+        }
       } else if (typeof document !== "undefined") {
         const textarea = document.createElement("textarea");
         textarea.value = inviteLink;

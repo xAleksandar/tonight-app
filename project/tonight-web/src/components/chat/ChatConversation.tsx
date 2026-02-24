@@ -978,7 +978,22 @@ export default function ChatConversation({
       setIsCopyingLocation(true);
       const value = context.event.locationName.trim();
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
+        if (typeof document !== 'undefined') {
+          const scrollY = window.scrollY;
+          document.body.style.position = 'fixed';
+          document.body.style.top = `-${scrollY}px`;
+          document.body.style.width = '100%';
+          try {
+            await navigator.clipboard.writeText(value);
+          } finally {
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.width = '';
+            window.scrollTo(0, scrollY);
+          }
+        } else {
+          await navigator.clipboard.writeText(value);
+        }
       } else if (typeof document !== 'undefined') {
         const textarea = document.createElement('textarea');
         textarea.value = value;
@@ -1701,9 +1716,22 @@ function buildChatEventInviteShareText(title: string, eventMomentLabel: string |
 
 async function copyTextToClipboard(value: string) {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    const savedScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
-    await navigator.clipboard.writeText(value);
-    if (typeof window !== 'undefined') window.scrollTo(0, savedScrollY);
+    if (typeof document !== 'undefined') {
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      try {
+        await navigator.clipboard.writeText(value);
+      } finally {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, scrollY);
+      }
+    } else {
+      await navigator.clipboard.writeText(value);
+    }
     return;
   }
 
