@@ -58,19 +58,23 @@ class SocketService {
 
     this.io = new SocketIOServer(server, options);
     this.httpServer = server;
+    // Also store on globalThis so the io instance is accessible across module
+    // contexts (e.g. App Router vs Pages Router in Next.js).
+    (globalThis as typeof globalThis & { __socketIO?: SocketIOServer }).__socketIO = this.io;
     this.configure(this.io);
     return this.io;
   }
 
   public getIO(): SocketIOServer {
-    if (!this.io) {
+    const io = this.io ?? (globalThis as typeof globalThis & { __socketIO?: SocketIOServer }).__socketIO;
+    if (!io) {
       throw new Error('Socket.IO server has not been initialized');
     }
-    return this.io;
+    return io;
   }
 
   private isInitialized(): boolean {
-    return this.io !== undefined;
+    return this.io !== undefined || (globalThis as typeof globalThis & { __socketIO?: SocketIOServer }).__socketIO !== undefined;
   }
 
   public emitMessage(joinRequestId: string, payload: SocketMessagePayload): void {

@@ -15,6 +15,7 @@ import { classNames } from "@/lib/classNames";
 import { CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES, DEFAULT_CHAT_ATTENTION_SNOOZE_MINUTES } from "@/lib/chatAttentionSnoozeOptions";
 import { buildChatAttentionLabels } from "@/lib/buildChatAttentionLabels";
 import { buildChatAttentionLinkLabel, formatRelativeTime } from "@/lib/chatAttentionHelpers";
+import { JOIN_REQUEST_MESSAGE_EVENT } from "@/lib/socket-shared";
 import type { SocketMessagePayload, JoinRequestStatusChangedPayload } from "@/lib/socket-shared";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
@@ -1468,7 +1469,7 @@ export function EventInsideExperience({
     }
   }, [event.id, joinRequestStatus]);
 
-  const { isConnected, joinRoom } = useSocket({
+  const { socket, isConnected, joinRoom } = useSocket({
     token: socketEnabled ? socketToken ?? undefined : undefined,
     autoConnect: socketEnabled,
     readinessEndpoint: "/api/socket/io",
@@ -2470,14 +2471,14 @@ export function EventInsideExperience({
                   email: host.email ?? `${host.displayName ?? "host"}@tonight.app`,
                   photoUrl: host.avatarUrl ?? null,
                 }}
-                socketToken={socketToken}
+                socket={socket}
               />
             ) : isHostViewer && hostActiveChatJoinRequestId && hostActiveChatCounterpart && viewerUser ? (
               <MiniEventChat
                 joinRequestId={hostActiveChatJoinRequestId}
                 currentUser={viewerUser}
                 counterpart={hostActiveChatCounterpart}
-                socketToken={socketToken}
+                socket={socket}
               />
             ) : isHostViewer ? (
               <p className="mt-4 text-sm text-white/60">No guest chats yet. Approve a guest to get started.</p>
@@ -2797,10 +2798,10 @@ type MiniEventChatProps = {
   joinRequestId: string;
   currentUser: ViewerUserProfile;
   counterpart: ViewerUserProfile;
-  socketToken?: string | null;
+  socket: ReturnType<typeof useSocket>['socket'];
 };
 
-const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socketToken }: MiniEventChatProps) => {
+const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socket }: MiniEventChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messagesStatus, setMessagesStatus] = useState<MessageListStatus>("loading");
   const [messagesError, setMessagesError] = useState<string | null>(null);
@@ -2844,29 +2845,49 @@ const MiniEventChat = ({ joinRequestId, currentUser, counterpart, socketToken }:
     fetchMessages().catch(() => {});
   }, [fetchMessages]);
 
-  const { isConnected, joinRoom } = useSocket({
-    token: socketToken ?? undefined,
-    autoConnect: Boolean(socketToken),
-    readinessEndpoint: "/api/socket/io",
-    onMessage: (payload) => {
+  // Mark messages as read on mount
+  useEffect(() => {
+    fetch(`/api/chat/${joinRequestId}/mark-read`, { method: "POST" }).catch(() => {});
+  }, [joinRequestId]);
+
+  // Listen directly on the parent's socket for real-time messages
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (payload: SocketMessagePayload) => {
       if (payload.joinRequestId === joinRequestId) {
         appendMessage(payload as ChatMessage);
       }
-    },
-  });
+    };
+    socket.on(JOIN_REQUEST_MESSAGE_EVENT, handler);
+    return () => {
+      socket.off(JOIN_REQUEST_MESSAGE_EVENT, handler);
+    };
+  }, [socket, joinRequestId, appendMessage]);
+
+  // Polling fallback: silently merge new messages every 3s
+  const pollMessages = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { messages?: ChatMessage[] };
+      const incoming = payload.messages ?? [];
+      setMessages((prev) => {
+        const prevIds = new Set(prev.map((m) => m.id));
+        const fresh = incoming.filter((m) => !prevIds.has(m.id));
+        if (!fresh.length) return prev;
+        return [...prev, ...fresh].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      });
+    } catch {
+      // Silently ignore poll errors
+    }
+  }, [joinRequestId]);
 
   useEffect(() => {
-    if (isConnected) {
-      joinRoom(joinRequestId);
-    }
-  }, [isConnected, joinRequestId, joinRoom]);
-
-  useEffect(() => {
-    if (!isConnected) {
-      return;
-    }
-    fetch(`/api/chat/${joinRequestId}/mark-read`, { method: "POST" }).catch(() => {});
-  }, [isConnected, joinRequestId]);
+    const interval = setInterval(() => {
+      pollMessages().catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [pollMessages]);
 
   const handleSend = useCallback(async () => {
     const trimmed = composer.trim();
