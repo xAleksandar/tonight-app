@@ -163,3 +163,83 @@ export const findNearbyEvents = async (
     }))
     .sort((a, b) => a.distanceMeters - b.distanceMeters);
 };
+
+export const findActiveEventsForMap = async (userId: string): Promise<NearbyEventRecord[]> => {
+  if (!userId) {
+    throw new Error('userId is required');
+  }
+
+  await expirePastEvents();
+
+  const events = await prisma.$queryRaw<NearbyEventRecord[]>`
+    SELECT
+      e."id",
+      e."title",
+      e."description",
+      e."datetime",
+      e."locationName",
+      e."maxParticipants",
+      e."status",
+      e."hostId",
+      u."displayName" AS "hostDisplayName",
+      u."photoUrl" AS "hostPhotoUrl",
+      e."createdAt",
+      e."updatedAt",
+      ST_Y(e."location"::geometry) AS "latitude",
+      ST_X(e."location"::geometry) AS "longitude",
+      0 AS "distanceMeters",
+      COALESCE(accepted."acceptedCount", 0) AS "acceptedCount",
+      viewer_request."status" AS "viewerJoinRequestStatus",
+      COALESCE(host_updates."unseenCount", 0) AS "viewerHostUpdatesUnseen"
+    FROM "Event" e
+    INNER JOIN "User" u ON u."id" = e."hostId"
+    LEFT JOIN (
+      SELECT "eventId", COUNT(*)::integer AS "acceptedCount"
+      FROM "JoinRequest"
+      WHERE "status" = 'ACCEPTED'
+      GROUP BY "eventId"
+    ) AS accepted ON accepted."eventId" = e."id"
+    LEFT JOIN "JoinRequest" AS viewer_request
+      ON viewer_request."eventId" = e."id"
+     AND viewer_request."userId" = ${userId}
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::integer AS "unseenCount"
+      FROM "Message" m
+      WHERE viewer_request."status" = 'ACCEPTED'
+        AND m."joinRequestId" = viewer_request."id"
+        AND m."senderId" = e."hostId"
+        AND (
+          viewer_request."lastSeenHostActivityAt" IS NULL
+          OR m."createdAt" > viewer_request."lastSeenHostActivityAt"
+        )
+    ) AS host_updates ON TRUE
+    WHERE e."status" = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM "BlockedUser" b
+        WHERE (b."blockerId" = ${userId} AND b."blockedId" = e."hostId")
+           OR (b."blockerId" = e."hostId" AND b."blockedId" = ${userId})
+      )
+    ORDER BY e."createdAt" DESC
+  `;
+
+  return events.map((event) => ({
+    ...event,
+    datetime: toDate(event.datetime),
+    createdAt: toDate(event.createdAt),
+    updatedAt: toDate(event.updatedAt),
+    distanceMeters:
+      typeof event.distanceMeters === 'number'
+        ? event.distanceMeters
+        : Number(event.distanceMeters),
+    latitude: typeof event.latitude === 'number' ? event.latitude : Number(event.latitude),
+    longitude: typeof event.longitude === 'number' ? event.longitude : Number(event.longitude),
+    acceptedCount:
+      typeof event.acceptedCount === 'number'
+        ? event.acceptedCount
+        : Number(event.acceptedCount),
+    viewerHostUpdatesUnseen:
+      typeof event.viewerHostUpdatesUnseen === 'number'
+        ? event.viewerHostUpdatesUnseen
+        : Number(event.viewerHostUpdatesUnseen ?? 0),
+  }));
+};
