@@ -1154,8 +1154,8 @@ export default function ChatConversation({
   }, [hasSavedComposerDraft, joinRequestId, showSuccessToast]);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(8,10,20,1),_rgba(3,4,9,1))] text-foreground">
+      <header className="z-40 flex-none border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3">
           <button
             type="button"
@@ -1367,8 +1367,8 @@ export default function ChatConversation({
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col">
-        <section className="mx-auto w-full max-w-3xl px-4 pt-5">
+      <main className="flex flex-1 flex-col overflow-hidden">
+        <section className="mx-auto w-full max-w-3xl px-4 pt-5 flex-none">
           <div className="flex flex-col gap-4">
             <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/80 px-4 py-1 text-xs font-semibold text-emerald-900 shadow-inner shadow-emerald-900/30">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -1377,7 +1377,7 @@ export default function ChatConversation({
           </div>
         </section>
 
-        <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-48 pt-4">
+        <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-4 pt-4">
           <MessageList
             status={messagesStatus}
             error={messagesError}
@@ -1402,7 +1402,7 @@ export default function ChatConversation({
         </section>
       </main>
 
-      <footer className="sticky bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur">
+      <footer className="z-40 flex-none border-t border-border/60 bg-background/85 backdrop-blur">
         <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-4">
           <div className="flex items-center">
             <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold', connectionAccent)}>

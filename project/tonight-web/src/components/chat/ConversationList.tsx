@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { AlertTriangle, BadgeCheck, Clock, Edit3, MessageCircle, Sparkles } from "lucide-react";
+import { AlertTriangle, Clock, Edit3, MessageCircle, Sparkles } from "lucide-react";
 
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import { formatRelativeTime } from "@/lib/chatAttentionHelpers";
@@ -165,11 +165,7 @@ export function ConversationList({
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                         <Clock className="h-3 w-3" /> Pending
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-                        <BadgeCheck className="h-3 w-3" /> Accepted
-                      </span>
-                    )}
+                    ) : null}
                     {attentionEntry ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                         <AlertTriangle className="h-3 w-3" /> Needs reply
@@ -181,17 +177,6 @@ export function ConversationList({
                       </span>
                     ) : null}
                   </div>
-                  {conversation.eventTitle ? (
-                    <p className="text-xs text-muted-foreground">{conversation.participantName}</p>
-                  ) : null}
-                  <p
-                    className={classNames(
-                      "text-sm",
-                      conversation.unreadCount ? "font-semibold text-foreground" : "text-muted-foreground"
-                    )}
-                  >
-                    {conversation.messageSnippet}
-                  </p>
                   {hasDraft ? (
                     <div className="mt-2 rounded-2xl border border-border/50 bg-background/60 p-3">
                       <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
