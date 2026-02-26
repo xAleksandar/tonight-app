@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Flag, Info, MapPin, Send, Share2, X } from 'lucide-react';
-
-import BlockUserButton from '@/components/BlockUserButton';
+import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Info, MapPin, Send, Share2, X } from 'lucide-react';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
 import { EventChatAttentionToast } from '@/components/tonight/EventChatAttentionToast';
@@ -1389,6 +1387,12 @@ export default function ChatConversation({
             counterpartName={counterpart.displayName ?? counterpart.email}
             onRetry={() => fetchMessages().catch(() => {})}
             className="!px-0"
+            onBlocked={() => {
+              setHasBlockedCounterpart(true);
+              setComposerValue('');
+              setSendError('You blocked this user. Messages are now disabled.');
+            }}
+            isCounterpartBlocked={hasBlockedCounterpart}
           />
           {isOtherUserTyping && (
             <div className="mt-4 rounded-2xl border border-border/60 bg-card/70 px-4 py-2 text-xs italic text-muted-foreground" aria-live="polite">
@@ -1400,37 +1404,11 @@ export default function ChatConversation({
 
       <footer className="sticky bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur">
         <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted-foreground">
-            <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold', connectionAccent)}>
+          <div className="flex items-center">
+            <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold', connectionAccent)}>
               <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
               {connectionLabel}
             </span>
-            <div className="flex items-center gap-4">
-              <BlockUserButton
-                targetUserId={counterpart.id}
-                targetDisplayName={counterpart.displayName ?? counterpart.email}
-                className="items-center text-[11px]"
-                label="Block"
-                confirmTitle={counterpart.displayName ? `Block ${counterpart.displayName}?` : 'Block this user?'}
-                confirmMessage="They won’t be able to message you, join your events, or see your plans."
-                disabled={hasBlockedCounterpart}
-                onBlocked={() => {
-                  setHasBlockedCounterpart(true);
-                  setComposerValue('');
-                  setSendError('You blocked this user. Messages are now disabled.');
-                }}
-              />
-              <span className="hidden h-3 w-px bg-border/70 sm:block" />
-              <button
-                type="button"
-                title="Reporting will be available soon"
-                className="flex items-center gap-1 text-[11px] text-muted-foreground"
-                disabled
-              >
-                <Flag className="h-3 w-3" />
-                Report
-              </button>
-            </div>
           </div>
 
           <form onSubmit={handleSend} className="flex flex-col gap-3">
