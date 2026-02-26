@@ -97,6 +97,7 @@ export const GET = requireAuth(async (request, context, auth) => {
         status: jr.status.toLowerCase() as "pending" | "accepted",
         participantName: otherUser.displayName || otherUser.email.split('@')[0],
         eventTitle: jr.event.title,
+        locationName: jr.event.locationName ?? undefined,
         eventCategoryLabel: "Social", // TODO: Add category to Event model if needed
         messageSnippet: lastMessage?.content || (jr.status === 'PENDING' ? 'Waiting for host response...' : 'No messages yet'),
         updatedAtLabel,

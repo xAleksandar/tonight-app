@@ -151,7 +151,16 @@ export function ConversationList({
                 </div>
                 <div className="flex flex-1 flex-col gap-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold leading-tight text-foreground">{conversation.participantName}</p>
+                    {conversation.eventTitle ? (
+                      <p className="text-sm font-semibold leading-tight text-foreground">
+                        {conversation.eventTitle}
+                        {conversation.locationName ? (
+                          <span className="font-normal text-muted-foreground"> · {conversation.locationName}</span>
+                        ) : null}
+                      </p>
+                    ) : (
+                      <p className="text-sm font-semibold leading-tight text-foreground">{conversation.participantName}</p>
+                    )}
                     {conversation.status === "pending" ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                         <Clock className="h-3 w-3" /> Pending
@@ -172,7 +181,9 @@ export function ConversationList({
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-xs text-muted-foreground">{conversation.eventTitle}</p>
+                  {conversation.eventTitle ? (
+                    <p className="text-xs text-muted-foreground">{conversation.participantName}</p>
+                  ) : null}
                   <p
                     className={classNames(
                       "text-sm",

@@ -16,7 +16,6 @@ import {
   X,
 } from "lucide-react";
 
-import { MessagesModal } from "@/components/chat/MessagesModal";
 import type { ConversationPreview } from "@/components/chat/conversations";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
@@ -264,12 +263,8 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const searchParams = useSearchParams();
   const searchParamsString = searchParams?.toString() ?? "";
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
-  const [messagesModalOpen, setMessagesModalOpen] = useState(false);
   const explicitViewParam = searchParams?.get("view");
   const derivedPrimarySection = useMemo<MobileNavTarget>(() => {
-    if (messagesModalOpen) {
-      return "messages";
-    }
     if (!pathname) {
       return "discover";
     }
@@ -286,41 +281,16 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       return "create";
     }
     return "discover";
-  }, [messagesModalOpen, pathname]);
+  }, [pathname]);
   const desktopPrimarySection: PrimarySection =
     derivedPrimarySection === "people"
       ? "people"
       : derivedPrimarySection === "messages"
         ? "messages"
         : "discover";
-  const handleCloseMessages = useCallback(() => {
-    setMessagesModalOpen(false);
-  }, []);
-  const handleToggleMessages = useCallback(() => {
-    setMessagesModalOpen((current) => !current);
-  }, []);
-  const handleNavigateDiscover = useCallback(() => {
-    handleCloseMessages();
-    router.push("/");
-  }, [handleCloseMessages, router]);
-  const handleNavigatePeople = useCallback(() => {
-    setMessagesModalOpen(false);
-    router.push("/people");
-  }, [router]);
-  const handleSelectConversation = useCallback(
-    (conversationId: string) => {
-      if (conversationId.startsWith("demo-")) {
-        return;
-      }
-      setMessagesModalOpen(false);
-      router.push(`/chat/${conversationId}`);
-    },
-    [router]
-  );
-  const messagesEmptyStateAction = useMemo(
-    () => ({ label: "Browse Discover", onAction: handleCloseMessages }),
-    [handleCloseMessages]
-  );
+  const handleNavigateMessages = useCallback(() => router.push("/messages"), [router]);
+  const handleNavigateDiscover = useCallback(() => router.push("/"), [router]);
+  const handleNavigatePeople = useCallback(() => router.push("/people"), [router]);
   const initialView: ViewMode = explicitViewParam === "map" ? "map" : "list";
   const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
@@ -844,7 +814,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
           onCreate={handleCreate}
           onNavigateDiscover={handleNavigateDiscover}
           onNavigatePeople={handleNavigatePeople}
-          onNavigateMessages={handleToggleMessages}
+          onNavigateMessages={handleNavigateMessages}
           activePrimaryNav={desktopPrimarySection}
         />
 
@@ -855,7 +825,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
             onNavigateProfile={() => router.push("/profile")}
-            onNavigateMessages={handleToggleMessages}
+            onNavigateMessages={handleNavigateMessages}
             unreadCount={unreadMessageCount}
             userDisplayName={currentUser?.displayName ?? null}
             userEmail={currentUser?.email ?? null}
@@ -1028,7 +998,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         active={derivedPrimarySection}
         onNavigateDiscover={handleNavigateDiscover}
         onNavigatePeople={handleNavigatePeople}
-        onNavigateMessages={handleToggleMessages}
+        onNavigateMessages={handleNavigateMessages}
         onCreate={handleCreate}
         onOpenProfile={() => router.push("/profile")}
         messagesUnreadCount={unreadMessageCount}
@@ -1043,13 +1013,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         />
       )}
 
-      <MessagesModal
-        isOpen={messagesModalOpen}
-        onClose={handleCloseMessages}
-        conversations={conversations}
-        onSelectConversation={handleSelectConversation}
-        emptyStateAction={messagesEmptyStateAction}
-      />
     </>
   );
 }

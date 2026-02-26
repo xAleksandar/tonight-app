@@ -1,7 +1,8 @@
 export type ConversationPreview = {
   id: string;
   participantName: string;
-  eventTitle: string;
+  eventTitle?: string;
+  locationName?: string;
   eventCategoryLabel?: string;
   messageSnippet: string;
   updatedAtLabel: string;
