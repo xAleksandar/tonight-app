@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Info, MapPin, Send, Share2, X } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, ChevronDown, Copy, Info, MapPin, Send, Share2 } from 'lucide-react';
 import MessageList, { type ChatMessage, type MessageListStatus } from '@/components/chat/MessageList';
 import UserAvatar from '@/components/UserAvatar';
 import { EventChatAttentionToast } from '@/components/tonight/EventChatAttentionToast';
+import { MobileBottomDrawer } from '@/components/tonight/MobileBottomDrawer';
 import { useSnoozeCountdown } from '@/hooks/useSnoozeCountdown';
 import { useSocket } from '@/hooks/useSocket';
 import type { SerializedMessage } from '@/lib/chat';
@@ -149,7 +150,6 @@ export default function ChatConversation({
   context,
 }: ChatConversationProps) {
   const router = useRouter();
-  const eventSheetTitleId = useId();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [messagesStatus, setMessagesStatus] = useState<MessagesStatus>('loading');
   const [messagesError, setMessagesError] = useState<string | null>(null);
@@ -1465,121 +1465,49 @@ export default function ChatConversation({
         </div>
       </footer>
 
-      {isEventSheetOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={eventSheetTitleId}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 py-6 sm:items-center"
-        >
-          <button
-            type="button"
-            className="absolute inset-0 h-full w-full"
-            aria-label="Close event info"
-            onClick={() => setIsEventSheetOpen(false)}
+      <MobileBottomDrawer
+        open={isEventSheetOpen}
+        onClose={() => setIsEventSheetOpen(false)}
+        title={context.event.title}
+        footer={
+          <Link
+            href={`/events/${context.event.id}`}
+            prefetch
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+          >
+            Open full event
+          </Link>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          {[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ') || 'Details coming soon'}
+        </p>
+
+        <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/40 p-3">
+          <UserAvatar
+            size="sm"
+            displayName={context.host.displayName ?? undefined}
+            email={context.host.email}
+            photoUrl={context.host.photoUrl ?? undefined}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-3xl border border-border/70 bg-card/95 p-6 shadow-[0_35px_120px_rgba(0,0,0,0.55)] backdrop-blur">
-            <button
-              type="button"
-              onClick={() => setIsEventSheetOpen(false)}
-              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <div className="space-y-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Tonight's plan</p>
-                <h2 id={eventSheetTitleId} className="mt-2 text-2xl font-semibold text-foreground">
-                  {context.event.title}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ') || 'Details coming soon'}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/40 p-3">
-                <UserAvatar
-                  size="sm"
-                  displayName={context.host.displayName ?? undefined}
-                  email={context.host.email}
-                  photoUrl={context.host.photoUrl ?? undefined}
-                />
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Hosted by</p>
-                  <p className="text-sm font-semibold">{context.host.displayName ?? context.host.email}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2 rounded-2xl border border-border/60 bg-background/40 p-4 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Where</span>
-                  <span className="font-medium text-foreground">{context.event.locationName ?? 'TBA'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">When</span>
-                  <span className="font-medium text-foreground">{eventTimeLabel ?? 'TBA'}</span>
-                </div>
-              </div>
-
-              <div className="space-y-3 rounded-2xl border border-border/60 bg-background/40 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick actions</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <button
-                    type="button"
-                    onClick={handleCopyAddress}
-                    disabled={!hasLocationDetails || isCopyingLocation}
-                    className={quickActionButtonClass(!hasLocationDetails || isCopyingLocation)}
-                    title={!hasLocationDetails ? 'Location details coming soon' : undefined}
-                  >
-                    <Copy className="h-4 w-4" />
-                    {isCopyingLocation ? 'Copying…' : 'Copy address'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenMaps}
-                    disabled={!mapsUrl}
-                    className={quickActionButtonClass(!mapsUrl)}
-                    title={!mapsUrl ? 'Maps unlock once the host confirms the venue.' : undefined}
-                  >
-                    <MapPin className="h-4 w-4" />
-                    Open in Maps
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddToCalendar}
-                    disabled={!eventStartDate || isCalendarExporting}
-                    className={quickActionButtonClass(!eventStartDate || isCalendarExporting)}
-                    title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
-                  >
-                    <CalendarPlus className="h-4 w-4" />
-                    {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Link
-                  href={`/events/${context.event.id}`}
-                  prefetch
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-                >
-                  Open full event
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setIsEventSheetOpen(false)}
-                  className="inline-flex flex-1 items-center justify-center rounded-2xl border border-border/60 px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-background/80"
-                >
-                  Done
-                </button>
-              </div>
-            </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Hosted by</p>
+            <p className="text-sm font-semibold">{context.host.displayName ?? context.host.email}</p>
           </div>
         </div>
-      ) : null}
+
+        <div className="space-y-2 rounded-2xl border border-border/60 bg-background/40 p-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Where</span>
+            <span className="font-medium text-foreground">{context.event.locationName ?? 'TBA'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">When</span>
+            <span className="font-medium text-foreground">{eventTimeLabel ?? 'TBA'}</span>
+          </div>
+        </div>
+
+      </MobileBottomDrawer>
 
       {showChatAttentionToast ? (
         <EventChatAttentionToast
