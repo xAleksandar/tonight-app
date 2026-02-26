@@ -385,12 +385,13 @@ export function EventInsideExperience({
   );
   const hostChatParticipantMap = useMemo(() => {
     if (!hostChatParticipants.length) {
-      return new Map<string, { displayName: string; avatarUrl?: string | null }>();
+      return new Map<string, { userId: string; displayName: string; avatarUrl?: string | null }>();
     }
     return new Map(
       hostChatParticipants.map((participant) => [
         participant.joinRequestId,
         {
+          userId: participant.userId,
           displayName: participant.displayName,
           avatarUrl: participant.avatarUrl ?? null,
         },
