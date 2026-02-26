@@ -637,6 +637,27 @@ export default function ChatConversation({
     [currentUserId, joinRequestId]
   );
 
+  const sendMessageViaApi = useCallback(
+    async (content: string) => {
+      const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const message = await readErrorPayload(response, 'Unable to send this message.');
+        throw new Error(message);
+      }
+
+      const payload = (await response.json()) as { message: SerializedMessage };
+      return payload.message;
+    },
+    [joinRequestId]
+  );
+
   const flushQueuedMessages = useCallback(async () => {
     if (queuedFlushInFlightRef.current || hasBlockedCounterpart) {
       return;
@@ -655,26 +676,13 @@ export default function ChatConversation({
         );
 
         try {
-          const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content: next.content }),
-          });
-
-          if (!response.ok) {
-            const message = await readErrorPayload(response, 'Unable to send this message.');
-            throw new Error(message);
-          }
-
-          const payload = (await response.json()) as { message: SerializedMessage };
-          setMessages((previous) => {
-            const remaining = previous.filter((message) => message.id !== next.clientReferenceId);
-            return sortMessages([...remaining, payload.message]);
-          });
-          setSendError(null);
-        } catch (error) {
+        const message = await sendMessageViaApi(next.content);
+        setMessages((previous) => {
+          const remaining = previous.filter((message) => message.id !== next.clientReferenceId);
+          return sortMessages([...remaining, message]);
+        });
+        setSendError(null);
+      } catch (error) {
           console.error('Failed to flush queued chat message', error);
           const failureMessage = (error as Error).message ?? 'Unable to send this message.';
           setMessages((previous) =>
@@ -697,7 +705,7 @@ export default function ChatConversation({
     } finally {
       queuedFlushInFlightRef.current = false;
     }
-  }, [hasBlockedCounterpart, joinRequestId]);
+  }, [hasBlockedCounterpart, joinRequestId, sendMessageViaApi]);
 
   useEffect(() => {
     if (!isConnected || !queuedMessagesRef.current.length) {
@@ -744,41 +752,29 @@ export default function ChatConversation({
 
       setSendError(null);
 
-      if (!isConnected && connectionState !== 'error') {
-        queueMessageForSend(trimmed);
-        setComposerValue('');
-        return;
-      }
-
       setSendStatus('sending');
 
       try {
-        const response = await fetch(`/api/chat/${joinRequestId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ content: trimmed }),
-        });
-
-        if (!response.ok) {
-          const message = await readErrorPayload(response, 'Unable to send this message.');
-          throw new Error(message);
-        }
-
-        const payload = (await response.json()) as { message: SerializedMessage };
-        appendMessage(payload.message);
+        const message = await sendMessageViaApi(trimmed);
+        appendMessage(message);
         setComposerValue('');
       } catch (error) {
         console.error('Failed to send chat message', error);
-        const message = (error as Error).message ?? 'Unable to send this message.';
-        setSendError(message);
-        showErrorToast('Message not sent', message);
+        const errorMessage = (error as Error).message ?? 'Unable to send this message.';
+        if (!isConnected) {
+          queueMessageForSend(trimmed);
+          setComposerValue('');
+          setSendError('Offline. Message queued until the connection returns.');
+          showErrorToast('Message queued', 'We will send it once you reconnect.');
+        } else {
+          setSendError(errorMessage);
+          showErrorToast('Message not sent', errorMessage);
+        }
       } finally {
         setSendStatus('idle');
       }
     },
-    [appendMessage, composerValue, connectionState, hasBlockedCounterpart, isConnected, isCurrentlyTyping, joinRequestId, queueMessageForSend, sendStatus, sendTypingStop]
+    [appendMessage, composerValue, hasBlockedCounterpart, isConnected, isCurrentlyTyping, queueMessageForSend, sendMessageViaApi, sendStatus, sendTypingStop]
   );
 
   const connectionLabel = (() => {
@@ -1171,12 +1167,11 @@ export default function ChatConversation({
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <UserAvatar displayName={counterpart.displayName ?? undefined} email={counterpart.email} photoUrl={counterpart.photoUrl ?? undefined} size="sm" />
           <div className="flex flex-1 flex-col overflow-hidden">
             <p className="truncate text-base font-semibold">
-              {counterpart.displayName ?? counterpart.email}
+              {context.event.title}
             </p>
-            <p className="text-xs text-muted-foreground">{context.event.title}</p>
+            <p className="text-xs text-muted-foreground">{context.event.locationName}</p>
           </div>
           <button
             type="button"
@@ -1371,58 +1366,6 @@ export default function ChatConversation({
               ) : null}
             </div>
           ) : null}
-          {isHostViewer && hasHydratedChatAttentionSnooze ? (
-            chatAttentionIsSnoozed ? (
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
-                {chatAttentionSnoozeBadgeLabel ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/40 px-3 py-1 text-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-300" aria-hidden />
-                    {chatAttentionSnoozeBadgeLabel}
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={handleChatAttentionResume}
-                  className="text-primary underline-offset-2 transition hover:underline"
-                  aria-label="Resume chat attention alerts"
-                >
-                  Resume alerts
-                </button>
-              </div>
-            ) : (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-                <button
-                  type="button"
-                  onClick={() => handleChatAttentionSnooze()}
-                  className="rounded-full border border-border/60 bg-card/70 px-3 py-1 text-foreground transition hover:bg-background/80"
-                  aria-label={quickSnoozeAriaLabel}
-                >
-                  {quickSnoozeButtonLabel}
-                </button>
-                <span className="text-muted-foreground/70">Snooze:</span>
-                {CHAT_ATTENTION_SNOOZE_OPTIONS_MINUTES.map((minutes) => {
-                  const isPreferred = chatAttentionPreferredSnoozeMinutes === minutes;
-                  return (
-                    <button
-                      key={minutes}
-                      type="button"
-                      onClick={() => handleChatAttentionSnooze(minutes)}
-                      className={classNames(
-                        'rounded-full border px-3 py-1 text-[11px] transition',
-                        isPreferred
-                          ? 'border-primary/60 bg-primary/10 text-primary'
-                          : 'border-border/60 text-muted-foreground hover:text-foreground'
-                      )}
-                      aria-label={`Snooze chat attention alerts for ${minutes} minutes`}
-                      aria-pressed={isPreferred}
-                    >
-                      {minutes} min
-                    </button>
-                  );
-                })}
-              </div>
-            )
-          ) : null}
         </div>
       </header>
 
@@ -1432,21 +1375,6 @@ export default function ChatConversation({
             <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-100/80 px-4 py-1 text-xs font-semibold text-emerald-900 shadow-inner shadow-emerald-900/30">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
               Join request accepted
-            </div>
-            <div className="rounded-3xl border border-border/60 bg-card/70 px-5 py-4 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Tonight&apos;s plan</p>
-                  <p className="text-base font-semibold text-foreground">{context.event.title}</p>
-                  <p className="text-xs text-muted-foreground">{[context.event.locationName, eventTimeLabel].filter(Boolean).join(' • ')}</p>
-                </div>
-                <span className={classNames('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold backdrop-blur', connectionAccent)}>
-                  <span className={classNames('h-1.5 w-1.5 rounded-full', connectionDot)} />
-                  {connectionLabel}
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">{connectionHelperText}</p>
-              {derivedNotice ? <p className="mt-2 text-xs text-amber-400">{derivedNotice}</p> : null}
             </div>
           </div>
         </section>
@@ -1505,7 +1433,7 @@ export default function ChatConversation({
             </div>
           </div>
 
-          <form onSubmit={handleSend} className="flex flex-col gap-3 rounded-3xl border border-border/80 bg-card/80 p-4 shadow-[0_25px_120px_rgba(0,0,0,0.45)]">
+          <form onSubmit={handleSend} className="flex flex-col gap-3">
             <div className="flex items-end gap-3">
               <label htmlFor="chat-message" className="sr-only">
                 Message
@@ -1518,19 +1446,15 @@ export default function ChatConversation({
                 placeholder={
                   hasBlockedCounterpart
                     ? "Blocked"
-                    : connectionState === 'connected'
-                    ? "Type a message"
-                    : connectionState === 'connecting'
-                    ? "Connecting..."
-                    : "Reconnecting..."
+                    : "Type a message"
                 }
                 rows={1}
-                disabled={hasBlockedCounterpart || connectionState !== 'connected'}
+                disabled={hasBlockedCounterpart || sendStatus === 'sending'}
                 className="max-h-48 min-h-[52px] w-full flex-1 resize-none rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
               />
               <button
                 type="submit"
-                disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart || connectionState !== 'connected'}
+                disabled={sendStatus === 'sending' || composerValue.trim().length === 0 || hasBlockedCounterpart}
                 className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-border"
                 aria-label="Send message"
               >

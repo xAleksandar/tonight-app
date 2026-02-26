@@ -67,6 +67,7 @@ export type UseSocketResult = {
 const DEFAULT_SOCKET_READINESS_ENDPOINT = '/api/socket/io';
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
+const CONNECTION_TIMEOUT_MS = 10000;
 
 const isBrowserEnvironment = () => typeof window !== 'undefined';
 
@@ -138,6 +139,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
   const reconnectCountdownIntervalRef = useRef<number | null>(null);
   const manualDisconnectRef = useRef(false);
   const connectionAttemptInProgressRef = useRef(false);
+  const connectionTimeoutRef = useRef<number | null>(null);
   const startConnectionRef = useRef<(({ isRetry }?: { isRetry?: boolean }) => Promise<void>) | undefined>(undefined);
 
   const [connectionState, setConnectionState] = useState<SocketConnectionState>('idle');
@@ -159,6 +161,10 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       socketRef.current?.removeAllListeners();
       socketRef.current?.disconnect();
       socketRef.current = null;
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -204,6 +210,13 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     if (reconnectCountdownIntervalRef.current) {
       clearInterval(reconnectCountdownIntervalRef.current);
       reconnectCountdownIntervalRef.current = null;
+    }
+  }, []);
+
+  const clearConnectionTimeout = useCallback(() => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
     }
   }, []);
 
@@ -267,6 +280,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       socket.on('connect', () => {
         connectionAttemptInProgressRef.current = false;
         manualDisconnectRef.current = false;
+        clearConnectionTimeout();
         resetReconnectTracking();
         updateState('connected');
         flushQueuedRoomJoins(socket);
@@ -276,6 +290,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       socket.on('disconnect', (reason) => {
         const normalizedReason = typeof reason === 'string' ? reason : 'disconnect';
         handlersRef.current.onDisconnect?.(normalizedReason);
+        clearConnectionTimeout();
 
         if (manualDisconnectRef.current) {
           manualDisconnectRef.current = false;
@@ -288,6 +303,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
 
       socket.on('connect_error', (err: Error) => {
         connectionAttemptInProgressRef.current = false;
+        clearConnectionTimeout();
         updateState('error', err);
         handlersRef.current.onError?.(err);
         scheduleReconnect();
@@ -313,7 +329,7 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
         handlersRef.current.onReadReceipt?.(payload);
       });
     },
-    [flushQueuedRoomJoins, resetReconnectTracking, scheduleReconnect, updateState]
+    [clearConnectionTimeout, flushQueuedRoomJoins, resetReconnectTracking, scheduleReconnect, updateState]
   );
 
   const getOrCreateSocket = useCallback(() => {
@@ -368,11 +384,22 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
       manualDisconnectRef.current = false;
       updateState('connecting');
 
+      clearConnectionTimeout();
+      connectionTimeoutRef.current = window.setTimeout(() => {
+        if (!socket.connected && connectionAttemptInProgressRef.current) {
+          connectionAttemptInProgressRef.current = false;
+          const timeoutError = new Error('Socket connection timed out');
+          updateState('error', timeoutError);
+          handlersRef.current.onError?.(timeoutError);
+          scheduleReconnect();
+        }
+      }, CONNECTION_TIMEOUT_MS);
+
       await ensureServerReady(readinessEndpoint);
 
       socket.connect();
     },
-    [connectionState, getOrCreateSocket, readinessEndpoint, resetReconnectTracking, updateState]
+    [clearConnectionTimeout, getOrCreateSocket, readinessEndpoint, resetReconnectTracking, scheduleReconnect, updateState]
   );
 
   startConnectionRef.current = startConnection;
@@ -390,12 +417,13 @@ export const useSocket = (options: UseSocketOptions): UseSocketResult => {
     joinedRoomsRef.current.clear();
     clearReconnectTimer();
     clearReconnectCountdown();
+    clearConnectionTimeout();
     resetReconnectTracking();
     socketRef.current?.removeAllListeners();
     socketRef.current?.disconnect();
     socketRef.current = null;
     updateState('idle');
-  }, [clearReconnectCountdown, clearReconnectTimer, resetReconnectTracking, updateState]);
+  }, [clearConnectionTimeout, clearReconnectCountdown, clearReconnectTimer, resetReconnectTracking, updateState]);
 
   const joinRoom = useCallback((joinRequestId: string) => {
     const normalized = normalizeJoinRequestId(joinRequestId);
