@@ -1189,7 +1189,7 @@ export default function ChatConversation({
             View plan
           </Link>
         </div>
-        <div className="mx-auto w-full max-w-4xl px-4 pb-3">
+        <div className="mx-auto w-full max-w-4xl pl-4 pb-3">
           <div
             className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             data-testid="chat-inline-actions"
@@ -1213,16 +1213,6 @@ export default function ChatConversation({
             >
               <MapPin className="h-3.5 w-3.5" />
               Open in Maps
-            </button>
-            <button
-              type="button"
-              onClick={handleAddToCalendar}
-              disabled={!eventStartDate || isCalendarExporting}
-              className={inlineChipClass(!eventStartDate || isCalendarExporting)}
-              title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
-            >
-              <CalendarPlus className="h-3.5 w-3.5" />
-              {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
             </button>
             {isHostViewer ? (
               <>
@@ -1253,6 +1243,16 @@ export default function ChatConversation({
                 ) : null}
               </>
             ) : null}
+            <button
+              type="button"
+              onClick={handleAddToCalendar}
+              disabled={!eventStartDate || isCalendarExporting}
+              className={inlineChipClass(!eventStartDate || isCalendarExporting)}
+              title={!eventStartDate ? 'Add to calendar will be available once timing is set.' : undefined}
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              {isCalendarExporting ? 'Building invite…' : 'Add to calendar'}
+            </button>
           </div>
           {isHostViewer && chatAttentionHasEntries ? (
             <div className="mt-3 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-[11px] font-semibold text-muted-foreground">
