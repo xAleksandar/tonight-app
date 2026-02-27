@@ -694,9 +694,9 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
             onCategoryChange={setSelectedCategory}
           />
 
-          <main className="flex-1 pb-20 pt-0 md:min-h-0 md:overflow-y-auto md:px-10 md:pb-12 md:pt-8">
+          <main className="flex-1 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-0 md:min-h-0 md:overflow-y-auto md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-5xl px-4 md:px-0">
-              <section className="mt-4 flex flex-col gap-4">
+              <section className="flex flex-col gap-4 md:mt-4">
                 {locationStatus === "denied" && permissionState === "denied" ? (
                   <AlertPanel
                     title="Location access blocked"
