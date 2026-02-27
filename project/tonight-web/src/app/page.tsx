@@ -5,11 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {
   Clock,
-  Copy,
   List as ListIcon,
   Map as MapIcon,
   MapPin,
-  Share2,
   SlidersHorizontal,
   Sparkles,
   ChevronRight,
@@ -23,7 +21,6 @@ import { MobileActionBar, type MobileNavTarget } from "@/components/tonight/Mobi
 import { MiniMap } from "@/components/tonight/MiniMap";
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
@@ -36,12 +33,6 @@ const DEFAULT_RADIUS_KM = 10;
 const MIN_RADIUS_KM = 1;
 const MAX_RADIUS_KM = 50;
 const VIEW_MODE_STORAGE_KEY = "tonight:view-mode";
-const HOST_UPDATES_FILTER_STORAGE_KEY = "tonight:host-updates-filter";
-const HOST_UPDATES_FILTER_QUERY_KEY = "hostUpdates";
-const HOST_UPDATES_FILTER_QUERY_VALUE = "new";
-const HOST_UPDATES_FILTER_ENABLED = "on";
-const HOST_UPDATES_FILTER_DISABLED = "off";
-
 const MAP_HEIGHT_DESKTOP = 520;
 const MAP_HEIGHT_MOBILE = 360;
 
@@ -99,16 +90,6 @@ type DecoratedEvent = NearbyEventPayload & {
   hostInitials: string;
   hostPhotoUrl: string | null;
   spotsRemaining: number | null;
-};
-
-const eventHasUnseenHostUpdates = (
-  event: Pick<DecoratedEvent, "viewerJoinRequestStatus" | "hostUpdatesUnseenCount">
-) => {
-  return (
-    event.viewerJoinRequestStatus === "ACCEPTED" &&
-    typeof event.hostUpdatesUnseenCount === "number" &&
-    event.hostUpdatesUnseenCount > 0
-  );
 };
 
 function formatEventTime(value?: string | null) {
@@ -204,41 +185,6 @@ const formatSpotsLabel = (value: number | null) => {
   return value === 1 ? '1 spot left' : `${value} spots left`;
 };
 
-const copyTextToClipboard = async (value: string) => {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    if (typeof document !== 'undefined') {
-      const scrollY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      try {
-        await navigator.clipboard.writeText(value);
-      } finally {
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        window.scrollTo(0, scrollY);
-      }
-    } else {
-      await navigator.clipboard.writeText(value);
-    }
-    return;
-  }
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.style.position = 'fixed';
-  textarea.style.top = '-1000px';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.focus({ preventScroll: true });
-  textarea.select();
-  const successful = document.execCommand('copy');
-  document.body.removeChild(textarea);
-  if (!successful) {
-    throw new Error('execCommand copy failed');
-  }
-};
-
 export default function HomePage() {
   const { status: authStatus, user: authUser } = useRequireAuth();
 
@@ -261,7 +207,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const searchParamsString = searchParams?.toString() ?? "";
   const handleCreate = useCallback(() => router.push("/events/create"), [router]);
   const explicitViewParam = searchParams?.get("view");
   const derivedPrimarySection = useMemo<MobileNavTarget>(() => {
@@ -303,7 +248,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [searchMeta, setSearchMeta] = useState<NearbyEventsResponse["meta"] | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const [showOnlyHostUpdates, setShowOnlyHostUpdates] = useState(false);
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [pendingRadiusKm, setPendingRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
@@ -314,18 +258,7 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
   const [permissionState, setPermissionState] = useState<PermissionState | "unsupported" | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [locationErrorDetails, setLocationErrorDetails] = useState<string | null>(null);
-  const hostUpdatesQueryValueRef = useRef(searchParams?.get(HOST_UPDATES_FILTER_QUERY_KEY) ?? null);
-  const hostUpdatesPrefInitializedRef = useRef(false);
   const debugLocation = searchParams?.get("debugLocation") === "1";
-  const hostUpdatesShareUrl = useMemo(() => {
-    if (typeof window === 'undefined' || !pathname) {
-      return null;
-    }
-    const params = new URLSearchParams(searchParamsString);
-    params.set(HOST_UPDATES_FILTER_QUERY_KEY, HOST_UPDATES_FILTER_QUERY_VALUE);
-    const queryString = params.toString();
-    return `${window.location.origin}${pathname}${queryString ? `?${queryString}` : ''}`;
-  }, [pathname, searchParamsString]);
 
   const unreadMessageCount = useMemo(
     () => conversations.reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
@@ -425,71 +358,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       console.warn("Unable to persist view mode", error);
     }
   }, [viewMode]);
-
-  useEffect(() => {
-    const queryValue = searchParams?.get(HOST_UPDATES_FILTER_QUERY_KEY) ?? null;
-    const previousValue = hostUpdatesQueryValueRef.current;
-    hostUpdatesQueryValueRef.current = queryValue;
-
-    if (queryValue === HOST_UPDATES_FILTER_QUERY_VALUE) {
-      hostUpdatesPrefInitializedRef.current = true;
-      setShowOnlyHostUpdates(true);
-      return;
-    }
-
-    if (previousValue === HOST_UPDATES_FILTER_QUERY_VALUE && queryValue !== HOST_UPDATES_FILTER_QUERY_VALUE) {
-      hostUpdatesPrefInitializedRef.current = true;
-      setShowOnlyHostUpdates(false);
-      return;
-    }
-
-    if (!hostUpdatesPrefInitializedRef.current) {
-      if (typeof window === "undefined") {
-        hostUpdatesPrefInitializedRef.current = true;
-        return;
-      }
-      try {
-        const stored = window.localStorage.getItem(HOST_UPDATES_FILTER_STORAGE_KEY);
-        setShowOnlyHostUpdates(stored === HOST_UPDATES_FILTER_ENABLED);
-      } catch (error) {
-        console.warn("Unable to read host updates filter preference", error);
-        setShowOnlyHostUpdates(false);
-      }
-      hostUpdatesPrefInitializedRef.current = true;
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    try {
-      window.localStorage.setItem(
-        HOST_UPDATES_FILTER_STORAGE_KEY,
-        showOnlyHostUpdates ? HOST_UPDATES_FILTER_ENABLED : HOST_UPDATES_FILTER_DISABLED
-      );
-    } catch (error) {
-      console.warn("Unable to persist host updates filter preference", error);
-    }
-  }, [showOnlyHostUpdates]);
-
-  useEffect(() => {
-    if (!pathname) {
-      return;
-    }
-    const params = new URLSearchParams(searchParams?.toString() ?? "");
-    const queryActive = params.get(HOST_UPDATES_FILTER_QUERY_KEY) === HOST_UPDATES_FILTER_QUERY_VALUE;
-    if (queryActive === showOnlyHostUpdates) {
-      return;
-    }
-    if (showOnlyHostUpdates) {
-      params.set(HOST_UPDATES_FILTER_QUERY_KEY, HOST_UPDATES_FILTER_QUERY_VALUE);
-    } else {
-      params.delete(HOST_UPDATES_FILTER_QUERY_KEY);
-    }
-    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-    router.replace(nextUrl, { scroll: false });
-  }, [pathname, router, searchParams, showOnlyHostUpdates]);
 
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
@@ -727,20 +595,13 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
     });
   }, [events]);
 
-  const hostUpdatesEligibleCount = useMemo(() => {
-    return decoratedEvents.filter((event) => eventHasUnseenHostUpdates(event)).length;
-  }, [decoratedEvents]);
-
   const visibleEvents = useMemo(() => {
     let next = decoratedEvents;
     if (selectedCategory) {
       next = next.filter((event) => event.categoryId === selectedCategory);
     }
-    if (showOnlyHostUpdates) {
-      next = next.filter((event) => eventHasUnseenHostUpdates(event));
-    }
     return next;
-  }, [decoratedEvents, selectedCategory, showOnlyHostUpdates]);
+  }, [decoratedEvents, selectedCategory]);
 
   useEffect(() => {
     setSelectedEventId((previous) => {
@@ -753,15 +614,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       return null;
     });
   }, [visibleEvents]);
-
-  useEffect(() => {
-    if (eventsStatus !== "success") {
-      return;
-    }
-    if (!hostUpdatesEligibleCount && showOnlyHostUpdates) {
-      setShowOnlyHostUpdates(false);
-    }
-  }, [eventsStatus, hostUpdatesEligibleCount, showOnlyHostUpdates]);
 
   const handleRefresh = useCallback(() => {
     if (userLocation) {
@@ -917,15 +769,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
 
                 {isLoading && <DiscoverySkeleton viewMode={viewMode} />}
 
-                {!isLoading && decoratedEvents.length > 0 && (
-                  <HostUpdatesFilterToggle
-                    active={showOnlyHostUpdates}
-                    availableCount={hostUpdatesEligibleCount}
-                    onToggle={() => setShowOnlyHostUpdates((current) => !current)}
-                    shareUrl={hostUpdatesShareUrl}
-                  />
-                )}
-
                 {!isLoading && locationReady && viewMode === "map" && (
                   <div className="overflow-hidden rounded-3xl border border-border/70 bg-background/40">
                     <div className="border-b border-border/60 bg-card/40 p-4">
@@ -984,8 +827,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
                     onSelect={handleSelectEvent}
                     locationReady={locationReady}
                     radiusSummary={buildRadiusSummary(radiusKm)}
-                    hostUpdatesFilterActive={showOnlyHostUpdates}
-                    onClearHostUpdatesFilter={() => setShowOnlyHostUpdates(false)}
                   />
                 )}
               </section>
@@ -1364,8 +1205,6 @@ type DiscoveryListProps = {
   onSelect: (eventId: string) => void;
   locationReady: boolean;
   radiusSummary: string;
-  hostUpdatesFilterActive?: boolean;
-  onClearHostUpdatesFilter?: () => void;
 };
 
 export function DiscoveryList({
@@ -1374,8 +1213,6 @@ export function DiscoveryList({
   onSelect,
   locationReady,
   radiusSummary,
-  hostUpdatesFilterActive = false,
-  onClearHostUpdatesFilter,
 }: DiscoveryListProps) {
   if (!locationReady) {
     return <DiscoverySkeleton viewMode="list" />;
@@ -1384,22 +1221,7 @@ export function DiscoveryList({
   if (events.length === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-border/60 bg-card/40 p-10 text-center text-sm text-muted-foreground">
-        {hostUpdatesFilterActive ? (
-          <div className="space-y-4">
-            <p>No events with new host updates within {radiusSummary}.</p>
-            {typeof onClearHostUpdatesFilter === "function" && (
-              <button
-                type="button"
-                onClick={onClearHostUpdatesFilter}
-                className="inline-flex items-center justify-center rounded-full border border-border/70 px-4 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:text-primary"
-              >
-                Show all nearby events
-              </button>
-            )}
-          </div>
-        ) : (
-          <p>No nearby events yet within {radiusSummary}. Try widening your radius or refreshing.</p>
-        )}
+        <p>No nearby events yet within {radiusSummary}. Try widening your radius or refreshing.</p>
       </div>
     );
   }
@@ -1508,156 +1330,6 @@ export function DiscoveryList({
           </button>
         );
         })}
-      </div>
-    </div>
-  );
-}
-
-type HostUpdatesFilterToggleProps = {
-  active: boolean;
-  availableCount: number;
-  onToggle: () => void;
-  shareUrl: string | null;
-};
-
-function HostUpdatesFilterToggle({ active, availableCount, onToggle, shareUrl }: HostUpdatesFilterToggleProps) {
-  const disabled = availableCount === 0;
-  const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
-  const [shareState, setShareState] = useState<"idle" | "sharing">("idle");
-  const [canUseWebShare, setCanUseWebShare] = useState(false);
-
-  useEffect(() => {
-    if (copyState !== "copied") {
-      return;
-    }
-    const timeout = window.setTimeout(() => setCopyState("idle"), 2500);
-    return () => window.clearTimeout(timeout);
-  }, [copyState]);
-
-  useEffect(() => {
-    setCopyState("idle");
-  }, [shareUrl]);
-
-  useEffect(() => {
-    if (typeof navigator === "undefined") {
-      return;
-    }
-    setCanUseWebShare(typeof navigator.share === "function");
-  }, []);
-
-  const handleCopyLink = useCallback(async () => {
-    if (!shareUrl || disabled) {
-      return;
-    }
-    try {
-      setCopyState("copying");
-      await copyTextToClipboard(shareUrl);
-      setCopyState("copied");
-      showSuccessToast("Filtered link copied", "Sharing this link highlights events with fresh host updates.");
-    } catch (error) {
-      console.error("Failed to copy filtered host updates link", error);
-      setCopyState("idle");
-      showErrorToast("Couldn't copy link", "Copy it manually from the address bar instead.");
-    }
-  }, [disabled, shareUrl]);
-
-  const handleShareLink = useCallback(async () => {
-    if (!shareUrl || disabled || !canUseWebShare || typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      return;
-    }
-    try {
-      setShareState("sharing");
-      await navigator.share({
-        title: "Tonight — host updates near you",
-        text: "Here are the plans with fresh host announcements.",
-        url: shareUrl,
-      });
-      showSuccessToast("Share link ready", "Your filtered discovery link is in the native share sheet.");
-    } catch (error) {
-      const dismissed =
-        error instanceof DOMException
-          ? error.name === "AbortError"
-          : typeof error === "object" && error !== null && "name" in error && (error as { name?: string }).name === "AbortError";
-      if (!dismissed) {
-        console.error("Failed to share filtered host updates link", error);
-        showErrorToast("Couldn't open share sheet", "Copy the link instead.");
-      }
-    } finally {
-      setShareState("idle");
-    }
-  }, [canUseWebShare, disabled, shareUrl]);
-
-  const copyDisabled = disabled || !shareUrl || copyState === "copying";
-  const shareDisabled = disabled || !shareUrl || !canUseWebShare || shareState === "sharing";
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/40 px-4 py-3">
-      <div>
-        <p className="text-sm font-semibold text-foreground">New host updates</p>
-        <p className="text-xs text-muted-foreground">
-          {disabled
-            ? "No fresh host announcements nearby right now."
-            : active
-              ? "Filtering to events waiting on your attention."
-              : "Highlight plans with unseen host announcements."}
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            if (!disabled) {
-              onToggle();
-            }
-          }}
-          disabled={disabled}
-          className={classNames(
-            "inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold transition",
-            disabled
-              ? "cursor-not-allowed border-border/60 text-muted-foreground"
-              : active
-                ? "border-amber-300/60 bg-amber-400/10 text-amber-100"
-                : "border-border/70 text-muted-foreground hover:border-amber-300 hover:text-amber-50"
-          )}
-        >
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          {active ? "Showing updates" : "New host updates"}
-          {availableCount > 0 && (
-            <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-50">
-              {availableCount > 99 ? "99+" : availableCount}
-            </span>
-          )}
-        </button>
-        {canUseWebShare && (
-          <button
-            type="button"
-            onClick={handleShareLink}
-            disabled={shareDisabled}
-            className={classNames(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition",
-              shareDisabled
-                ? "cursor-not-allowed border-border/60 text-muted-foreground"
-                : "border-border/70 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Share2 className="h-3.5 w-3.5" aria-hidden />
-            {shareState === "sharing" ? "Sharing…" : "Share filtered link"}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleCopyLink}
-          disabled={copyDisabled}
-          className={classNames(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition",
-            copyDisabled
-              ? "cursor-not-allowed border-border/60 text-muted-foreground"
-              : "border-border/70 text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Copy className="h-3.5 w-3.5" aria-hidden />
-          {copyState === "copied" ? "Link copied" : copyState === "copying" ? "Copying…" : "Copy filtered link"}
-        </button>
       </div>
     </div>
   );
