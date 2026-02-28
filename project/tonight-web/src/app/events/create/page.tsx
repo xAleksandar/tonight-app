@@ -285,7 +285,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
     <div className="min-h-dvh bg-background text-foreground">
 
       {/* ── Mobile: step-by-step flow ── */}
-      <div className="flex h-dvh flex-col md:hidden">
+      <div className="fixed inset-0 flex flex-col md:hidden">
 
         {/* Step header */}
         <div className="flex shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-lg">
