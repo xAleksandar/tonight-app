@@ -69,15 +69,13 @@ export function Drawer({ isOpen, title, onClose, children, className, panelClass
           panelClassName
         )}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-border/60 px-5 pb-3 pt-4">
-          <div className="min-w-0">
-            {title && <p className="text-sm font-semibold text-zinc-700">{title}</p>}
-          </div>
+        <div className="relative flex items-center justify-center border-b border-border/60 px-5 pb-3 pt-4">
+          {title && <p className="text-sm font-semibold text-foreground">{title}</p>}
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition hover:bg-card/80 hover:text-foreground"
+            className="absolute right-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition hover:bg-card/80 hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

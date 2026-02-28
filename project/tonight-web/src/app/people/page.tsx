@@ -67,6 +67,7 @@ const CATEGORY_ICON_MAP: Record<PersonEventCategory, LucideIcon> = {
   music: Music,
   fitness: Dumbbell,
   social: Coffee,
+  other: Sparkles,
 };
 
 const CATEGORY_STYLE_MAP: Record<PersonEventCategory, string> = {
@@ -76,6 +77,7 @@ const CATEGORY_STYLE_MAP: Record<PersonEventCategory, string> = {
   music: "border-rose-400/30 bg-rose-500/10 text-rose-200",
   fitness: "border-lime-400/30 bg-lime-500/10 text-lime-200",
   social: "border-orange-400/30 bg-orange-500/10 text-orange-200",
+  other: "border-border/50 bg-border/10 text-muted-foreground",
 };
 
 const PEOPLE_PROSPECTS: PersonProspect[] = [

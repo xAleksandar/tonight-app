@@ -1,22 +1,21 @@
 
 'use client';
 
-import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlignLeft, ChevronRight, Clock, MapPin, Sparkles, Type, Users } from 'lucide-react';
+import { AlignLeft, ArrowLeft, ChevronRight, Clock, MapPin, Sparkles, Type, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLocationPicker';
 import { DesktopHeader } from '@/components/tonight/DesktopHeader';
 import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
-import { MobileActionBar } from '@/components/tonight/MobileActionBar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
 import type { AuthUser } from '@/components/auth/AuthProvider';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { CATEGORY_DEFINITIONS, type CategoryId } from '@/lib/categories';
 import { Drawer } from "@/components/tonight/Drawer";
 import { classNames } from '@/lib/classNames';
-import { showErrorToast, showSuccessToast } from '@/lib/toast';
+import { showErrorToast } from '@/lib/toast';
 
 const TITLE_LIMITS = { min: 3, max: 120 } as const;
 const DESCRIPTION_LIMITS = { min: 1, max: 2000 } as const;
@@ -47,12 +46,8 @@ const getInitialDateValue = () => {
 
 const formatReadableDatetime = (value: string) => {
   if (!value) return 'Not set';
-
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'Invalid date';
-  }
-
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
   try {
     return new Intl.DateTimeFormat(undefined, {
       weekday: 'short',
@@ -67,26 +62,14 @@ const formatReadableDatetime = (value: string) => {
 };
 
 type FieldErrors = Partial<Record<'title' | 'description' | 'datetime' | 'location' | 'locationName' | 'maxParticipants', string>>;
-
-type ApiErrorPayload = {
-  error?: string;
-  errors?: FieldErrors;
-};
+type ApiErrorPayload = { error?: string; errors?: FieldErrors };
 
 export default function CreateEventPage() {
   const { status: authStatus, user: authUser } = useRequireAuth();
 
-  if (authStatus === 'loading') {
-    return <AuthStatusMessage label="Checking your session…" />;
-  }
-
-  if (authStatus === 'unauthenticated') {
-    return <AuthStatusMessage label="Redirecting you to the welcome screen…" />;
-  }
-
-  if (authStatus === 'error') {
-    return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
-  }
+  if (authStatus === 'loading') return <AuthStatusMessage label="Checking your session…" />;
+  if (authStatus === 'unauthenticated') return <AuthStatusMessage label="Redirecting you to the welcome screen…" />;
+  if (authStatus === 'error') return <AuthStatusMessage label="We couldn't verify your session. Refresh to try again." />;
 
   return <AuthenticatedCreateEventPage currentUser={authUser ?? null} />;
 }
@@ -107,33 +90,35 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
   const [statusIntent, setStatusIntent] = useState<'idle' | 'error' | 'success'>('idle');
   const [submitting, setSubmitting] = useState(false);
   const [geolocating, setGeolocating] = useState(false);
+  const [mobileStep, setMobileStep] = useState(1);
+
+  const mobileContentRef = useRef<HTMLDivElement>(null);
 
   const friendlyDatetime = useMemo(() => formatReadableDatetime(datetimeInput), [datetimeInput]);
 
+  // On every step change: scroll to top and clear any lingering field errors
   useEffect(() => {
-    if (!navigator.geolocation) {
-      return;
-    }
+    mobileContentRef.current?.scrollTo({ top: 0 });
+    setFieldErrors({});
+  }, [mobileStep]);
 
+  // Silently pre-fetch user location for map center
+  useEffect(() => {
+    if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
       },
-      () => {
-        // Silently fail - user hasn't granted permission or it failed
-      },
+      () => {},
       { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
     );
   }, []);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) {
-      setStatusIntent('error');
-      setStatusMessage('Your browser does not support geolocation.');
       showErrorToast('Turn on location services', 'Your browser does not support geolocation.');
       return;
     }
-
     setGeolocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -144,8 +129,6 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
       },
       (error) => {
         console.error('Geolocation failed', error);
-        setStatusIntent('error');
-        setStatusMessage('Unable to detect your location. Try selecting it on the map.');
         showErrorToast('Unable to detect location', 'Try selecting it manually on the map.');
         setGeolocating(false);
       },
@@ -160,50 +143,85 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
     });
   };
 
-  const validateBeforeSubmit = () => {
+  const validateStep = (step: number): FieldErrors => {
+    const errors: FieldErrors = {};
+    if (step === 1) {
+      const trimmedTitle = title.trim();
+      if (trimmedTitle.length < TITLE_LIMITS.min || trimmedTitle.length > TITLE_LIMITS.max) {
+        errors.title = `Title must be between ${TITLE_LIMITS.min} and ${TITLE_LIMITS.max} characters.`;
+      }
+      const trimmedDescription = description.trim();
+      if (trimmedDescription.length < DESCRIPTION_LIMITS.min) {
+        errors.description = 'Description is required.';
+      } else if (trimmedDescription.length > DESCRIPTION_LIMITS.max) {
+        errors.description = `Description must be under ${DESCRIPTION_LIMITS.max} characters.`;
+      }
+    } else if (step === 2) {
+      const date = datetimeInput ? new Date(datetimeInput) : null;
+      if (!date || Number.isNaN(date.getTime())) {
+        errors.datetime = 'Please choose a valid date and time.';
+      } else if (date.getTime() <= Date.now()) {
+        errors.datetime = 'Events must start in the future.';
+      }
+      if (Number.isNaN(maxParticipants) || maxParticipants < MAX_PARTICIPANTS_LIMITS.min || maxParticipants > MAX_PARTICIPANTS_LIMITS.max) {
+        errors.maxParticipants = `Max participants must be between ${MAX_PARTICIPANTS_LIMITS.min} and ${MAX_PARTICIPANTS_LIMITS.max}.`;
+      }
+    }
+    setFieldErrors(errors);
+    return errors;
+  };
+
+  const validateBeforeSubmit = (): FieldErrors => {
     const errors: FieldErrors = {};
     const trimmedTitle = title.trim();
     if (trimmedTitle.length < TITLE_LIMITS.min || trimmedTitle.length > TITLE_LIMITS.max) {
       errors.title = `Title must be between ${TITLE_LIMITS.min} and ${TITLE_LIMITS.max} characters.`;
     }
-
     const trimmedDescription = description.trim();
     if (trimmedDescription.length < DESCRIPTION_LIMITS.min) {
       errors.description = 'Description is required.';
     } else if (trimmedDescription.length > DESCRIPTION_LIMITS.max) {
       errors.description = `Description must be under ${DESCRIPTION_LIMITS.max} characters.`;
     }
-
     const date = datetimeInput ? new Date(datetimeInput) : null;
     if (!date || Number.isNaN(date.getTime())) {
       errors.datetime = 'Please choose a valid date and time.';
     } else if (date.getTime() <= Date.now()) {
       errors.datetime = 'Events must start in the future.';
     }
-
     if (!location) {
       errors.location = 'Pick a spot on the map to continue.';
     }
-
     const trimmedLocationName = locationName.trim();
     if (trimmedLocationName.length < LOCATION_NAME_LIMITS.min || trimmedLocationName.length > LOCATION_NAME_LIMITS.max) {
       errors.locationName = `Location name must be between ${LOCATION_NAME_LIMITS.min} and ${LOCATION_NAME_LIMITS.max} characters.`;
     }
-
-    if (
-      Number.isNaN(maxParticipants) ||
-      maxParticipants < MAX_PARTICIPANTS_LIMITS.min ||
-      maxParticipants > MAX_PARTICIPANTS_LIMITS.max
-    ) {
+    if (Number.isNaN(maxParticipants) || maxParticipants < MAX_PARTICIPANTS_LIMITS.min || maxParticipants > MAX_PARTICIPANTS_LIMITS.max) {
       errors.maxParticipants = `Max participants must be between ${MAX_PARTICIPANTS_LIMITS.min} and ${MAX_PARTICIPANTS_LIMITS.max}.`;
     }
-
     setFieldErrors(errors);
     return errors;
   };
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleContinue = () => {
+    const errors = validateStep(mobileStep);
+    if (Object.keys(errors).length > 0) {
+      showErrorToast('Fix the highlighted fields', 'Update the form before continuing.');
+      return;
+    }
+    setMobileStep((prev) => Math.min(prev + 1, 3));
+  };
+
+  const handleBack = () => {
+    if (mobileStep === 1) {
+      router.back();
+    } else {
+      setFieldErrors({});
+      setMobileStep((prev) => prev - 1);
+    }
+  };
+
+  const submitEvent = async () => {
     setStatusIntent('idle');
     setStatusMessage(null);
 
@@ -212,13 +230,9 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
       showErrorToast('Fix the highlighted fields', 'Update the form before publishing.');
       return;
     }
-
-    if (!location) {
-      return;
-    }
+    if (!location) return;
 
     const datetimeIso = new Date(datetimeInput).toISOString();
-
     setSubmitting(true);
     try {
       const response = await fetch('/api/events', {
@@ -245,9 +259,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
         return;
       }
 
-      setStatusIntent('success');
-      setStatusMessage('Event created! Redirecting…');
-      showSuccessToast('Event published', 'Your meetup is now live in the feed.');
+      sessionStorage.setItem('tonight:event-created', '1');
       router.push('/');
       router.refresh();
     } catch (error) {
@@ -261,12 +273,266 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
     }
   };
 
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await submitEvent();
+  };
+
   const errorBorderClass = 'border-rose-400/80 focus:border-rose-400 focus:ring-rose-400/30';
   const categories = Object.values(CATEGORY_DEFINITIONS);
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-[#101227] via-[#0f1324] to-[#050814] text-foreground">
-      <div className="flex min-h-dvh flex-col md:flex-row">
+    <div className="min-h-dvh bg-background text-foreground">
+
+      {/* ── Mobile: step-by-step flow ── */}
+      <div className="flex h-dvh flex-col md:hidden">
+
+        {/* Step header */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-lg">
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label={mobileStep === 1 ? 'Back' : 'Previous step'}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card/60 text-muted-foreground transition hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="flex-1 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Step {mobileStep} of 3</p>
+            <p className="text-base font-semibold leading-tight text-foreground">
+              {mobileStep === 1 && 'Event details'}
+              {mobileStep === 2 && 'Date & guests'}
+              {mobileStep === 3 && 'Location'}
+            </p>
+          </div>
+          {/* Progress dots */}
+          <div className="flex items-center gap-1.5">
+            {[1, 2, 3].map((s) => (
+              <div
+                key={s}
+                className={classNames(
+                  'rounded-full transition-all duration-200',
+                  s === mobileStep ? 'h-2 w-5 bg-primary' : s < mobileStep ? 'h-2 w-2 bg-primary/50' : 'h-2 w-2 bg-border/60'
+                )}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Scrollable step content */}
+        <div ref={mobileContentRef} className="flex-1 overflow-y-auto px-4 py-5">
+          <div>
+
+            {/* Step 1: Event details */}
+            {mobileStep === 1 && (
+              <div className="space-y-5">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25">
+                  <header className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
+                      <p className="text-xs text-muted-foreground/80">Optional: highlight the vibe.</p>
+                    </div>
+                    {selectedCategory && (
+                      <button type="button" onClick={() => setSelectedCategory(null)} className="text-[11px] font-semibold text-primary">
+                        Clear
+                      </button>
+                    )}
+                  </header>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setCategoryDrawerOpen(true)}
+                      className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/60"
+                    >
+                      <span className="flex items-center gap-2">
+                        {selectedCategory && (() => {
+                          const def = CATEGORY_DEFINITIONS[selectedCategory];
+                          return <def.icon className="h-4 w-4 text-primary" />;
+                        })()}
+                        {selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory].label : 'Pick a category'}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                </section>
+
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25">
+                  <div className="space-y-5">
+                    <FormField label="Title" icon={Type}>
+                      <input
+                        id="event-title"
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Going to cinema"
+                        className={classNames(INPUT_BASE_CLASS, fieldErrors.title && errorBorderClass)}
+                        maxLength={TITLE_LIMITS.max}
+                      />
+                      <FieldMeta>{title.trim().length}/{TITLE_LIMITS.max} characters</FieldMeta>
+                      {fieldErrors.title && <FieldError message={fieldErrors.title} />}
+                    </FormField>
+
+                    <FormField label="Description" icon={AlignLeft}>
+                      <textarea
+                        id="event-description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Tell people what you're planning..."
+                        className={classNames(INPUT_BASE_CLASS, 'min-h-[120px] resize-none py-3', fieldErrors.description && errorBorderClass)}
+                        maxLength={DESCRIPTION_LIMITS.max}
+                      />
+                      <FieldMeta>{description.trim().length}/{DESCRIPTION_LIMITS.max} characters</FieldMeta>
+                      {fieldErrors.description && <FieldError message={fieldErrors.description} />}
+                    </FormField>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* Step 2: Date & guests */}
+            {mobileStep === 2 && (
+              <div className="space-y-5">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25">
+                  <div className="space-y-5">
+                    <FormField label="Date & time" icon={Clock}>
+                      <input
+                        id="event-datetime"
+                        type="datetime-local"
+                        value={datetimeInput}
+                        onChange={(e) => setDatetimeInput(e.target.value)}
+                        className={classNames(INPUT_BASE_CLASS, fieldErrors.datetime && errorBorderClass)}
+                        min={getInitialDateValue()}
+                      />
+                      <FieldMeta>{friendlyDatetime}</FieldMeta>
+                      {fieldErrors.datetime && <FieldError message={fieldErrors.datetime} />}
+                    </FormField>
+
+                    <FormField label="Max participants" icon={Users}>
+                      <div className="space-y-2">
+                        <div className="flex items-center rounded-2xl border border-border/70 bg-card/50 text-foreground">
+                          <button
+                            type="button"
+                            onClick={() => handleParticipantChange(-1)}
+                            className="flex h-12 w-12 items-center justify-center text-lg font-semibold text-muted-foreground transition hover:text-foreground"
+                            aria-label="Decrease participants"
+                          >
+                            -
+                          </button>
+                          <span className="flex h-12 flex-1 items-center justify-center border-x border-border/70 text-lg font-semibold">
+                            {maxParticipants}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleParticipantChange(1)}
+                            className="flex h-12 w-12 items-center justify-center text-lg font-semibold text-muted-foreground transition hover:text-foreground"
+                            aria-label="Increase participants"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          You + {Math.max(1, maxParticipants - 1)} {maxParticipants - 1 === 1 ? 'other' : 'others'}
+                        </p>
+                      </div>
+                      {fieldErrors.maxParticipants && <FieldError message={fieldErrors.maxParticipants} />}
+                    </FormField>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* Step 3: Location */}
+            {mobileStep === 3 && (
+              <div className="space-y-5">
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
+                      <p className="text-xs text-muted-foreground/80">Drop the meetup pin and name the spot.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGeolocate}
+                      disabled={geolocating}
+                      className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {geolocating ? 'Locating…' : 'Use my location'}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    <MapboxLocationPicker
+                      label="Event location"
+                      initialValue={location}
+                      initialCenter={mapCenter}
+                      onChange={setLocation}
+                      tone="dark"
+                      className="rounded-2xl border border-border/40 bg-card/30 p-3"
+                    />
+                    {fieldErrors.location && <FieldError message={fieldErrors.location} />}
+
+                    <div className="space-y-2">
+                      <label
+                        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                        htmlFor="event-location-name"
+                      >
+                        <MapPin className="h-3.5 w-3.5 text-muted-foreground/70" />
+                        Location name
+                      </label>
+                      <input
+                        id="event-location-name"
+                        type="text"
+                        value={locationName}
+                        onChange={(e) => setLocationName(e.target.value)}
+                        placeholder="Cinema City, Downtown"
+                        className={classNames(INPUT_BASE_CLASS, fieldErrors.locationName && errorBorderClass)}
+                        maxLength={LOCATION_NAME_LIMITS.max}
+                      />
+                      <FieldMeta>
+                        Visible to attendees. {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
+                      </FieldMeta>
+                      {fieldErrors.locationName && <FieldError message={fieldErrors.locationName} />}
+                    </div>
+                  </div>
+                </section>
+
+                {statusMessage && <StatusBanner intent={statusIntent} message={statusMessage} />}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Static bottom action button */}
+        <div className="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4">
+          {mobileStep < 3 ? (
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={mobileStep === 1 && (
+                title.trim().length < TITLE_LIMITS.min ||
+                title.trim().length > TITLE_LIMITS.max ||
+                description.trim().length < DESCRIPTION_LIMITS.min ||
+                description.trim().length > DESCRIPTION_LIMITS.max
+              )}
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={submitEvent}
+              disabled={submitting}
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? 'Publishing…' : 'Create event'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Desktop: full single-page form ── */}
+      <div className="hidden md:flex md:min-h-dvh">
         <DesktopSidebar
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -280,7 +546,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
         <div className="flex flex-1 flex-col">
           <DesktopHeader
             title="Create"
-            subtitle="Share what you’re planning tonight"
+            subtitle="Share what you're planning tonight"
             onNavigateProfile={() => router.push('/profile')}
             onNavigateMessages={() => router.push('/messages')}
             userDisplayName={currentUser?.displayName ?? null}
@@ -288,114 +554,86 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
             userPhotoUrl={currentUser?.photoUrl ?? null}
           />
 
-          <main className="flex-1 px-4 pb-24 pt-4 md:px-10 md:pb-12 md:pt-8">
-            <div className="mx-auto w-full max-w-4xl space-y-4 md:space-y-6">
-              <MobileCreateHero />
+          <main className="flex-1 px-10 pb-12 pt-8">
+            <div className="mx-auto w-full max-w-4xl space-y-6">
+              {statusMessage && <StatusBanner intent={statusIntent} message={statusMessage} />}
 
-              {statusMessage && (
-                <StatusBanner intent={statusIntent} message={statusMessage} />
-              )}
-
-              <form onSubmit={onSubmit} className="space-y-5 md:space-y-6">
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
+              <form onSubmit={onSubmit} className="space-y-6">
+                {/* Category */}
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
                   <header className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
                       <p className="text-xs text-muted-foreground/80">Optional: highlight the vibe.</p>
                     </div>
                     {selectedCategory && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCategory(null)}
-                        className="text-[11px] font-semibold text-primary"
-                      >
+                      <button type="button" onClick={() => setSelectedCategory(null)} className="text-[11px] font-semibold text-primary">
                         Clear
                       </button>
                     )}
                   </header>
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <div className="md:hidden">
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    {categories.map((category) => (
                       <button
+                        key={category.id}
                         type="button"
-                        onClick={() => setCategoryDrawerOpen(true)}
-                        className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm font-semibold text-foreground transition hover:border-primary/60"
+                        onClick={() => setSelectedCategory(category.id)}
+                        className={classNames(
+                          'flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 text-xs font-semibold transition',
+                          selectedCategory === category.id
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
+                        )}
                       >
-                        <span>
-                          {selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory].label : "Pick a category"}
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <category.icon className="h-5 w-5" />
+                        {category.label}
                       </button>
-                    </div>
-
-                    <div className="hidden gap-3 md:grid md:grid-cols-3">
-                      {categories.map((category) => (
-                        <button
-                          key={category.id}
-                          type="button"
-                          onClick={() => setSelectedCategory(category.id)}
-                          className={classNames(
-                            'flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 text-xs font-semibold transition',
-                            selectedCategory === category.id
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
-                          )}
-                        >
-                          <category.icon className="h-5 w-5" />
-                          {category.label}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
+                {/* Title & Description */}
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
                   <div className="space-y-5">
                     <FormField label="Title" icon={Type}>
                       <input
-                        id="event-title"
+                        id="event-title-desktop"
                         type="text"
                         value={title}
-                        onChange={(event) => setTitle(event.target.value)}
+                        onChange={(e) => setTitle(e.target.value)}
                         placeholder="Going to cinema"
                         className={classNames(INPUT_BASE_CLASS, fieldErrors.title && errorBorderClass)}
                         maxLength={TITLE_LIMITS.max}
                         required
                       />
-                      <FieldMeta>
-                        {title.trim().length}/{TITLE_LIMITS.max} characters
-                      </FieldMeta>
+                      <FieldMeta>{title.trim().length}/{TITLE_LIMITS.max} characters</FieldMeta>
                       {fieldErrors.title && <FieldError message={fieldErrors.title} />}
                     </FormField>
 
                     <FormField label="Description" icon={AlignLeft}>
                       <textarea
-                        id="event-description"
+                        id="event-description-desktop"
                         value={description}
-                        onChange={(event) => setDescription(event.target.value)}
+                        onChange={(e) => setDescription(e.target.value)}
                         placeholder="Tell people what you're planning..."
-                        className={classNames(
-                          INPUT_BASE_CLASS,
-                          'min-h-[120px] resize-none py-3 md:min-h-[140px]',
-                          fieldErrors.description && errorBorderClass
-                        )}
+                        className={classNames(INPUT_BASE_CLASS, 'min-h-[140px] resize-none py-3', fieldErrors.description && errorBorderClass)}
                         maxLength={DESCRIPTION_LIMITS.max}
                       />
-                      <FieldMeta>
-                        {description.trim().length}/{DESCRIPTION_LIMITS.max} characters
-                      </FieldMeta>
+                      <FieldMeta>{description.trim().length}/{DESCRIPTION_LIMITS.max} characters</FieldMeta>
                       {fieldErrors.description && <FieldError message={fieldErrors.description} />}
                     </FormField>
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
-                  <div className="grid gap-5 md:grid-cols-2">
+                {/* Date & Participants */}
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
+                  <div className="grid grid-cols-2 gap-5">
                     <FormField label="Date & time" icon={Clock}>
                       <input
-                        id="event-datetime"
+                        id="event-datetime-desktop"
                         type="datetime-local"
                         value={datetimeInput}
-                        onChange={(event) => setDatetimeInput(event.target.value)}
+                        onChange={(e) => setDatetimeInput(e.target.value)}
                         className={classNames(INPUT_BASE_CLASS, fieldErrors.datetime && errorBorderClass)}
                         min={getInitialDateValue()}
                         required
@@ -436,7 +674,8 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25 md:p-5">
+                {/* Location */}
+                <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
@@ -445,8 +684,8 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                     <button
                       type="button"
                       onClick={handleGeolocate}
-                      className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={geolocating}
+                      className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {geolocating ? 'Locating…' : 'Use my location'}
                     </button>
@@ -464,15 +703,18 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                     {fieldErrors.location && <FieldError message={fieldErrors.location} />}
 
                     <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="event-location-name">
+                      <label
+                        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                        htmlFor="event-location-name-desktop"
+                      >
                         <MapPin className="h-3.5 w-3.5 text-muted-foreground/70" />
                         Location name
                       </label>
                       <input
-                        id="event-location-name"
+                        id="event-location-name-desktop"
                         type="text"
                         value={locationName}
-                        onChange={(event) => setLocationName(event.target.value)}
+                        onChange={(e) => setLocationName(e.target.value)}
                         placeholder="Cinema City, Downtown"
                         className={classNames(INPUT_BASE_CLASS, fieldErrors.locationName && errorBorderClass)}
                         maxLength={LOCATION_NAME_LIMITS.max}
@@ -486,12 +728,13 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                   </div>
                 </section>
 
+                {/* Submit row */}
                 <div className="flex flex-col gap-3 border-t border-white/5 pt-4 text-sm text-muted-foreground">
                   <p>You can edit or cancel the event later from your profile.</p>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                  <div className="flex items-center justify-end gap-4">
                     <button
                       type="button"
-                      className="text-sm font-semibold text-muted-foreground hover:text-primary"
+                      disabled={submitting}
                       onClick={() => {
                         setTitle('');
                         setDescription('');
@@ -503,7 +746,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                         setStatusMessage(null);
                         setSelectedCategory(null);
                       }}
-                      disabled={submitting}
+                      className="text-sm font-semibold text-muted-foreground hover:text-primary"
                     >
                       Reset form
                     </button>
@@ -522,6 +765,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
         </div>
       </div>
 
+      {/* Category drawer — used in mobile step 1 */}
       <Drawer
         isOpen={categoryDrawerOpen}
         onClose={() => setCategoryDrawerOpen(false)}
@@ -529,7 +773,7 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
         className="md:hidden"
       >
         <div className="grid grid-cols-2 gap-3">
-          {categories.map((category) => (
+          {categories.filter((c) => c.id !== 'other').map((category) => (
             <button
               key={category.id}
               type="button"
@@ -538,59 +782,41 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
                 setCategoryDrawerOpen(false);
               }}
               className={classNames(
-                "flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-xs font-semibold transition",
+                'flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-xs font-semibold transition',
                 selectedCategory === category.id
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border/60 bg-background/40 text-muted-foreground hover:text-foreground"
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
               )}
             >
               <category.icon className="h-5 w-5" />
               {category.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory('other');
+              setCategoryDrawerOpen(false);
+            }}
+            className={classNames(
+              'col-span-2 flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-semibold transition',
+              selectedCategory === 'other'
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Sparkles className="h-4 w-4" />
+            Other
+          </button>
         </div>
       </Drawer>
 
-      <MobileActionBar
-        active="create"
-        onNavigateDiscover={() => router.push('/')}
-        onNavigatePeople={() => router.push('/people')}
-        onCreate={() => router.push('/events/create')}
-        onOpenProfile={() => router.push('/profile')}
-      />
+      {/* MobileActionBar intentionally omitted — nav is hidden during create flow */}
     </div>
   );
 }
 
-function MobileCreateHero() {
-  return (
-    <div className="rounded-3xl border border-border/70 bg-card/50 px-5 py-4 text-foreground shadow-xl shadow-black/20 md:hidden">
-      <p className="text-xs font-semibold uppercase tracking-wide text-primary">Tonight</p>
-      <h1 className="mt-1 text-2xl font-serif font-semibold leading-tight">Create event</h1>
-      <p className="text-xs text-muted-foreground">Share what you’re up to tonight</p>
-    </div>
-  );
-}
-
-type SummaryItemProps = {
-  label: string;
-  value: string;
-};
-
-function SummaryItem({ label, value }: SummaryItemProps) {
-  return (
-    <div className="rounded-2xl border border-border/60 bg-background/30 px-4 py-3">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-sm font-semibold text-foreground">{value}</p>
-    </div>
-  );
-}
-
-type StatusBannerProps = {
-  intent: 'idle' | 'error' | 'success';
-  message: string;
-};
-
+type StatusBannerProps = { intent: 'idle' | 'error' | 'success'; message: string };
 function StatusBanner({ intent, message }: StatusBannerProps) {
   const isSuccess = intent === 'success';
   return (
@@ -608,12 +834,7 @@ function StatusBanner({ intent, message }: StatusBannerProps) {
   );
 }
 
-type FormFieldProps = {
-  label: string;
-  icon: LucideIcon;
-  children: ReactNode;
-};
-
+type FormFieldProps = { label: string; icon: LucideIcon; children: ReactNode };
 function FormField({ label, icon: Icon, children }: FormFieldProps) {
   return (
     <div className="space-y-2">
@@ -626,18 +847,10 @@ function FormField({ label, icon: Icon, children }: FormFieldProps) {
   );
 }
 
-type FieldErrorProps = {
-  message: string;
-};
-
-function FieldError({ message }: FieldErrorProps) {
+function FieldError({ message }: { message: string }) {
   return <p className="text-xs text-rose-300">{message}</p>;
 }
 
-type FieldMetaProps = {
-  children: ReactNode;
-};
-
-function FieldMeta({ children }: FieldMetaProps) {
+function FieldMeta({ children }: { children: ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>;
 }

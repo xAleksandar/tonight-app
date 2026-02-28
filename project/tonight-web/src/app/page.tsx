@@ -21,6 +21,7 @@ import { MobileActionBar, type MobileNavTarget } from "@/components/tonight/Mobi
 import { MiniMap } from "@/components/tonight/MiniMap";
 import { CATEGORY_DEFINITIONS, CATEGORY_ORDER, type CategoryId } from "@/lib/categories";
 import { classNames } from "@/lib/classNames";
+import { showSuccessToast } from "@/lib/toast";
 
 import EventMapView, { type MapPoint } from "@/components/EventMapView";
 import { AuthStatusMessage } from "@/components/auth/AuthStatusMessage";
@@ -327,6 +328,13 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
       fetchConversations();
     }
   }, [currentUser, fetchConversations]);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('tonight:event-created')) {
+      sessionStorage.removeItem('tonight:event-created');
+      showSuccessToast('Event published', 'Your meetup is now live in the feed.');
+    }
+  }, []);
 
   useEffect(() => {
     if (explicitViewParam === "map" || explicitViewParam === "list") {

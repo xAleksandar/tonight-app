@@ -90,6 +90,10 @@ body[data-safe-area="discover"]::before {
   height: 0;
 }
 
+body[data-safe-area="discover"] {
+  padding-top: 0;
+}
+
 .text-balance {
   text-wrap: balance;
 }

@@ -4,11 +4,12 @@ import {
   Coffee,
   Dumbbell,
   Music,
+  Sparkles,
   UtensilsCrossed,
   Waves,
 } from "lucide-react";
 
-export type CategoryId = "cinema" | "food" | "outdoor" | "music" | "fitness" | "social";
+export type CategoryId = "cinema" | "food" | "outdoor" | "music" | "fitness" | "social" | "other";
 
 export type CategoryDefinition = {
   id: CategoryId;
@@ -67,6 +68,14 @@ export const CATEGORY_DEFINITIONS: Record<CategoryId, CategoryDefinition> = {
     icon: Coffee,
     accent: "bg-orange-500/15 text-orange-200 border-orange-400/30",
     badge: "border border-orange-400/30 bg-orange-500/10 text-orange-100",
+  },
+  other: {
+    id: "other",
+    label: "Other",
+    keywords: ["other", "misc", "general"],
+    icon: Sparkles,
+    accent: "bg-border/20 text-muted-foreground border-border/50",
+    badge: "border border-border/50 bg-border/10 text-muted-foreground",
   },
 };
 
