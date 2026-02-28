@@ -293,9 +293,7 @@ export default function MapboxLocationPicker({
 
   const coordinateSummary = selected
     ? `${formatCoordinate(selected.lat)}, ${formatCoordinate(selected.lng)}`
-    : mapReady
-      ? "No location selected"
-      : "";
+    : "";
 
   const isDark = tone === 'dark';
   const headingTextClass = isDark ? "text-white" : "text-zinc-700";

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -18,6 +18,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Tonight",
   description: "Discover or host spontaneous meetups happening near you.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#30324b",
 };
 
 export default function RootLayout({
