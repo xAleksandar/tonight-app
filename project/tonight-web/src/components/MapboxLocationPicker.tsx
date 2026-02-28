@@ -41,6 +41,8 @@ export type MapboxLocationPickerProps = {
   mapboxLoader?: () => Promise<typeof mapboxgl>;
   /** Visual tone for helper text + borders */
   tone?: 'light' | 'dark';
+  /** Called with the reverse-geocoded place name after the user clicks the map */
+  onLocationName?: (name: string) => void;
 };
 
 const formatCoordinate = (value: number) => value.toFixed(5);
@@ -62,6 +64,7 @@ export default function MapboxLocationPicker({
   disabled = false,
   mapboxLoader = defaultMapboxLoader,
   tone = 'light',
+  onLocationName,
 }: MapboxLocationPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -75,9 +78,12 @@ export default function MapboxLocationPicker({
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
+  const onLocationNameRef = useRef(onLocationName);
+
   mapboxLoaderRef.current = mapboxLoader;
   disabledRef.current = disabled;
   onChangeRef.current = onChange;
+  onLocationNameRef.current = onLocationName;
 
   const instruction = useMemo(() => {
     if (disabled) {
@@ -140,7 +146,7 @@ export default function MapboxLocationPicker({
       return initialValue;
     });
 
-    placeMarker(initialValue, { flyTo: false });
+    placeMarker(initialValue, { flyTo: true });
   }, [initialValue?.lat, initialValue?.lng, mapReady, placeMarker]);
 
   useEffect(() => {
@@ -198,6 +204,17 @@ export default function MapboxLocationPicker({
           setSelected(coords);
           placeMarker(coords);
           onChangeRef.current?.(coords);
+
+          if (onLocationNameRef.current) {
+            const accessToken = getMapboxConfig().accessToken;
+            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${accessToken}&limit=1&language=en`)
+              .then(r => r.ok ? r.json() : null)
+              .then(data => {
+                const name = data?.features?.[0]?.place_name ?? '';
+                if (name) onLocationNameRef.current?.(name);
+              })
+              .catch(() => {});
+          }
         };
 
         map.on("click", handleClick);
@@ -291,14 +308,9 @@ export default function MapboxLocationPicker({
     return () => observer.disconnect();
   }, [mapReady]);
 
-  const coordinateSummary = selected
-    ? `${formatCoordinate(selected.lat)}, ${formatCoordinate(selected.lng)}`
-    : "";
-
   const isDark = tone === 'dark';
   const headingTextClass = isDark ? "text-white" : "text-zinc-700";
   const subheadingTextClass = isDark ? "text-white/70" : "text-zinc-500";
-  const summaryTextClass = isDark ? "text-white/60" : "text-zinc-500";
   const mapShellClass = isDark
     ? "w-full overflow-hidden rounded-xl border border-white/10 bg-black/30"
     : "w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50";
@@ -318,9 +330,6 @@ export default function MapboxLocationPicker({
             {instruction}
           </p>
         </div>
-        {coordinateSummary && (
-          <p className={`text-xs font-mono ${summaryTextClass}`}>{coordinateSummary}</p>
-        )}
       </div>
 
       <div className="relative">

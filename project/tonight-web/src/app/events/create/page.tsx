@@ -7,6 +7,7 @@ import { AlignLeft, ArrowLeft, ChevronRight, Clock, MapPin, Sparkles, Type, User
 import type { LucideIcon } from 'lucide-react';
 
 import MapboxLocationPicker, { type MapCoordinates } from '@/components/MapboxLocationPicker';
+import { getMapboxConfig } from '@/lib/mapbox';
 import { DesktopHeader } from '@/components/tonight/DesktopHeader';
 import { DesktopSidebar } from '@/components/tonight/DesktopSidebar';
 import { AuthStatusMessage } from '@/components/auth/AuthStatusMessage';
@@ -63,6 +64,7 @@ const formatReadableDatetime = (value: string) => {
 
 type FieldErrors = Partial<Record<'title' | 'description' | 'datetime' | 'location' | 'locationName' | 'maxParticipants', string>>;
 type ApiErrorPayload = { error?: string; errors?: FieldErrors };
+type LocationSuggestion = { id: string; name: string; fullName: string; coords: MapCoordinates };
 
 export default function CreateEventPage() {
   const { status: authStatus, user: authUser } = useRequireAuth();
@@ -91,8 +93,11 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
   const [submitting, setSubmitting] = useState(false);
   const [geolocating, setGeolocating] = useState(false);
   const [mobileStep, setMobileStep] = useState(1);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const mobileContentRef = useRef<HTMLDivElement>(null);
+  const suggestionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const friendlyDatetime = useMemo(() => formatReadableDatetime(datetimeInput), [datetimeInput]);
 
@@ -122,10 +127,19 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
     setGeolocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setLocation(coords);
         setStatusIntent('idle');
         setStatusMessage(null);
         setGeolocating(false);
+        const { accessToken } = getMapboxConfig();
+        fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${accessToken}&limit=1&language=en`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            const name = data?.features?.[0]?.place_name ?? '';
+            if (name) setLocationName(name);
+          })
+          .catch(() => {});
       },
       (error) => {
         console.error('Geolocation failed', error);
@@ -135,6 +149,55 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
+
+  // Cleanup debounce on unmount
+  useEffect(() => () => { if (suggestionDebounceRef.current) clearTimeout(suggestionDebounceRef.current); }, []);
+
+  const fetchLocationSuggestions = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const { accessToken } = getMapboxConfig();
+      const proximity = mapCenter ?? location;
+      const proximityParam = proximity ? `&proximity=${proximity.lng},${proximity.lat}` : '';
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${accessToken}&autocomplete=true&limit=5&language=en${proximityParam}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      const items: LocationSuggestion[] = (data.features ?? []).map((f: { id: string; text: string; place_name: string; center: [number, number] }) => ({
+        id: f.id,
+        name: f.text,
+        fullName: f.place_name,
+        coords: { lng: f.center[0], lat: f.center[1] },
+      }));
+      setSuggestions(items);
+    } catch {
+      // Swallow errors — autocomplete is best-effort
+    }
+  }, [mapCenter, location]);
+
+  const handleLocationNameChange = (value: string) => {
+    setLocationName(value);
+    if (value.trim().length < 2) {
+      setShowSuggestions(false);
+      setSuggestions([]);
+      return;
+    }
+    setShowSuggestions(true);
+    if (suggestionDebounceRef.current) clearTimeout(suggestionDebounceRef.current);
+    suggestionDebounceRef.current = setTimeout(() => {
+      fetchLocationSuggestions(value);
+    }, 300);
+  };
+
+  const handleSuggestionSelect = (suggestion: LocationSuggestion) => {
+    setLocationName(suggestion.fullName);
+    setLocation(suggestion.coords);
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   const handleParticipantChange = (delta: number) => {
     setMaxParticipants((prev) => {
@@ -445,54 +508,81 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
             {mobileStep === 3 && (
               <div className="space-y-5">
                 <section className="rounded-3xl border border-border/60 bg-card/40 p-4 shadow-xl shadow-black/25">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
-                      <p className="text-xs text-muted-foreground/80">Drop the meetup pin and name the spot.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleGeolocate}
-                      disabled={geolocating}
-                      className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {geolocating ? 'Locating…' : 'Use my location'}
-                    </button>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
+                    <p className="text-xs text-muted-foreground/80">Search by name or tap the map to drop a pin.</p>
                   </div>
 
-                  <div className="mt-4 space-y-4">
+                  <div className="mt-4 space-y-3">
                     <MapboxLocationPicker
                       label="Event location"
                       initialValue={location}
                       initialCenter={mapCenter}
                       onChange={setLocation}
+                      onLocationName={(name) => {
+                        setLocationName(name);
+                        setSuggestions([]);
+                        setShowSuggestions(false);
+                      }}
                       tone="dark"
                       className="rounded-2xl border border-border/40 bg-card/30 p-3"
                     />
                     {fieldErrors.location && <FieldError message={fieldErrors.location} />}
 
                     <div className="space-y-2">
-                      <label
-                        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                        htmlFor="event-location-name"
-                      >
-                        <MapPin className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        Location name
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label
+                          className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                          htmlFor="event-location-name"
+                        >
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground/70" />
+                          Location name
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleGeolocate}
+                          disabled={geolocating}
+                          className="text-xs font-semibold text-primary transition hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {geolocating ? 'Locating…' : 'Use my location'}
+                        </button>
+                      </div>
                       <input
                         id="event-location-name"
                         type="text"
                         value={locationName}
-                        onChange={(e) => setLocationName(e.target.value)}
-                        placeholder="Cinema City, Downtown"
+                        onChange={(e) => handleLocationNameChange(e.target.value)}
+                        onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                        onBlur={() => setShowSuggestions(false)}
+                        placeholder="Search or type a place name…"
                         className={classNames(INPUT_BASE_CLASS, fieldErrors.locationName && errorBorderClass)}
                         maxLength={LOCATION_NAME_LIMITS.max}
+                        autoComplete="off"
                       />
                       <FieldMeta>
-                        Visible to attendees. {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
+                        {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
                       </FieldMeta>
                       {fieldErrors.locationName && <FieldError message={fieldErrors.locationName} />}
                     </div>
+
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div className="rounded-2xl border border-border/60 bg-card shadow-xl overflow-hidden">
+                        {suggestions.map((s) => {
+                          const ctx = s.fullName.startsWith(s.name + ', ') ? s.fullName.slice(s.name.length + 2) : '';
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); handleSuggestionSelect(s); }}
+                              className="flex w-full flex-col gap-0.5 border-b border-border/40 px-4 py-3 text-left last:border-0 hover:bg-card/80 transition-colors"
+                            >
+                              <span className="text-sm font-medium text-foreground">{s.name}</span>
+                              {ctx && <span className="text-xs text-muted-foreground line-clamp-1">{ctx}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -676,55 +766,82 @@ function AuthenticatedCreateEventPage({ currentUser }: { currentUser: AuthUser |
 
                 {/* Location */}
                 <section className="rounded-3xl border border-border/60 bg-card/40 p-5 shadow-xl shadow-black/25">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
-                      <p className="text-xs text-muted-foreground/80">Drop the meetup pin and name the spot.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleGeolocate}
-                      disabled={geolocating}
-                      className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {geolocating ? 'Locating…' : 'Use my location'}
-                    </button>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
+                    <p className="text-xs text-muted-foreground/80">Search by name or tap the map to drop a pin.</p>
                   </div>
 
-                  <div className="mt-4 space-y-4">
+                  <div className="mt-4 space-y-3">
                     <MapboxLocationPicker
                       label="Event location"
                       initialValue={location}
                       initialCenter={mapCenter}
                       onChange={setLocation}
+                      onLocationName={(name) => {
+                        setLocationName(name);
+                        setSuggestions([]);
+                        setShowSuggestions(false);
+                      }}
                       tone="dark"
                       className="rounded-2xl border border-border/40 bg-card/30 p-3"
                     />
                     {fieldErrors.location && <FieldError message={fieldErrors.location} />}
 
                     <div className="space-y-2">
-                      <label
-                        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                        htmlFor="event-location-name-desktop"
-                      >
-                        <MapPin className="h-3.5 w-3.5 text-muted-foreground/70" />
-                        Location name
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label
+                          className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                          htmlFor="event-location-name-desktop"
+                        >
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground/70" />
+                          Location name
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleGeolocate}
+                          disabled={geolocating}
+                          className="text-xs font-semibold text-primary transition hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {geolocating ? 'Locating…' : 'Use my location'}
+                        </button>
+                      </div>
                       <input
                         id="event-location-name-desktop"
                         type="text"
                         value={locationName}
-                        onChange={(e) => setLocationName(e.target.value)}
-                        placeholder="Cinema City, Downtown"
+                        onChange={(e) => handleLocationNameChange(e.target.value)}
+                        onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                        onBlur={() => setShowSuggestions(false)}
+                        placeholder="Search or type a place name…"
                         className={classNames(INPUT_BASE_CLASS, fieldErrors.locationName && errorBorderClass)}
                         maxLength={LOCATION_NAME_LIMITS.max}
+                        autoComplete="off"
                         required
                       />
                       <FieldMeta>
-                        Visible to attendees. {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
+                        {locationName.trim().length}/{LOCATION_NAME_LIMITS.max} characters
                       </FieldMeta>
                       {fieldErrors.locationName && <FieldError message={fieldErrors.locationName} />}
                     </div>
+
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div className="rounded-2xl border border-border/60 bg-card shadow-xl overflow-hidden">
+                        {suggestions.map((s) => {
+                          const ctx = s.fullName.startsWith(s.name + ', ') ? s.fullName.slice(s.name.length + 2) : '';
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); handleSuggestionSelect(s); }}
+                              className="flex w-full flex-col gap-0.5 border-b border-border/40 px-4 py-3 text-left last:border-0 hover:bg-card/80 transition-colors"
+                            >
+                              <span className="text-sm font-medium text-foreground">{s.name}</span>
+                              {ctx && <span className="text-xs text-muted-foreground line-clamp-1">{ctx}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </section>
 
