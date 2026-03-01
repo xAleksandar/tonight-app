@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ToastPresenter } from "@/components/tonight/ToastPresenter";
 import { SafeAreaTint } from "@/components/tonight/SafeAreaTint";
+import { PersistentMobileNav } from "@/components/tonight/PersistentMobileNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
         <AuthProvider>
           <SafeAreaTint />
           {children}
+          <PersistentMobileNav />
         </AuthProvider>
         <ToastPresenter />
       </body>

@@ -843,15 +843,6 @@ function AuthenticatedHomePage({ currentUser }: { currentUser: AuthUser | null }
         </div>
       </div>
 
-      <MobileActionBar
-        active={derivedPrimarySection}
-        onNavigateDiscover={handleNavigateDiscover}
-        onNavigatePeople={handleNavigatePeople}
-        onNavigateMessages={handleNavigateMessages}
-        onCreate={handleCreate}
-        onOpenProfile={() => router.push("/profile")}
-        messagesUnreadCount={unreadMessageCount}
-      />
 
       {rangeSheetOpen && (
         <RangeSheet

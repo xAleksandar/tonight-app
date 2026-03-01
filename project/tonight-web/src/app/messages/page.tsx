@@ -139,15 +139,6 @@ function AuthenticatedMessagesPage({ currentUser }: { currentUser: AuthUser | nu
         </div>
       </div>
 
-      <MobileActionBar
-        active="messages"
-        onNavigateDiscover={() => router.push("/")}
-        onNavigatePeople={() => router.push("/people")}
-        onNavigateMessages={() => router.push("/messages")}
-        onCreate={() => router.push("/events/create")}
-        onOpenProfile={() => router.push("/profile")}
-        messagesUnreadCount={unreadMessageCount}
-      />
     </div>
   );
 }

@@ -331,15 +331,6 @@ function AuthenticatedPeoplePage({ currentUser }: { currentUser: AuthUser | null
         </div>
       </div>
 
-      <MobileActionBar
-        active={activePrimarySection === "messages" ? "messages" : activePrimarySection}
-        onNavigateDiscover={handleDiscover}
-        onNavigatePeople={handlePeopleNav}
-        onNavigateMessages={handleToggleMessages}
-        onCreate={handleCreate}
-        onOpenProfile={() => router.push("/profile")}
-        messagesUnreadCount={unreadMessageCount}
-      />
 
       {rangeSheetOpen ? (
         <PeopleRangeSheet

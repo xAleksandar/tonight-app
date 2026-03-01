@@ -60,6 +60,7 @@ export type MobileActionBarProps = {
   onJumpToDrafts?: () => void;
   draftQuickPickEntries?: DraftQuickPickEntry[] | null;
   onClearDraft?: (conversationId: string) => void;
+  className?: string;
 };
 
 type NavItem = {
@@ -98,6 +99,7 @@ export function MobileActionBar({
   onJumpToDrafts,
   draftQuickPickEntries,
   onClearDraft,
+  className,
 }: MobileActionBarProps) {
   const navItems: NavItem[] = [
     { id: "discover" as const, label: "Discover", icon: Compass, onPress: onNavigateDiscover },
@@ -208,7 +210,7 @@ export function MobileActionBar({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/55 pb-[env(safe-area-inset-bottom)] text-foreground shadow-[0_-18px_45px_rgba(2,6,23,0.7)] backdrop-blur-lg md:hidden"
+      className={classNames("fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/55 pb-[env(safe-area-inset-bottom)] text-foreground shadow-[0_-18px_45px_rgba(2,6,23,0.7)] backdrop-blur-lg md:hidden", className)}
       role="navigation"
       aria-label="Primary navigation"
     >

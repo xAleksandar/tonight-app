@@ -701,14 +701,6 @@ function AuthenticatedProfilePage({ currentUserId, currentUser }: AuthenticatedP
         </div>
       </div>
 
-      <MobileActionBar
-        active="profile"
-        onNavigateDiscover={() => router.push('/')}
-        onNavigatePeople={() => router.push('/people')}
-        onNavigateMessages={() => router.push('/messages')}
-        onCreate={() => router.push('/events/create')}
-        onOpenProfile={() => router.push('/profile')}
-      />
 
       {profile ? (
         <ReportModal

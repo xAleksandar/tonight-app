@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { DesktopSidebar } from "@/components/tonight/DesktopSidebar";
 import { DesktopHeader } from "@/components/tonight/DesktopHeader";
-import { MobileActionBar, type MobileActionBarProps } from "@/components/tonight/MobileActionBar";
+import { type MobileActionBarProps } from "@/components/tonight/MobileActionBar";
 import { EventChatAttentionToast } from "@/components/tonight/EventChatAttentionToast";
 import type { EventChatAttentionPayload } from "@/components/tonight/event-inside/EventInsideExperience";
 import type { CategoryId } from "@/lib/categories";
@@ -64,6 +65,24 @@ export function EventLayout({
         />
 
         <div className="flex flex-1 flex-col">
+          {/* Mobile header — back arrow + event title */}
+          <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-border/60 bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-lg md:hidden">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Back"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card/60 text-muted-foreground transition hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <p className="truncate text-base font-semibold text-foreground">{eventTitle}</p>
+              {eventLocation && (
+                <p className="truncate text-xs text-muted-foreground">{eventLocation}</p>
+              )}
+            </div>
+          </div>
+
           <DesktopHeader
             title={eventTitle}
             subtitle={eventLocation}
@@ -82,7 +101,7 @@ export function EventLayout({
             onChatAttentionResume={onChatAttentionResume}
           />
 
-          <main className="flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-10 md:pb-12 md:pt-8">
+          <main className="flex-1 overflow-y-auto px-4 pb-8 pt-4 md:px-10 md:pb-12 md:pt-8">
             <div className="mx-auto w-full max-w-[1344px]">
               {children}
             </div>
@@ -110,22 +129,6 @@ export function EventLayout({
         />
       ) : null}
 
-      <MobileActionBar
-        active={null}
-        onNavigateDiscover={() => router.push('/')}
-        onNavigatePeople={() => router.push('/people')}
-        onNavigateMessages={() => router.push('/messages')}
-        onCreate={() => router.push('/events/create')}
-        onOpenProfile={() => router.push('/profile')}
-        chatAction={chatAction}
-        chatAttentionQueue={chatAttentionQueue}
-        chatAttentionSnoozedUntil={chatAttentionSnoozedUntil}
-        chatAttentionPreferredSnoozeMinutes={chatAttentionPreferredSnoozeMinutes}
-        onChatAttentionEntryHandled={onChatAttentionEntryHandled}
-        onChatAttentionClearAll={onChatAttentionClearAll}
-        onChatAttentionSnooze={onChatAttentionSnooze}
-        onChatAttentionResume={onChatAttentionResume}
-      />
     </div>
   );
 }
